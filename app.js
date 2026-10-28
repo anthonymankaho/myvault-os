@@ -1184,7 +1184,7 @@ function applySidebarState() {
   const collapsed = localStorage.getItem(SIDEBAR_KEY) === "1";
   document.body.classList.toggle("sidebar-collapsed", collapsed);
   if (sidebarCollapseButton) {
-    sidebarCollapseButton.textContent = collapsed ? "⇥" : "⇤ Collapse";
+    sidebarCollapseButton.textContent = collapsed ? ">" : "< Collapse";
   }
   return collapsed;
 }
@@ -1192,7 +1192,7 @@ applySidebarState();
 sidebarCollapseButton?.addEventListener("click", () => {
   const collapsed = document.body.classList.toggle("sidebar-collapsed");
   localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
-  sidebarCollapseButton.textContent = collapsed ? "⇥" : "⇤ Collapse";
+  sidebarCollapseButton.textContent = collapsed ? ">" : "< Collapse";
   window.dispatchEvent(new Event("resize"));
 });
 
