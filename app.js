@@ -72,6 +72,7 @@ const VIEWS = {
   ...Object.fromEntries(
     Object.entries(COLLECTIONS).map(([key, config]) => [key, { title: config.title }])
   ),
+  constellation: { title: "Constellation" },
   build: { title: "Build/Repair" }
 };
 
@@ -350,6 +351,11 @@ function startVoiceInput() {
 }
 
 function render() {
+  if (constellationCleanup) {
+    constellationCleanup();
+    constellationCleanup = null;
+  }
+
   if (!state.vault) {
     viewContainer.innerHTML = "";
     return;
@@ -358,6 +364,9 @@ function render() {
   switch (state.view) {
     case "home":
       renderHome();
+      break;
+    case "constellation":
+      renderConstellation();
       break;
     case "build":
       renderBuild();
@@ -714,6 +723,267 @@ function renderBuild() {
     }
     loadVault();
   });
+}
+
+let constellationCleanup = null;
+
+function normalizeTags(value) {
+  const list = Array.isArray(value)
+    ? value
+    : String(value ?? "")
+        .split(",")
+        .map((tag) => tag.trim());
+  return list.filter(Boolean).map((tag) => String(tag).toLowerCase());
+}
+
+async function renderConstellation() {
+  const token = {};
+  constellationCleanup = () => {
+    token.cancelled = true;
+  };
+
+  viewContainer.innerHTML = `
+    <section class="panel constellation-panel" aria-labelledby="constellation-heading">
+      <div class="panel-heading">
+        <h2 id="constellation-heading">Skills × Projects in space</h2>
+      </div>
+      <div id="constellation-canvas" class="constellation-canvas" role="img"
+        aria-label="3D constellation graph of skills and projects"></div>
+      <p class="diagnostics" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
+    </section>`;
+
+  const container = viewContainer.querySelector("#constellation-canvas");
+  const stats = viewContainer.querySelector("#constellation-stats");
+
+  let THREE;
+  let OrbitControls;
+  try {
+    THREE = await import("three");
+    ({ OrbitControls } = await import("three/addons/controls/OrbitControls.js"));
+  } catch {
+    stats.dataset.kind = "error";
+    stats.textContent = "The 3D engine could not be loaded. Check your internet connection, then switch views and back to retry.";
+    return;
+  }
+  if (token.cancelled) {
+    return;
+  }
+
+  const KIND_COLOR = { skill: "#7ee0ff", project: "#ffb86b" };
+  const nodes = [
+    ...state.vault.skills.map((item) => ({ item, kind: "skill" })),
+    ...state.vault.projects.map((item) => ({ item, kind: "project" }))
+  ].map((node) => ({
+    ...node,
+    label: itemTitle(node.item),
+    tags: normalizeTags(node.item.tags)
+  }));
+
+  const edgeKeys = new Set();
+  const edges = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const shared = nodes[i].tags.filter((tag) => nodes[j].tags.includes(tag));
+      if (shared.length) {
+        edges.push([i, j]);
+        edgeKeys.add(`${i}-${j}`);
+      }
+    }
+  }
+
+  // Layout: golden-spiral seed, then simple repulsion + spring relaxation.
+  const count = nodes.length;
+  const positions = new Float32Array(count * 3);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i / Math.max(1, count - 1)) * 2;
+    const radius = Math.sqrt(1 - y * y);
+    const theta = golden * i;
+    positions[i * 3] = Math.cos(theta) * radius * 16;
+    positions[i * 3 + 1] = y * 16;
+    positions[i * 3 + 2] = Math.sin(theta) * radius * 16;
+  }
+  for (let iter = 0; iter < 220; iter++) {
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        let dx = positions[i * 3] - positions[j * 3];
+        let dy = positions[i * 3 + 1] - positions[j * 3 + 1];
+        let dz = positions[i * 3 + 2] - positions[j * 3 + 2];
+        let dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
+        const push = 26 / (dist * dist);
+        dx /= dist;
+        dy /= dist;
+        dz /= dist;
+        positions[i * 3] += dx * push;
+        positions[i * 3 + 1] += dy * push;
+        positions[i * 3 + 2] += dz * push;
+        positions[j * 3] -= dx * push;
+        positions[j * 3 + 1] -= dy * push;
+        positions[j * 3 + 2] -= dz * push;
+      }
+    }
+    for (const [a, b] of edges) {
+      for (let axis = 0; axis < 3; axis++) {
+        const diff = positions[b * 3 + axis] - positions[a * 3 + axis];
+        const pull = diff * 0.018;
+        positions[a * 3 + axis] += pull;
+        positions[b * 3 + axis] -= pull;
+      }
+    }
+  }
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 600);
+  camera.position.set(0, 8, 52);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.7;
+
+  const glowTexture = (() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.35, "rgba(255,255,255,0.7)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(canvas);
+  })();
+
+  const pointGeometry = new THREE.BufferGeometry();
+  pointGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  pointGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(
+      new Float32Array(
+        nodes.flatMap((node) => new THREE.Color(KIND_COLOR[node.kind]).toArray())
+      ),
+      3
+    )
+  );
+  const points = new THREE.Points(
+    pointGeometry,
+    new THREE.PointsMaterial({
+      size: 2.4,
+      map: glowTexture,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  scene.add(points);
+
+  const linePositions = new Float32Array(edges.length * 6);
+  edges.forEach(([a, b], index) => {
+    linePositions.set(positions.slice(a * 3, a * 3 + 3), index * 6);
+    linePositions.set(positions.slice(b * 3, b * 3 + 3), index * 6 + 3);
+  });
+  const lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
+  scene.add(
+    new THREE.LineSegments(
+      lineGeometry,
+      new THREE.LineBasicMaterial({
+        color: 0x6ea8ff,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending
+      })
+    )
+  );
+
+  const labelSprites = nodes.map((node) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext("2d");
+    ctx.font = "500 34px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = KIND_COLOR[node.kind];
+    ctx.shadowColor = "rgba(0,0,0,0.9)";
+    ctx.shadowBlur = 10;
+    ctx.fillText(node.label.slice(0, 34), 256, 58);
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false })
+    );
+    sprite.scale.set(11, 2.1, 1);
+    sprite.position.set(
+      positions[nodes.indexOf(node) * 3],
+      positions[nodes.indexOf(node) * 3 + 1] + 1.8,
+      positions[nodes.indexOf(node) * 3 + 2]
+    );
+    scene.add(sprite);
+    return sprite;
+  });
+
+  function resize() {
+    const width = container.clientWidth || 600;
+    const height = Math.max(320, Math.min(560, window.innerHeight * 0.55));
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.params.Points = { threshold: 1.6 };
+  const pointer = new THREE.Vector2(-10, -10);
+  renderer.domElement.addEventListener("pointermove", (event) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  });
+
+  stats.dataset.kind = "ok";
+  stats.textContent =
+    `${nodes.filter((n) => n.kind === "skill").length} skills · ` +
+    `${nodes.filter((n) => n.kind === "project").length} projects · ` +
+    `${edges.length} tag links — drag to orbit, scroll to zoom, hover a star for details.`;
+
+  let frame = 0;
+  function animate() {
+    if (token.cancelled) {
+      return;
+    }
+    frame = requestAnimationFrame(animate);
+    controls.update();
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObject(points)[0];
+    if (hit) {
+      const node = nodes[hit.index];
+      const shared = edges
+        .filter(([a, b]) => a === hit.index || b === hit.index)
+        .length;
+      stats.textContent = `✦ ${node.label} (${node.kind}) — ${node.tags.length} tags · ${shared} links`;
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  constellationCleanup = () => {
+    token.cancelled = true;
+    cancelAnimationFrame(frame);
+    window.removeEventListener("resize", resize);
+    controls.dispose();
+    pointGeometry.dispose();
+    lineGeometry.dispose();
+    labelSprites.forEach((sprite) => {
+      sprite.material.map.dispose();
+      sprite.material.dispose();
+    });
+    renderer.dispose();
+    renderer.domElement.remove();
+  };
 }
 
 document.querySelectorAll(".nav-link").forEach((link) => {
