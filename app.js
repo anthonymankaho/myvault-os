@@ -745,10 +745,13 @@ async function renderConstellation() {
   viewContainer.innerHTML = `
     <section class="panel constellation-panel" aria-labelledby="constellation-heading">
       <div class="panel-heading">
-        <h2 id="constellation-heading">Skills × Projects in space</h2>
+        <h2 id="constellation-heading">Constellation Finder</h2>
+        <div class="actions">
+          <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
+        </div>
       </div>
       <div id="constellation-canvas" class="constellation-canvas" role="img"
-        aria-label="3D constellation graph of skills and projects"></div>
+        aria-label="Star chart of skills and projects"></div>
       <p class="diagnostics" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
     </section>`;
 
@@ -769,7 +772,7 @@ async function renderConstellation() {
     return;
   }
 
-  const KIND_COLOR = { skill: "#7ee0ff", project: "#ffb86b" };
+  const KIND_COLOR = { skill: "#cfe8ff", project: "#ffe3b3" };
   const nodes = [
     ...state.vault.skills.map((item) => ({ item, kind: "skill" })),
     ...state.vault.projects.map((item) => ({ item, kind: "project" }))
@@ -779,14 +782,11 @@ async function renderConstellation() {
     tags: normalizeTags(node.item.tags)
   }));
 
-  const edgeKeys = new Set();
   const edges = [];
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      const shared = nodes[i].tags.filter((tag) => nodes[j].tags.includes(tag));
-      if (shared.length) {
+      if (nodes[i].tags.some((tag) => nodes[j].tags.includes(tag))) {
         edges.push([i, j]);
-        edgeKeys.add(`${i}-${j}`);
       }
     }
   }
@@ -809,7 +809,7 @@ async function renderConstellation() {
         let dx = positions[i * 3] - positions[j * 3];
         let dy = positions[i * 3 + 1] - positions[j * 3 + 1];
         let dz = positions[i * 3 + 2] - positions[j * 3 + 2];
-        let dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
         const push = 26 / (dist * dist);
         dx /= dist;
         dy /= dist;
@@ -837,51 +837,112 @@ async function renderConstellation() {
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 600);
-  camera.position.set(0, 8, 52);
+  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 600);
+  camera.position.set(0, 6, 56);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.7;
+  controls.autoRotateSpeed = 0.35;
 
+  // Star textures: soft glow for named stars, tiny dot for background sky.
   const glowTexture = (() => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 64;
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
     gradient.addColorStop(0, "rgba(255,255,255,1)");
-    gradient.addColorStop(0.35, "rgba(255,255,255,0.7)");
+    gradient.addColorStop(0.3, "rgba(255,255,255,0.85)");
+    gradient.addColorStop(0.6, "rgba(255,255,255,0.25)");
     gradient.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 64, 64);
     return new THREE.CanvasTexture(canvas);
   })();
+  const dotTexture = (() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 32;
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, "rgba(255,255,255,0.9)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 32, 32);
+    return new THREE.CanvasTexture(canvas);
+  })();
 
-  const pointGeometry = new THREE.BufferGeometry();
-  pointGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  pointGeometry.setAttribute(
-    "color",
-    new THREE.BufferAttribute(
-      new Float32Array(
-        nodes.flatMap((node) => new THREE.Color(KIND_COLOR[node.kind]).toArray())
-      ),
-      3
-    )
-  );
-  const points = new THREE.Points(
-    pointGeometry,
-    new THREE.PointsMaterial({
-      size: 2.4,
-      map: glowTexture,
-      vertexColors: true,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
-    })
-  );
-  scene.add(points);
+  // Background sky: ~350 faint anonymous stars on a larger sphere.
+  {
+    const skyCount = 350;
+    const skyPositions = new Float32Array(skyCount * 3);
+    const sky = new THREE.Spherical(30 + Math.random() * 6, 0, 0);
+    for (let i = 0; i < skyCount; i++) {
+      sky.phi = Math.acos(2 * Math.random() - 1);
+      sky.theta = Math.random() * Math.PI * 2;
+      const v = new THREE.Vector3().setFromSpherical(sky);
+      skyPositions[i * 3] = v.x;
+      skyPositions[i * 3 + 1] = v.y;
+      skyPositions[i * 3 + 2] = v.z;
+    }
+    const skyGeometry = new THREE.BufferGeometry();
+    skyGeometry.setAttribute("position", new THREE.BufferAttribute(skyPositions, 3));
+    scene.add(
+      new THREE.Points(
+        skyGeometry,
+        new THREE.PointsMaterial({
+          size: 0.55,
+          map: dotTexture,
+          color: 0x93a7c9,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+      )
+    );
+  }
 
+  // Named stars, bucketed into three magnitudes by tag count.
+  const magnitudeOf = (node) => {
+    if (node.tags.length >= 3) return 0;
+    if (node.tags.length >= 1) return 1;
+    return 2;
+  };
+  const magnitudeSize = [3.4, 2.3, 1.5];
+  const pointLayers = [];
+  const pointGeometries = [];
+  for (let mag = 0; mag < 3; mag++) {
+    const indexes = nodes
+      .map((node, index) => (magnitudeOf(node) === mag ? index : -1))
+      .filter((index) => index >= 0);
+    if (!indexes.length) continue;
+    const layerPositions = new Float32Array(indexes.length * 3);
+    const layerColors = new Float32Array(indexes.length * 3);
+    indexes.forEach((nodeIndex, slot) => {
+      layerPositions.set(positions.slice(nodeIndex * 3, nodeIndex * 3 + 3), slot * 3);
+      layerColors.set(new THREE.Color(KIND_COLOR[nodes[nodeIndex].kind]).toArray(), slot * 3);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(layerPositions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(layerColors, 3));
+    geometry.userData.nodeIndexes = indexes;
+    pointGeometries.push(geometry);
+    const points = new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({
+        size: magnitudeSize[mag],
+        map: glowTexture,
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    scene.add(points);
+    pointLayers.push(points);
+  }
+
+  // Constellation lines.
   const linePositions = new Float32Array(edges.length * 6);
   edges.forEach(([a, b], index) => {
     linePositions.set(positions.slice(a * 3, a * 3 + 3), index * 6);
@@ -893,41 +954,101 @@ async function renderConstellation() {
     new THREE.LineSegments(
       lineGeometry,
       new THREE.LineBasicMaterial({
-        color: 0x6ea8ff,
+        color: 0x9db9e8,
         transparent: true,
-        opacity: 0.22,
-        blending: THREE.AdditiveBlending
+        opacity: 0.32
       })
     )
   );
 
-  const labelSprites = nodes.map((node) => {
+  // Celestial graticule: meridian + parallel rings, like a real star chart.
+  const gridMaterial = new THREE.LineBasicMaterial({
+    color: 0x4a6491,
+    transparent: true,
+    opacity: 0.16
+  });
+  const gridGeometries = [];
+  {
+    const ringRadius = 22;
+    const makeRing = (plane) => {
+      const segments = 96;
+      const ring = new Float32Array(segments * 3);
+      for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const [x, y, z] =
+          plane === "xy"
+            ? [Math.cos(angle) * ringRadius, Math.sin(angle) * ringRadius, 0]
+            : plane === "xz"
+              ? [Math.cos(angle) * ringRadius, 0, Math.sin(angle) * ringRadius]
+              : [0, Math.cos(angle) * ringRadius, Math.sin(angle) * ringRadius];
+        ring[i * 3] = x;
+        ring[i * 3 + 1] = y;
+        ring[i * 3 + 2] = z;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(ring, 3));
+      return geometry;
+    };
+    // Equator + tropics-style parallels.
+    for (const plane of ["xz", "tilt1", "tilt2", "xy"]) {
+      const geometry = makeRing(plane === "xy" ? "xy" : "xz");
+      if (plane === "tilt1") geometry.rotateX(Math.PI / 3);
+      if (plane === "tilt2") geometry.rotateX(-Math.PI / 3);
+      if (plane === "xy") geometry.rotateY(Math.PI / 2.6);
+      gridGeometries.push(geometry);
+      scene.add(new THREE.LineLoop(geometry, gridMaterial));
+    }
+    // Meridians.
+    for (let m = 0; m < 4; m++) {
+      const geometry = makeRing("xy");
+      geometry.rotateY((m / 4) * Math.PI);
+      gridGeometries.push(geometry);
+      scene.add(new THREE.LineLoop(geometry, gridMaterial));
+    }
+  }
+
+  // Name labels beside stars, toggleable like a planetarium.
+  const labelSprites = nodes.map((node, nodeIndex) => {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
-    canvas.height = 96;
+    canvas.height = 72;
     const ctx = canvas.getContext("2d");
-    ctx.font = "500 34px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillStyle = KIND_COLOR[node.kind];
-    ctx.shadowColor = "rgba(0,0,0,0.9)";
-    ctx.shadowBlur = 10;
-    ctx.fillText(node.label.slice(0, 34), 256, 58);
+    ctx.font = "400 30px Georgia, 'Times New Roman', serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = node.kind === "skill" ? "#9fc6ee" : "#e8c795";
+    ctx.shadowColor = "rgba(2,6,18,0.95)";
+    ctx.shadowBlur = 8;
+    ctx.fillText(node.label.slice(0, 30), 8, 46);
     const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false })
+      new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        transparent: true,
+        opacity: 0.92,
+        depthTest: false
+      })
     );
-    sprite.scale.set(11, 2.1, 1);
+    sprite.scale.set(9.5, 1.35, 1);
     sprite.position.set(
-      positions[nodes.indexOf(node) * 3],
-      positions[nodes.indexOf(node) * 3 + 1] + 1.8,
-      positions[nodes.indexOf(node) * 3 + 2]
+      positions[nodeIndex * 3] + 1.6,
+      positions[nodeIndex * 3 + 1] + 1.1,
+      positions[nodeIndex * 3 + 2]
     );
     scene.add(sprite);
     return sprite;
   });
+  let namesVisible = true;
+  viewContainer.querySelector("#constellation-names").addEventListener("click", (event) => {
+    namesVisible = !namesVisible;
+    labelSprites.forEach((sprite) => {
+      sprite.visible = namesVisible;
+    });
+    event.currentTarget.textContent = namesVisible ? "Hide names" : "Show names";
+    event.currentTarget.setAttribute("aria-pressed", String(namesVisible));
+  });
 
   function resize() {
     const width = container.clientWidth || 600;
-    const height = Math.max(320, Math.min(560, window.innerHeight * 0.55));
+    const height = Math.max(340, Math.min(600, window.innerHeight * 0.6));
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -936,7 +1057,7 @@ async function renderConstellation() {
   window.addEventListener("resize", resize);
 
   const raycaster = new THREE.Raycaster();
-  raycaster.params.Points = { threshold: 1.6 };
+  raycaster.params.Points = { threshold: 1.5 };
   const pointer = new THREE.Vector2(-10, -10);
   renderer.domElement.addEventListener("pointermove", (event) => {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -948,7 +1069,7 @@ async function renderConstellation() {
   stats.textContent =
     `${nodes.filter((n) => n.kind === "skill").length} skills · ` +
     `${nodes.filter((n) => n.kind === "project").length} projects · ` +
-    `${edges.length} tag links — drag to orbit, scroll to zoom, hover a star for details.`;
+    `${edges.length} constellation lines — drag to orbit, scroll to zoom, hover a star.`;
 
   let frame = 0;
   function animate() {
@@ -958,13 +1079,15 @@ async function renderConstellation() {
     frame = requestAnimationFrame(animate);
     controls.update();
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObject(points)[0];
-    if (hit) {
-      const node = nodes[hit.index];
-      const shared = edges
-        .filter(([a, b]) => a === hit.index || b === hit.index)
-        .length;
-      stats.textContent = `✦ ${node.label} (${node.kind}) — ${node.tags.length} tags · ${shared} links`;
+    for (const layer of pointLayers) {
+      const hit = raycaster.intersectObject(layer)[0];
+      if (hit) {
+        const nodeIndex = layer.geometry.userData.nodeIndexes[hit.index];
+        const node = nodes[nodeIndex];
+        const shared = edges.filter(([a, b]) => a === nodeIndex || b === nodeIndex).length;
+        stats.textContent = `✦ ${node.label} (${node.kind}) — ${node.tags.length} tags · ${shared} lines`;
+        break;
+      }
     }
     renderer.render(scene, camera);
   }
@@ -975,8 +1098,10 @@ async function renderConstellation() {
     cancelAnimationFrame(frame);
     window.removeEventListener("resize", resize);
     controls.dispose();
-    pointGeometry.dispose();
+    pointGeometries.forEach((geometry) => geometry.dispose());
     lineGeometry.dispose();
+    gridGeometries.forEach((geometry) => geometry.dispose());
+    gridMaterial.dispose();
     labelSprites.forEach((sprite) => {
       sprite.material.map.dispose();
       sprite.material.dispose();
