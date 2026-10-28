@@ -1,627 +1,152 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0d1117">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="MyVault OS">
-    <title>MyVault OS</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon-180.png" type="image/png">
-    <link rel="apple-touch-icon" href="icon-180.png">
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0d1117;
-        color: #e6edf3;
-        font-synthesis: none;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-width: 320px;
-        min-height: 100vh;
-      }
-
-      button,
-      textarea,
-      input,
-      select {
-        font: inherit;
-      }
-
-      button {
-        cursor: pointer;
-      }
-
-      .app-shell {
-        display: grid;
-        grid-template-columns: 248px minmax(0, 1fr);
-        min-height: 100vh;
-      }
-
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        gap: 32px;
-        padding: 28px 18px;
-        border-right: 1px solid #30363d;
-        background: #010409;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 0 10px;
-        font-size: 18px;
-        font-weight: 700;
-      }
-
-      .brand-mark {
-        color: #58a6ff;
-        font-size: 28px;
-      }
-
-      .nav-list {
-        display: grid;
-        gap: 6px;
-      }
-
-      .nav-link {
-        width: 100%;
-        padding: 11px 12px;
-        border: 0;
-        border-radius: 8px;
-        background: transparent;
-        color: #c9d1d9;
-        text-align: left;
-        font-size: 15px;
-      }
-
-      .nav-link:hover,
-      .nav-link[aria-current="page"] {
-        background: #161b22;
-        color: #f0f6fc;
-      }
-
-      .sidebar-footer {
-        margin-top: auto;
-        padding: 0 10px;
-        color: #8b949e;
-        font-size: 13px;
-      }
-
-      main {
-        width: min(100%, 1100px);
-        margin: 0 auto;
-        padding: 36px clamp(20px, 5vw, 64px);
-      }
-
-      .topbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 18px;
-      }
-
-      h1 {
-        margin: 0;
-        font-size: clamp(26px, 4vw, 36px);
-        letter-spacing: -0.04em;
-      }
-
-      .subtitle {
-        margin: 8px 0 0;
-        color: #8b949e;
-      }
-
-      .topbar-actions {
-        display: flex;
-        gap: 8px;
-        flex-shrink: 0;
-      }
-
-      .button {
-        min-height: 40px;
-        padding: 0 15px;
-        border: 1px solid #30363d;
-        border-radius: 7px;
-        background: #21262d;
-        color: #f0f6fc;
-      }
-
-      .button:hover {
-        border-color: #8b949e;
-      }
-
-      .button-primary {
-        border-color: #238636;
-        background: #238636;
-      }
-
-      .button-primary:hover {
-        border-color: #2ea043;
-        background: #2ea043;
-      }
-
-      .button-danger {
-        border-color: #6e2c33;
-        background: transparent;
-        color: #ff7b72;
-        min-height: 32px;
-        padding: 0 10px;
-        font-size: 13px;
-      }
-
-      .button-danger:hover {
-        border-color: #ff7b72;
-      }
-
-      .button[disabled] {
-        opacity: 0.55;
-        cursor: default;
-      }
-
-      .status {
-        min-height: 22px;
-        margin: 0 0 20px;
-        color: #8b949e;
-        font-size: 14px;
-      }
-
-      .status[data-kind="error"] {
-        color: #ff7b72;
-      }
-
-      .status[data-kind="success"] {
-        color: #3fb950;
-      }
-
-      .card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
-      }
-
-      .card,
-      .panel,
-      .vault-panel {
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        background: #161b22;
-      }
-
-      .card {
-        padding: 20px;
-      }
-
-      button.card {
-        text-align: left;
-        color: inherit;
-      }
-
-      button.card:hover {
-        border-color: #58a6ff;
-      }
-
-      .card-label {
-        margin: 0 0 12px;
-        color: #8b949e;
-        font-size: 14px;
-      }
-
-      .card-value {
-        margin: 0;
-        font-size: 28px;
-        font-weight: 650;
-      }
-
-      .panel,
-      .vault-panel {
-        padding: 20px;
-        margin-bottom: 20px;
-      }
-
-      .panel-heading {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 14px;
-      }
-
-      h2 {
-        margin: 0;
-        font-size: 17px;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .item-form {
-        display: grid;
-        gap: 10px;
-        margin-bottom: 18px;
-      }
-
-      .form-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 10px;
-      }
-
-      .field {
-        display: grid;
-        gap: 5px;
-      }
-
-      .field label {
-        color: #8b949e;
-        font-size: 13px;
-      }
-
-      .field input,
-      .field select,
-      .field textarea,
-      .search-input {
-        padding: 9px 12px;
-        border: 1px solid #30363d;
-        border-radius: 7px;
-        background: #0d1117;
-        color: #e6edf3;
-      }
-
-      .field textarea {
-        min-height: 70px;
-        resize: vertical;
-      }
-
-      .field input:focus,
-      .field select:focus,
-      .field textarea:focus,
-      .search-input:focus {
-        border-color: #58a6ff;
-        outline: none;
-      }
-
-      .item-list {
-        display: grid;
-        gap: 10px;
-      }
-
-      .item {
-        display: grid;
-        gap: 6px;
-        padding: 14px 16px;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        background: #0d1117;
-      }
-
-      .item-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .item-name {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-      }
-
-      .item-name a {
-        color: #58a6ff;
-        text-decoration: none;
-      }
-
-      .item-name a:hover {
-        text-decoration: underline;
-      }
-
-      .item-meta {
-        color: #8b949e;
-        font-size: 13px;
-      }
-
-      .item-notes {
-        margin: 0;
-        color: #c9d1d9;
-        font-size: 14px;
-        white-space: pre-wrap;
-      }
-
-      .item-actions {
-        display: flex;
-        gap: 6px;
-      }
-
-      .item-actions .button {
-        min-height: 32px;
-        padding: 0 10px;
-        font-size: 13px;
-      }
-
-      .badge {
-        display: inline-block;
-        padding: 2px 9px;
-        border: 1px solid #30363d;
-        border-radius: 999px;
-        color: #8b949e;
-        font-size: 12px;
-        white-space: nowrap;
-      }
-
-      .empty-state {
-        padding: 28px 16px;
-        border: 1px dashed #30363d;
-        border-radius: 8px;
-        color: #8b949e;
-        text-align: center;
-      }
-
-      .search-input {
-        width: 100%;
-        margin-bottom: 14px;
-      }
-
-      #vault-editor {
-        display: block;
-        width: 100%;
-        min-height: 340px;
-        padding: 14px;
-        border: 1px solid #30363d;
-        border-radius: 7px;
-        background: #0d1117;
-        color: #e6edf3;
-        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-        font-size: 13px;
-        line-height: 1.6;
-        resize: vertical;
-      }
-
-      .diagnostics {
-        margin: 14px 0 0;
-        padding: 12px 16px;
-        border-radius: 7px;
-        background: #0d1117;
-        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-        font-size: 13px;
-        white-space: pre-wrap;
-      }
-
-      .diagnostics:empty {
-        display: none;
-      }
-
-      .diagnostics[data-kind="ok"] {
-        color: #3fb950;
-      }
-
-      .diagnostics[data-kind="warn"] {
-        color: #d29922;
-      }
-
-      .diagnostics[data-kind="error"] {
-        color: #ff7b72;
-      }
-
-      .voice-note time {
-        color: #8b949e;
-        font-size: 12px;
-      }
-
-      @media (max-width: 700px) {
-        .app-shell {
-          grid-template-columns: 1fr;
-        }
-
-        .sidebar {
-          gap: 16px;
-          padding: 16px;
-          border-right: 0;
-          border-bottom: 1px solid #30363d;
-        }
-
-        .nav-list {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        main {
-          padding-top: 24px;
-        }
-
-        .constellation-canvas {
-          width: 100%;
-          border-radius: 12px;
-          background: radial-gradient(ellipse at center, #101a2e 0%, #05070d 75%);
-          cursor: grab;
-          overflow: hidden;
-        }
-
-        .constellation-canvas:active {
-          cursor: grabbing;
-        }
-
-        .constellation-canvas canvas {
-          display: block;
-        }
-
-        .constellation-controls {
-          position: fixed;
-          top: 12px;
-          right: 12px;
-          z-index: 70;
-          display: flex;
-          gap: 8px;
-          opacity: 0.3;
-          transition: opacity 0.2s ease;
-        }
-
-        .constellation-controls:hover {
-          opacity: 1;
-        }
-
-        body.constellation-mode {
-          overflow: hidden;
-        }
-
-        body.constellation-mode .sidebar,
-        body.constellation-mode .topbar,
-        body.constellation-mode .status {
-          display: none;
-        }
-
-        body.constellation-mode .app-shell {
-          display: block;
-        }
-
-        body.constellation-mode .constellation-panel {
-          border: none;
-          background: transparent;
-          box-shadow: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        body.constellation-mode .constellation-canvas {
-          border-radius: 0;
-        }
-
-        body.constellation-mode .constellation-stats {
-          position: fixed;
-          bottom: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 70;
-          width: max-content;
-          max-width: 92vw;
-          background: rgba(4, 8, 18, 0.72);
-          padding: 6px 16px;
-          border-radius: 999px;
-        }
-
-        .sidebar-collapse {
-          width: 100%;
-          padding: 9px 10px;
-          border: 1px solid #30363d;
-          border-radius: 8px;
-          background: transparent;
-          color: #8b949e;
-          font-size: 13px;
-          cursor: pointer;
-        }
-
-        .sidebar-collapse:hover {
-          background: #161b22;
-          color: #f0f6fc;
-        }
-
-        body.sidebar-collapsed .app-shell {
-          grid-template-columns: 64px minmax(0, 1fr);
-        }
-
-        body.sidebar-collapsed .sidebar {
-          padding: 28px 10px;
-          gap: 24px;
-          align-items: center;
-        }
-
-        body.sidebar-collapsed .brand {
-          padding: 0;
-        }
-
-        body.sidebar-collapsed .brand-text,
-        body.sidebar-collapsed .nav-label,
-        body.sidebar-collapsed .sidebar-footer {
-          display: none;
-        }
-
-        body.sidebar-collapsed .nav-list {
-          width: 100%;
-        }
-
-        body.sidebar-collapsed .nav-link {
-          padding: 11px 6px;
-          text-align: center;
-          font-size: 17px;
-        }
-
-        .constellation-panel {
-          border: none;
-          background: transparent;
-          box-shadow: none;
-          padding: 0;
-        }
-
-        .constellation-canvas {
-          height: 560px;
-        }
-
-        body.constellation-mode .constellation-canvas {
-          height: 100vh;
-        }
-
-        .topbar {
-          flex-direction: column;
-        }
-      }
-    </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111719" />
+    <meta
+      name="description"
+      content="A quiet workspace for your projects, skills, documents, and ideas."
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="MyVault OS" />
+    <title>Home · MyVault OS</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon-180.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <link rel="stylesheet" href="styles.css?v=design-1" />
     <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
       }
-    }
-  </script>
-</head>
+    </script>
+  </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span class="brand-text">MyVault OS</span></div>
+      <aside class="sidebar" aria-label="Workspace">
+        <a class="brand" href="#home" aria-label="MyVault OS overview"
+          ><span class="brand-mark" aria-hidden="true">⬡</span
+          ><span class="brand-text"
+            >MyVault<span class="brand-os">OS</span></span
+          ></a
+        >
+        <div class="workspace-label">
+          <span class="presence-dot"></span><span>PERSONAL WORKSPACE</span>
+        </div>
         <nav class="nav-list" aria-label="Main navigation">
-          <button class="nav-link" type="button" data-view="home">🏠 <span class="nav-label">Home</span></button>
-          <button class="nav-link" type="button" data-view="skills">🧠 <span class="nav-label">Skills</span></button>
-          <button class="nav-link" type="button" data-view="projects">📁 <span class="nav-label">Projects</span></button>
-          <button class="nav-link" type="button" data-view="docs">📝 <span class="nav-label">Docs</span></button>
-          <button class="nav-link" type="button" data-view="chats">💬 <span class="nav-label">Chats</span></button>
-          <button class="nav-link" type="button" data-view="constellation" aria-current="page">🌌 <span class="nav-label">Constellation</span></button>
-          <button class="nav-link" type="button" data-view="build">🔧 <span class="nav-label">Build/Repair</span></button>
+          <button
+            class="nav-link"
+            type="button"
+            data-view="home"
+            aria-current="page"
+          >
+            <span data-icon="home"></span
+            ><span class="nav-label">Overview</span>
+          </button>
+          <span class="nav-section">YOUR VAULT</span>
+          <button class="nav-link" type="button" data-view="projects">
+            <span data-icon="projects"></span
+            ><span class="nav-label">Projects</span
+            ><span class="nav-count" data-count="projects">0</span>
+          </button>
+          <button class="nav-link" type="button" data-view="skills">
+            <span data-icon="skills"></span><span class="nav-label">Skills</span
+            ><span class="nav-count" data-count="skills">0</span>
+          </button>
+          <button class="nav-link" type="button" data-view="docs">
+            <span data-icon="docs"></span
+            ><span class="nav-label">Documents</span
+            ><span class="nav-count" data-count="docs">0</span>
+          </button>
+          <button class="nav-link" type="button" data-view="chats">
+            <span data-icon="chats"></span><span class="nav-label">Chats</span
+            ><span class="nav-count" data-count="chats">0</span>
+          </button>
+          <span class="nav-section">EXPLORE</span>
+          <button class="nav-link" type="button" data-view="constellation">
+            <span data-icon="constellation"></span
+            ><span class="nav-label">Constellation</span>
+          </button>
+          <button class="nav-link" type="button" data-view="build">
+            <span data-icon="build"></span
+            ><span class="nav-label">Build / Repair</span>
+          </button>
         </nav>
-        <div class="sidebar-footer">Your personal workspace</div>
-        <button class="sidebar-collapse" id="sidebar-collapse" type="button" aria-label="Toggle sidebar">&lt; Collapse</button>
-      </aside>
-      <main>
-        <header class="topbar">
+        <div class="sidebar-footer">
+          <div class="workspace-avatar">M</div>
           <div>
-            <h1 id="view-title">Constellation</h1>
-            <p class="subtitle">Your personal knowledge and project vault.</p>
+            <strong>Your personal OS</strong
+            ><span>A little more connected.</span>
           </div>
-          <div class="topbar-actions">
-            <button class="button button-primary" id="save-button" type="button" disabled>Save</button>
-            <button class="button" id="login-button" type="button">Sign in with GitHub</button>
+        </div>
+        <button
+          class="sidebar-collapse"
+          id="sidebar-collapse"
+          type="button"
+          aria-label="Collapse sidebar"
+          aria-expanded="true"
+        >
+          ← <span>Collapse sidebar</span>
+        </button>
+      </aside>
+      <div class="workspace">
+        <div class="utility-bar">
+          <div class="breadcrumb">
+            Workspace <span>/</span> <strong id="view-title">Home</strong>
           </div>
-        </header>
-        <p class="status" id="status" role="status" aria-live="polite">Sign in to load your vault.</p>
-        <div id="view"></div>
-      </main>
+          <div class="utility-actions">
+            <span class="sync-indicator" id="sync-indicator"
+              >Local workspace</span
+            ><button
+              class="button button-quiet"
+              id="login-button"
+              type="button"
+            >
+              Sign in with GitHub
+            </button>
+          </div>
+        </div>
+        <main id="main" tabindex="-1">
+          <div class="workspace-toolbar">
+            <div class="global-search-wrap">
+              <span data-icon="search"></span
+              ><label class="visually-hidden" for="global-search"
+                >Search your vault</label
+              ><input
+                id="global-search"
+                type="search"
+                placeholder="Search your vault…"
+                autocomplete="off"
+              /><kbd>/</kbd>
+            </div>
+            <button class="button" id="save-button" type="button" disabled>
+              Saved locally
+            </button>
+          </div>
+          <p class="status" id="status" role="status" aria-live="polite">
+            Your workspace is ready.
+          </p>
+          <div id="view"></div>
+          <footer class="main-footer">
+            <span
+              >MyVault OS <span class="footer-dot">·</span> A home for what
+              you’re building.</span
+            ><span id="workspace-date"></span>
+          </footer>
+        </main>
+      </div>
     </div>
-    <script src="app.js?v=5a3f6b5c"></script>
+    <dialog id="item-dialog" aria-labelledby="dialog-title">
+      <div id="dialog-content"></div>
+    </dialog>
+    <script src="app.js?v=design-1"></script>
   </body>
 </html>

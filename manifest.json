@@ -2,8 +2,8 @@
   "name": "MyVault OS",
   "short_name": "MyVault OS",
   "display": "standalone",
-  "theme_color": "#0d1117",
-  "background_color": "#0d1117",
+  "theme_color": "#111719",
+  "background_color": "#111719",
   "start_url": ".",
   "icons": [
     {
