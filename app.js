@@ -1087,11 +1087,8 @@ async function renderConstellation() {
   });
 
   function resize() {
-    const full = document.body.classList.contains("constellation-mode");
-    const width = full ? window.innerWidth : container.clientWidth || 600;
-    const height = full
-      ? window.innerHeight
-      : Math.max(340, Math.min(600, window.innerHeight * 0.6));
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 560;
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -1181,6 +1178,24 @@ window.addEventListener("message", (event) => {
 });
 
 handleOAuthCallback();
+
+const SIDEBAR_KEY = "myvault_sidebar_collapsed";
+const sidebarCollapseButton = document.querySelector("#sidebar-collapse");
+function applySidebarState() {
+  const collapsed = localStorage.getItem(SIDEBAR_KEY) === "1";
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  if (sidebarCollapseButton) {
+    sidebarCollapseButton.textContent = collapsed ? "⇥" : "⇤ Collapse";
+  }
+  return collapsed;
+}
+applySidebarState();
+sidebarCollapseButton?.addEventListener("click", () => {
+  const collapsed = document.body.classList.toggle("sidebar-collapsed");
+  localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+  sidebarCollapseButton.textContent = collapsed ? "⇥" : "⇤ Collapse";
+  window.dispatchEvent(new Event("resize"));
+});
 
 document.body.classList.toggle("constellation-mode", state.view === "constellation");
 window.addEventListener("keydown", (event) => {
