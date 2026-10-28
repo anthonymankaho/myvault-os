@@ -1082,8 +1082,7 @@ async function renderConstellation() {
 
   const panel = viewContainer.querySelector(".constellation-panel");
   viewContainer.querySelector("#constellation-menu").addEventListener("click", () => {
-    document.body.classList.toggle("constellation-mode");
-    resize();
+    navigate("home");
   });
 
   function resize() {
@@ -1199,8 +1198,8 @@ sidebarCollapseButton?.addEventListener("click", () => {
 
 document.body.classList.toggle("constellation-mode", state.view === "constellation");
 window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && document.body.classList.contains("constellation-mode")) {
-    document.querySelector("#constellation-menu")?.click();
+  if (event.key === "Escape" && state.view === "constellation") {
+    navigate("home");
   }
 });
 
