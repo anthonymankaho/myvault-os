@@ -3,6 +3,7 @@ const CLIENT_ID = "Ov23liJh92zfUJkRnUX7";
 const TOKEN_KEY = "myvault_token";
 const STATE_KEY = "myvault_oauth_state";
 const CACHE_KEY = "myvault_cache";
+const DIRTY_KEY = "myvault_pending_changes";
 
 const DEFAULT_VAULT = {
   skills: [],
@@ -13,8 +14,8 @@ const DEFAULT_VAULT = {
   meta: {
     created: new Date().toISOString().slice(0, 10),
     owner: "anthonymankaho",
-    version: 1
-  }
+    version: 1,
+  },
 };
 
 const COLLECTIONS = {
@@ -27,10 +28,10 @@ const COLLECTIONS = {
         key: "level",
         label: "Level",
         type: "select",
-        options: ["Beginner", "Intermediate", "Advanced", "Expert"]
+        options: ["Beginner", "Intermediate", "Advanced", "Expert"],
       },
-      { key: "notes", label: "Notes", type: "textarea" }
-    ]
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
   },
   projects: {
     title: "Projects",
@@ -41,20 +42,20 @@ const COLLECTIONS = {
         key: "status",
         label: "Status",
         type: "select",
-        options: ["Idea", "Active", "Paused", "Done", "Archived"]
+        options: ["Idea", "Active", "Paused", "Done", "Archived"],
       },
-      { key: "notes", label: "Notes", type: "textarea" }
-    ]
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
   },
   docs: {
-    title: "Docs",
+    title: "Documents",
     singular: "document",
     fields: [
       { key: "title", label: "Title", required: true },
       { key: "url", label: "Link", type: "url" },
       { key: "tags", label: "Tags (comma separated)" },
-      { key: "notes", label: "Notes", type: "textarea" }
-    ]
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
   },
   chats: {
     title: "Chats",
@@ -62,30 +63,38 @@ const COLLECTIONS = {
     fields: [
       { key: "title", label: "Title", required: true },
       { key: "url", label: "Link", type: "url" },
-      { key: "notes", label: "Notes", type: "textarea" }
-    ]
-  }
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
 };
 
 const VIEWS = {
   home: { title: "Home" },
   ...Object.fromEntries(
-    Object.entries(COLLECTIONS).map(([key, config]) => [key, { title: config.title }])
+    Object.entries(COLLECTIONS).map(([key, config]) => [
+      key,
+      { title: config.title },
+    ]),
   ),
   constellation: { title: "Constellation" },
-  build: { title: "Build/Repair" }
+  build: { title: "Build / Repair" },
+  search: { title: "Search" },
 };
 
 const state = {
   vault: null,
-  view: "constellation",
+  view: "home",
   dirty: false,
-  savedAt: null
+  savedAt: null,
+  saving: false,
+  revision: 0,
 };
 
 const ui = {
   queries: {},
-  editing: {}
+  filters: {},
+  sorts: {},
+  globalQuery: "",
 };
 
 const statusMessage = document.querySelector("#status");
@@ -110,7 +119,7 @@ function escapeHtml(value) {
 
 function uid() {
   return Array.from(crypto.getRandomValues(new Uint8Array(8)), (value) =>
-    value.toString(16).padStart(2, "0")
+    value.toString(16).padStart(2, "0"),
   ).join("");
 }
 
@@ -124,10 +133,15 @@ function itemTitle(item) {
 }
 
 function normalizeVault(raw) {
-  const vault = { ...DEFAULT_VAULT, ...(raw && typeof raw === "object" ? raw : {}) };
+  const vault = {
+    ...DEFAULT_VAULT,
+    ...(raw && typeof raw === "object" ? raw : {}),
+  };
   for (const key of ["skills", "projects", "docs", "cards", "chats"]) {
     vault[key] = Array.isArray(vault[key])
-      ? vault[key].map((item) => (item && typeof item === "object" ? item : { name: String(item) }))
+      ? vault[key].map((item) =>
+          item && typeof item === "object" ? item : { name: String(item) },
+        )
       : [];
   }
   vault.meta =
@@ -148,7 +162,7 @@ async function call(action, payload = {}) {
   const response = await fetch(API, {
     method: "POST",
     headers,
-    body: JSON.stringify({ action, payload })
+    body: JSON.stringify({ action, payload }),
   });
   const result = await response.json().catch(() => ({}));
 
@@ -162,6 +176,7 @@ async function call(action, payload = {}) {
 function writeCache() {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(state.vault));
+    localStorage.setItem(DIRTY_KEY, state.dirty ? "1" : "0");
   } catch {
     setStatus("Vault is too large to cache locally.", "error");
   }
@@ -186,19 +201,32 @@ function applyVault(vault, { fromCache = false } = {}) {
     setStatus("Loaded from local cache.", "success");
   } else {
     setStatus(
-      state.savedAt ? `Vault loaded. Last saved ${state.savedAt.toLocaleString()}.` : "Vault loaded.",
-      "success"
+      state.savedAt
+        ? `Vault loaded. Last saved ${state.savedAt.toLocaleString()}.`
+        : "Vault loaded.",
+      "success",
     );
   }
 }
 
 async function loadVault({ silent = false } = {}) {
+  if (silent && state.dirty) {
+    setStatus("Local changes are ready. Save to sync them with GitHub.");
+    return;
+  }
+  const revision = state.revision;
   if (!silent) {
     setStatus("Loading vault…");
   }
 
   try {
     const result = await call("load");
+    if (state.revision !== revision) {
+      setStatus(
+        "Kept your newer local changes. Save when you’re ready to sync.",
+      );
+      return;
+    }
     state.savedAt = new Date();
     applyVault(result.vault ?? result.data ?? result);
   } catch (error) {
@@ -211,43 +239,77 @@ async function loadVault({ silent = false } = {}) {
 }
 
 async function saveVault() {
-  if (!state.vault) {
+  if (!state.vault || state.saving || !state.dirty) {
     return;
   }
-
+  if (!localStorage.getItem(TOKEN_KEY)) {
+    setStatus(
+      "Changes are saved on this device. Sign in with GitHub to sync them.",
+    );
+    return;
+  }
+  const revision = state.revision;
+  const snapshot = structuredClone(state.vault);
+  state.saving = true;
   setStatus("Saving vault…");
-  saveButton.disabled = true;
+  updateSaveButton();
 
   try {
-    const result = await call("save", { vault: state.vault });
-    state.dirty = false;
+    const result = await call("save", { vault: snapshot });
+    state.dirty = state.revision !== revision;
     state.savedAt = new Date();
     writeCache();
     updateSaveButton();
     setStatus(
-      result.created ? "Vault created in GitHub. 🎉" : `Vault saved at ${state.savedAt.toLocaleString()}.`,
-      "success"
+      state.dirty
+        ? "Saved. Newer local changes are still waiting to sync."
+        : result.created
+          ? "Vault created in GitHub."
+          : `Vault saved at ${state.savedAt.toLocaleString()}.`,
+      "success",
     );
   } catch (error) {
     writeCache();
     setStatus(`${error.message} — changes kept in the local cache.`, "error");
+  } finally {
+    state.saving = false;
+    updateSaveButton();
   }
 }
 
 function markDirty() {
   state.dirty = true;
+  state.revision += 1;
   updateSaveButton();
   writeCache();
 }
 
 function updateSaveButton() {
-  saveButton.disabled = !state.dirty;
-  saveButton.textContent = state.dirty ? "Save changes" : "Saved";
+  const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
+  saveButton.disabled = state.saving || !state.dirty || !signedIn;
+  saveButton.textContent = state.saving
+    ? "Syncing…"
+    : state.dirty && signedIn
+      ? "Save changes"
+      : signedIn
+        ? "Synced"
+        : "Saved locally";
+  saveButton.classList.toggle("button-primary", state.dirty && signedIn);
+  const indicator = document.querySelector("#sync-indicator");
+  indicator.textContent = state.saving
+    ? "Syncing to GitHub"
+    : state.dirty
+      ? "Local changes · not synced"
+      : signedIn
+        ? "Connected to GitHub"
+        : "Local workspace";
+  indicator.dataset.kind = state.dirty ? "pending" : "";
 }
 
 function startLogin() {
-  const stateParam = Array.from(crypto.getRandomValues(new Uint8Array(24)), (value) =>
-    value.toString(16).padStart(2, "0")
+  const stateParam = Array.from(
+    crypto.getRandomValues(new Uint8Array(24)),
+    (value) => value.toString(16).padStart(2, "0"),
   ).join("");
   const redirectUri = `${window.location.origin}${window.location.pathname}`;
   const authorizationUrl = new URL("https://github.com/login/oauth/authorize");
@@ -257,7 +319,11 @@ function startLogin() {
   authorizationUrl.searchParams.set("state", stateParam);
   localStorage.setItem(STATE_KEY, stateParam);
 
-  const popup = window.open(authorizationUrl, "myvault-oauth", "width=600,height=720");
+  const popup = window.open(
+    authorizationUrl,
+    "myvault-oauth",
+    "width=600,height=720",
+  );
   if (!popup) {
     setStatus("Allow popups to sign in with GitHub.", "error");
     return;
@@ -268,6 +334,7 @@ function startLogin() {
 function signOut() {
   localStorage.removeItem(TOKEN_KEY);
   loginButton.textContent = "Sign in with GitHub";
+  updateSaveButton();
   setStatus("Signed out. Your local copy is still available offline.");
 }
 
@@ -282,7 +349,7 @@ async function handleOAuthCallback() {
   if (!stateParam || stateParam !== localStorage.getItem(STATE_KEY)) {
     window.opener.postMessage(
       { type: "myvault-oauth", error: "GitHub sign-in state did not match." },
-      window.location.origin
+      window.location.origin,
     );
     window.close();
     return;
@@ -291,7 +358,7 @@ async function handleOAuthCallback() {
   try {
     const result = await call("auth", {
       code,
-      redirect_uri: `${window.location.origin}${window.location.pathname}`
+      redirect_uri: `${window.location.origin}${window.location.pathname}`,
     });
     const token = result.token || result.access_token;
     if (!token) {
@@ -299,11 +366,14 @@ async function handleOAuthCallback() {
     }
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.removeItem(STATE_KEY);
-    window.opener.postMessage({ type: "myvault-oauth", success: true }, window.location.origin);
+    window.opener.postMessage(
+      { type: "myvault-oauth", success: true },
+      window.location.origin,
+    );
   } catch (error) {
     window.opener.postMessage(
       { type: "myvault-oauth", error: error.message },
-      window.location.origin
+      window.location.origin,
     );
   }
 
@@ -318,7 +388,7 @@ function voiceNotes() {
   return meta.voiceNotes
     .map((note, rawIndex) => ({
       rawIndex,
-      ...(typeof note === "string" ? { text: note } : note)
+      ...(typeof note === "string" ? { text: note } : note),
     }))
     .filter((note) => note && typeof note.text === "string");
 }
@@ -333,7 +403,8 @@ function addVoiceNote(text) {
 }
 
 function startVoiceInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     setStatus("Voice input is not supported in this browser.", "error");
     return;
@@ -345,7 +416,8 @@ function startVoiceInput() {
   recognition.onresult = (event) => {
     addVoiceNote(event.results[0][0].transcript);
   };
-  recognition.onerror = () => setStatus("Voice input could not be completed.", "error");
+  recognition.onerror = () =>
+    setStatus("Voice input could not be completed.", "error");
   setStatus("Listening… speak now.");
   recognition.start();
 }
@@ -360,6 +432,10 @@ function render() {
     viewContainer.innerHTML = "";
     return;
   }
+  updateSaveButton();
+  document.querySelectorAll("[data-count]").forEach((el) => {
+    el.textContent = state.vault[el.dataset.count].length;
+  });
 
   switch (state.view) {
     case "home":
@@ -371,19 +447,30 @@ function render() {
     case "build":
       renderBuild();
       break;
+    case "search":
+      renderSearch();
+      break;
     default:
       renderCollection(state.view);
   }
 }
 
 function navigate(view) {
+  if (!VIEWS[view]) view = "home";
+  if (view !== "search") {
+    ui.globalQuery = "";
+    document.querySelector("#global-search").value = "";
+  }
   state.view = view;
-  document.body.classList.toggle("constellation-mode", view === "constellation");
-  document.querySelectorAll(".nav-link").forEach((item) => item.removeAttribute("aria-current"));
+  document
+    .querySelectorAll(".nav-link")
+    .forEach((item) => item.removeAttribute("aria-current"));
   document
     .querySelector(`.nav-link[data-view="${view}"]`)
     ?.setAttribute("aria-current", "page");
   viewTitle.textContent = VIEWS[view]?.title ?? "Home";
+  document.title = `${VIEWS[view]?.title ?? "Home"} · MyVault OS`;
+  history.replaceState(null, "", `#${view}`);
   render();
 }
 
@@ -395,261 +482,378 @@ function recentItems() {
     }
   }
   return entries
-    .sort((a, b) => String(b.item.created ?? "").localeCompare(String(a.item.created ?? "")))
+    .sort((a, b) =>
+      String(b.item.created ?? "").localeCompare(String(a.item.created ?? "")),
+    )
     .slice(0, 6);
 }
 
-function renderHome() {
-  const cards = Object.entries(COLLECTIONS)
-    .map(
-      ([key, config]) => `
-        <button class="card" type="button" data-navigate="${key}">
-          <p class="card-label">${config.title}</p>
-          <p class="card-value">${state.vault[key].length}</p>
-        </button>`
-    )
-    .join("");
+const ICON_PATHS = {
+  home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  projects: '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3z"/>',
+  skills: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
+  docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
+  chats:
+    '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
+  constellation:
+    '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="4" r="2"/><circle cx="13" cy="17" r="3"/><path d="m7 6 10-2M6 8l5 7m8-9-5 8"/>',
+  build:
+    '<path d="m14 6 4 4m-12 4 4 4M3 21l7-7m3-6L7 2 2 7l6 6m5 0 8 8m-4-8a6 6 0 0 0 5-8l-4 4-3-3 4-4a6 6 0 0 0-8 5"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  calendar:
+    '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/>',
+  voice:
+    '<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>',
+};
 
-  const notes = voiceNotes();
-  const recent = recentItems();
+function icon(name) {
+  return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] ?? ICON_PATHS.docs}</svg>`;
+}
 
-  viewContainer.innerHTML = `
-    <section class="card-grid" aria-label="Vault overview">${cards}</section>
-    <section class="panel" aria-labelledby="recent-heading">
-      <div class="panel-heading">
-        <h2 id="recent-heading">Recent items</h2>
-        <div class="actions"><button class="button" id="voice-button" type="button">🎙 Voice note</button></div>
-      </div>
-      ${
-        recent.length
-          ? `<div class="item-list">${recent
-              .map(
-                ({ collection, config, item }) => `
-          <div class="item">
-            <div class="item-top">
-              <p class="item-name">${escapeHtml(itemTitle(item))}</p>
-              <span class="badge">${config.title} · ${formatTime(item.created) || "no date"}</span>
-            </div>
-            ${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}
-          </div>`
-              )
-              .join("")}</div>`
-          : `<div class="empty-state">Nothing here yet — add your first skill, project, doc, or chat below.</div>`
-      }
-    </section>
-    <section class="panel" aria-labelledby="voice-heading">
-      <div class="panel-heading"><h2 id="voice-heading">Voice notes</h2></div>
-      ${
-        notes.length
-          ? `<div class="item-list">${notes
-              .map(
-                (note) => `
-          <div class="item voice-note">
-            <div class="item-top">
-              <p class="item-notes">${escapeHtml(note.text)}</p>
-              <span class="item-actions">
-                ${note.at ? `<time>${formatTime(note.at)}</time>` : ""}
-                <button class="button-danger" type="button" data-delete-voice="${note.rawIndex}">Delete</button>
-              </span>
-            </div>
-          </div>`
-              )
-              .join("")}</div>`
-          : `<div class="empty-state">No voice notes yet. Tap 🎙 and speak to capture a thought.</div>`
-      }
-    </section>`;
+function pageHeading(title, description, action = "") {
+  return `<header class="page-heading"><div><p class="eyebrow">Your personal workspace</p><h1>${escapeHtml(title)}</h1><p class="subtitle">${escapeHtml(description)}</p></div>${action}</header>`;
+}
 
+function emptyState(kind, title, description, action = "") {
+  return `<div class="empty-state">${icon(kind)}<strong>${escapeHtml(title)}</strong><p>${escapeHtml(description)}</p>${action}</div>`;
+}
+
+function openRecordButton(
+  collection,
+  index,
+  item,
+  detail,
+  className = "recent-row",
+) {
+  return `<button class="${className}" data-open-collection="${collection}" data-open-index="${index}" type="button"><span class="row-icon">${icon(collection)}</span><span class="row-text"><span class="row-title">${escapeHtml(itemTitle(item))}</span><span class="row-detail">${escapeHtml(detail)}</span></span><span class="row-arrow" aria-hidden="true">↗</span></button>`;
+}
+
+function bindWorkspaceActions() {
   viewContainer.querySelectorAll("[data-navigate]").forEach((button) => {
     button.addEventListener("click", () => navigate(button.dataset.navigate));
   });
-  viewContainer.querySelector("#voice-button")?.addEventListener("click", startVoiceInput);
-  viewContainer.querySelectorAll("[data-delete-voice]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.vault.meta.voiceNotes.splice(Number(button.dataset.deleteVoice), 1);
-      markDirty();
-      render();
-    });
+  viewContainer.querySelectorAll("[data-add]").forEach((button) => {
+    button.addEventListener("click", () => openItemDialog(button.dataset.add));
+  });
+  viewContainer.querySelectorAll("[data-open-collection]").forEach((button) => {
+    button.addEventListener("click", () =>
+      openItemDialog(
+        button.dataset.openCollection,
+        Number(button.dataset.openIndex),
+      ),
+    );
   });
 }
 
+function renderHome() {
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12
+      ? "Good morning."
+      : hour < 18
+        ? "Good afternoon."
+        : "Good evening.";
+  const active = state.vault.projects
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => String(item.status).toLowerCase() === "active");
+  const captions = {
+    projects: `${active.length} active right now`,
+    skills: "Keep your curiosity growing",
+    docs: "Knowledge, within reach",
+    chats: "Conversations worth keeping",
+  };
+  const notes = voiceNotes();
+  const recent = recentItems();
+  viewContainer.innerHTML = `
+    ${pageHeading(greeting, "A little clarity for everything you’re building.", `<div class="date-chip">${icon("calendar")}${escapeHtml(new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))}</div>`)}
+    <section class="card-grid" aria-label="Vault overview">${["projects", "skills", "docs", "chats"].map((key) => `<button class="card" type="button" data-navigate="${key}"><span class="card-top"><span class="card-icon">${icon(key)}</span><span class="card-arrow" aria-hidden="true">↗</span></span><p class="card-label">${COLLECTIONS[key].title}</p><p class="card-value">${state.vault[key].length}</p><span class="card-caption">${captions[key]}</span></button>`).join("")}</section>
+    <div class="dashboard-grid"><div>
+      <section class="panel" aria-labelledby="projects-heading"><div class="panel-heading"><div><h2 id="projects-heading">In focus</h2><p class="section-caption">Your active projects, all in one place</p></div><button class="text-button" type="button" data-navigate="projects">All projects ↗</button></div>
+        ${
+          active.length
+            ? active
+                .slice(0, 4)
+                .map(({ item, index }) =>
+                  openRecordButton(
+                    "projects",
+                    index,
+                    item,
+                    item.status,
+                    "project-row",
+                  ),
+                )
+                .join("")
+            : emptyState(
+                "projects",
+                "Make room for your next idea",
+                "Add a project and set it to Active to see it here.",
+                `<button class="button" type="button" data-add="projects">${icon("plus")} New project</button>`,
+              )
+        }
+      </section>
+      <section class="panel" aria-labelledby="recent-heading"><div class="panel-heading"><div><h2 id="recent-heading">Recently added</h2><p class="section-caption">Pick up a thread from your vault</p></div><span class="item-meta">${recent.length} items</span></div><div class="recent-list">
+        ${recent.length ? recent.map(({ collection, config, item }) => openRecordButton(collection, state.vault[collection].indexOf(item), item, `${config.title} · ${formatTime(item.created) || "Imported item"}`)).join("") : emptyState("docs", "Your workspace starts here", "Add your first skill, document, project, or chat using Quick capture.")}
+      </div></section>
+    </div><div>
+      <section class="panel" aria-labelledby="capture-heading"><div class="panel-heading"><div><h2 id="capture-heading">Quick capture</h2><p class="section-caption">Give your next thought a home</p></div>${icon("plus")}</div><div class="quick-actions">${["projects", "skills", "docs", "chats"].map((key) => `<button class="quick-action" type="button" data-add="${key}">${icon(key)}<span>New ${COLLECTIONS[key].singular}</span></button>`).join("")}</div></section>
+      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 54 53 34-63 75 28-38 45-71-10L80 30l88-10M25 70l109 13 109-35" stroke="currentColor" opacity=".3"/>${[
+        [25, 70],
+        [80, 30],
+        [134, 83],
+        [168, 20],
+        [243, 48],
+        [205, 93],
+      ]
+        .map(
+          ([x, y]) =>
+            `<circle cx="${x}" cy="${y}" r="9" fill="currentColor" opacity=".06"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`,
+        )
+        .join(
+          "",
+        )}<circle cx="50" cy="18" r="1" fill="currentColor"/><circle cx="224" cy="15" r="1" fill="currentColor"/></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connect the dots.</h2><p>Explore the relationships between your skills and projects in your constellation.</p><button class="button" type="button" data-navigate="constellation">Explore constellation ↗</button></section>
+      <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><h2 id="voice-heading">Voice notes</h2><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>${notes.length ? `<div class="item-list">${notes.map((note) => `<div class="item voice-note"><p class="item-notes">${escapeHtml(note.text)}</p><div class="item-top">${note.at ? `<time>${escapeHtml(formatTime(note.at))}</time>` : ""}<button class="button-danger" type="button" data-delete-voice="${note.rawIndex}" aria-label="Delete voice note">Delete</button></div></div>`).join("")}</div>` : '<p class="voice-empty">A passing thought? Say it out loud.<br>Capture a note and come back to it later.</p>'}</section>
+    </div></div>`;
+  bindWorkspaceActions();
+  viewContainer
+    .querySelector("#voice-button")
+    .addEventListener("click", startVoiceInput);
+  viewContainer.querySelectorAll("[data-delete-voice]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (!window.confirm("Delete this voice note?")) return;
+      state.vault.meta.voiceNotes.splice(Number(button.dataset.deleteVoice), 1);
+      markDirty();
+      render();
+      setStatus("Voice note deleted. Changes saved on this device.", "success");
+    }),
+  );
+}
+
 function fieldHtml(field, item = {}) {
-  const value = item[field.key] ?? "";
-  if (field.type === "textarea") {
-    return `<div class="field"><label for="field-${field.key}">${escapeHtml(field.label)}</label>
-      <textarea id="field-${field.key}" name="${field.key}">${escapeHtml(value)}</textarea></div>`;
-  }
+  const raw = item[field.key] ?? "";
+  const value = Array.isArray(raw) ? raw.join(", ") : raw;
+  const required = field.required ? " required autofocus" : "";
+  const label = `<label for="field-${field.key}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>`;
+  if (field.type === "textarea")
+    return `<div class="field">${label}<textarea id="field-${field.key}" name="${field.key}">${escapeHtml(value)}</textarea></div>`;
   if (field.type === "select") {
     const options = ["", ...field.options];
-    return `<div class="field"><label for="field-${field.key}">${escapeHtml(field.label)}</label>
-      <select id="field-${field.key}" name="${field.key}">
-        ${options
-          .map(
-            (option) =>
-              `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${
-                option || "—"
-              }</option>`
-          )
-          .join("")}
-      </select></div>`;
+    if (value && !options.includes(value)) options.push(value);
+    return `<div class="field">${label}<select id="field-${field.key}" name="${field.key}">${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option || "Choose…")}</option>`).join("")}</select></div>`;
   }
-  return `<div class="field"><label for="field-${field.key}">${escapeHtml(field.label)}</label>
-    <input id="field-${field.key}" name="${field.key}" type="${field.type ?? "text"}" value="${escapeHtml(value)}"></div>`;
+  return `<div class="field">${label}<input id="field-${field.key}" name="${field.key}" type="${field.type ?? "text"}" value="${escapeHtml(value)}"${required}${field.type === "url" ? ' placeholder="https://…"' : ""}></div>`;
+}
+
+function openItemDialog(key, index = null) {
+  const config = COLLECTIONS[key];
+  const editingItem = index === null ? null : state.vault[key][index];
+  const dialog = document.querySelector("#item-dialog");
+  const content = document.querySelector("#dialog-content");
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${config.title}</p><h2 id="dialog-title">${editingItem ? "Edit" : "New"} ${config.singular}</h2><p>Saved on this device. Sync to GitHub when you’re ready.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form" id="item-form"><div class="form-row">${config.fields.map((field) => fieldHtml(field, editingItem ?? {})).join("")}</div><p class="form-help" id="form-feedback" role="status">* Required field</p><div class="form-footer"><button class="button" type="button" id="cancel-edit">Cancel</button><button class="button button-primary" type="submit">${editingItem ? "Save changes" : `Add ${config.singular}`}</button></div></form>`;
+  const form = content.querySelector("form");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const titleKey = config.fields[0].key;
+    if (!String(data[titleKey] ?? "").trim()) {
+      const feedback = content.querySelector("#form-feedback");
+      feedback.textContent = `${config.fields[0].label} is required.`;
+      feedback.dataset.kind = "error";
+      form.elements[titleKey].focus();
+      return;
+    }
+    for (const field of config.fields) {
+      if (typeof data[field.key] === "string")
+        data[field.key] = data[field.key].trim();
+    }
+    if (key === "docs")
+      data.tags = data.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    if (editingItem) {
+      // Replace editable fields only, preserving import metadata and links.
+      for (const field of config.fields) {
+        delete editingItem[field.key];
+        if (data[field.key] !== "") editingItem[field.key] = data[field.key];
+      }
+    } else {
+      for (const field of config.fields)
+        if (data[field.key] === "") delete data[field.key];
+      state.vault[key].unshift({
+        id: uid(),
+        created: new Date().toISOString(),
+        ...data,
+      });
+    }
+    markDirty();
+    dialog.close();
+    render();
+    setStatus(
+      `${config.singular[0].toUpperCase() + config.singular.slice(1)} ${editingItem ? "updated" : "added"}. Saved on this device${localStorage.getItem(TOKEN_KEY) ? "; save changes to sync with GitHub." : ". Sign in to sync with GitHub."}`,
+      "success",
+    );
+  });
+  content
+    .querySelector(".dialog-close")
+    .addEventListener("click", () => dialog.close());
+  content
+    .querySelector("#cancel-edit")
+    .addEventListener("click", () => dialog.close());
+  dialog.showModal();
 }
 
 function itemMatches(item, query) {
   return JSON.stringify(item).toLowerCase().includes(query);
 }
 
+function safeUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function filteredItems(key) {
+  const query = (ui.queries[key] ?? "").trim().toLowerCase();
+  const filterField = key === "projects" ? "status" : "level";
+  const items = state.vault[key]
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) =>
+        (!query || itemMatches(item, query)) &&
+        (!ui.filters[key] || item[filterField] === ui.filters[key]),
+    );
+  return items.sort((a, b) =>
+    ui.sorts[key] === "name"
+      ? itemTitle(a.item).localeCompare(itemTitle(b.item))
+      : String(b.item.created ?? "").localeCompare(
+          String(a.item.created ?? ""),
+        ),
+  );
+}
+
 function renderItems(key) {
   const config = COLLECTIONS[key];
-  const query = (ui.queries[key] ?? "").toLowerCase();
-  const items = state.vault[key].filter((item) => !query || itemMatches(item, query));
-
-  if (!items.length) {
-    return `<div class="empty-state">${
-      query ? "No matches — try a different search." : `No ${config.title.toLowerCase()} yet. Add one above.`
-    }</div>`;
-  }
-
+  const items = filteredItems(key);
+  if (!items.length)
+    return state.vault[key].length
+      ? emptyState(
+          "search",
+          "No matching items",
+          "Try another search or reset your filters.",
+          '<button class="button" type="button" id="clear-filters">Clear filters</button>',
+        )
+      : emptyState(
+          key,
+          `A home for your ${config.title.toLowerCase()}`,
+          `Add your first ${config.singular} to get started.`,
+          `<button class="button" type="button" data-add="${key}">${icon("plus")} New ${config.singular}</button>`,
+        );
   return `<div class="item-list">${items
-    .map((item) => {
-      const extra = config.fields
-        .filter((field) => field.key !== "name" && field.key !== "title" && item[field.key])
-        .map((field) => {
-          const value = item[field.key];
-          const display = Array.isArray(value) ? value.join(", ") : String(value);
-          return `<span class="badge">${escapeHtml(display)}</span>`;
-        })
-        .join(" ");
-      const name = item.url
-        ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(itemTitle(item))}</a>`
-        : escapeHtml(itemTitle(item));
-      return `
-        <div class="item">
-          <div class="item-top">
-            <p class="item-name">${name}</p>
-            <span class="item-actions">
-              ${extra ? `<span class="item-meta">${extra}</span>` : ""}
-              <button class="button" type="button" data-edit="${escapeHtml(item.id ?? "")}">Edit</button>
-              <button class="button-danger" type="button" data-delete="${escapeHtml(item.id ?? "")}">Delete</button>
-            </span>
-          </div>
-          ${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}
-        </div>`;
+    .map(({ item, index }) => {
+      const badges = [
+        item.status,
+        item.level,
+        ...(Array.isArray(item.tags) ? item.tags : normalizeTags(item.tags)),
+      ].filter(Boolean);
+      const url = safeUrl(item.url);
+      return `<article class="item"><div class="item-top"><h2 class="item-name">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(itemTitle(item))} ↗</a>` : escapeHtml(itemTitle(item))}</h2><div class="item-actions"><button class="button" type="button" data-edit="${index}" aria-label="Edit ${escapeHtml(itemTitle(item))}">Edit</button><button class="button-danger" type="button" data-delete="${index}" aria-label="Delete ${escapeHtml(itemTitle(item))}">Delete</button></div></div><div class="record-badges">${badges.map((value) => `<span class="badge" data-value="${escapeHtml(value)}">${escapeHtml(value)}</span>`).join("")}</div>${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}${item.sourcePath ? `<p class="row-detail">${escapeHtml(item.sourcePath)}</p>` : ""}</article>`;
     })
     .join("")}</div>`;
 }
 
 function renderCollection(key) {
   const config = COLLECTIONS[key];
-  const editingId = ui.editing[key];
-  const editingItem = editingId
-    ? state.vault[key].find((item) => item.id === editingId)
-    : null;
-
-  viewContainer.innerHTML = `
-    <section class="panel" aria-labelledby="collection-heading">
-      <div class="panel-heading">
-        <h2 id="collection-heading">${editingItem ? `Edit ${config.singular}` : `Add a ${config.singular}`}</h2>
-      </div>
-      <form class="item-form" id="item-form">
-        <div class="form-row">
-          ${config.fields.map((field) => fieldHtml(field, editingItem)).join("")}
-        </div>
-        <div class="actions">
-          <button class="button button-primary" type="submit">${editingItem ? "Update" : "Add"}</button>
-          ${
-            editingItem
-              ? `<button class="button" type="button" id="cancel-edit">Cancel</button>`
-              : ""
-          }
-        </div>
-      </form>
-      <input class="search-input" id="collection-search" type="search" placeholder="Search ${config.title.toLowerCase()}…" value="${escapeHtml(ui.queries[key] ?? "")}">
-      <div id="collection-items">${renderItems(key)}</div>
-    </section>`;
-
-  const form = viewContainer.querySelector("#item-form");
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(form));
-    const titleKey = config.fields[0].key;
-
-    if (!String(data[titleKey] ?? "").trim()) {
-      setStatus(`${config.fields[0].label} is required.`, "error");
-      return;
-    }
-
-    for (const field of config.fields) {
-      if (field.type === "select" && !data[field.key]) {
-        delete data[field.key];
-      }
-    }
-    if (key === "docs" && typeof data.tags === "string") {
-      data.tags = data.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean);
-    }
-    for (const field of config.fields) {
-      if (typeof data[field.key] === "string") {
-        data[field.key] = data[field.key].trim();
-        if (!data[field.key]) {
-          delete data[field.key];
-        }
-      }
-    }
-
-    if (editingItem) {
-      Object.assign(editingItem, data);
-      setStatus(`${config.singular} updated. Save to sync.`, "success");
-    } else {
-      state.vault[key].unshift({ id: uid(), created: new Date().toISOString(), ...data });
-      setStatus(`${config.singular} added. Save to sync.`, "success");
-    }
-
-    ui.editing[key] = null;
-    markDirty();
-    renderCollection(key);
-  });
-
-  viewContainer.querySelector("#cancel-edit")?.addEventListener("click", () => {
-    ui.editing[key] = null;
-    renderCollection(key);
-  });
-
-  viewContainer.querySelector("#collection-search").addEventListener("input", (event) => {
-    ui.queries[key] = event.target.value;
-    viewContainer.querySelector("#collection-items").innerHTML = renderItems(key);
-    bindItemButtons(key);
-  });
-
-  bindItemButtons(key);
+  const descriptions = {
+    projects: "From first idea to finished work. Keep things moving.",
+    skills: "Everything you know, and everything you’re learning.",
+    docs: "Keep useful knowledge close at hand.",
+    chats: "Good conversations deserve a place to live.",
+  };
+  const field = config.fields.find((field) => field.type === "select");
+  const filterValues = field
+    ? [
+        ...new Set([
+          ...field.options,
+          ...state.vault[key].map((item) => item[field.key]).filter(Boolean),
+        ]),
+      ]
+    : [];
+  viewContainer.innerHTML = `${pageHeading(config.title, descriptions[key], `<button class="button button-primary" type="button" data-add="${key}">${icon("plus")} New ${config.singular}</button>`)}<section class="panel" aria-label="${config.title}"><div class="collection-toolbar"><label class="visually-hidden" for="collection-search">Search ${config.title.toLowerCase()}</label><input class="search-input" id="collection-search" type="search" placeholder="Search ${config.title.toLowerCase()}…" value="${escapeHtml(ui.queries[key] ?? "")}">${field ? `<label class="visually-hidden" for="collection-filter">Filter by ${field.label.toLowerCase()}</label><select id="collection-filter"><option value="">All ${field.label === "Status" ? "statuses" : "levels"}</option>${filterValues.map((value) => `<option value="${escapeHtml(value)}" ${ui.filters[key] === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>` : ""}<label class="visually-hidden" for="collection-sort">Sort items</label><select id="collection-sort"><option value="newest">Newest first</option><option value="name" ${ui.sorts[key] === "name" ? "selected" : ""}>Name A–Z</option></select></div><p class="results-count" id="results-count" role="status"></p><div id="collection-items"></div></section>`;
+  refreshCollectionItems(key);
+  viewContainer
+    .querySelector("#collection-search")
+    .addEventListener("input", (event) => {
+      ui.queries[key] = event.target.value;
+      refreshCollectionItems(key);
+    });
+  viewContainer
+    .querySelector("#collection-filter")
+    ?.addEventListener("change", (event) => {
+      ui.filters[key] = event.target.value;
+      refreshCollectionItems(key);
+    });
+  viewContainer
+    .querySelector("#collection-sort")
+    .addEventListener("change", (event) => {
+      ui.sorts[key] = event.target.value;
+      refreshCollectionItems(key);
+    });
+  viewContainer
+    .querySelector(".page-heading [data-add]")
+    .addEventListener("click", () => openItemDialog(key));
 }
 
-function bindItemButtons(key) {
-  const config = COLLECTIONS[key];
-  viewContainer.querySelectorAll(`#collection-items [data-edit]`).forEach((button) => {
-    button.addEventListener("click", () => {
-      ui.editing[key] = button.dataset.edit;
-      renderCollection(key);
-      viewContainer.querySelector("#item-form")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
+function refreshCollectionItems(key) {
+  const container = viewContainer.querySelector("#collection-items");
+  container.innerHTML = renderItems(key);
+  viewContainer.querySelector("#results-count").textContent =
+    `${filteredItems(key).length} of ${state.vault[key].length} ${COLLECTIONS[key].title.toLowerCase()}`;
+  container
+    .querySelectorAll("[data-add]")
+    .forEach((button) =>
+      button.addEventListener("click", () => openItemDialog(key)),
+    );
+  container.querySelector("#clear-filters")?.addEventListener("click", () => {
+    ui.queries[key] = "";
+    ui.filters[key] = "";
+    renderCollection(key);
   });
-  viewContainer.querySelectorAll(`#collection-items [data-delete]`).forEach((button) => {
+  container
+    .querySelectorAll("[data-edit]")
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        openItemDialog(key, Number(button.dataset.edit)),
+      ),
+    );
+  container.querySelectorAll("[data-delete]").forEach((button) =>
     button.addEventListener("click", () => {
-      const index = state.vault[key].findIndex((item) => item.id === button.dataset.delete);
-      if (index >= 0 && window.confirm(`Delete this ${config.singular}?`)) {
-        state.vault[key].splice(index, 1);
-        if (ui.editing[key] === button.dataset.delete) {
-          ui.editing[key] = null;
-        }
-        markDirty();
-        renderCollection(key);
-        setStatus(`${config.singular} deleted. Save to sync.`, "success");
-      }
-    });
-  });
+      const index = Number(button.dataset.delete);
+      if (!window.confirm(`Delete “${itemTitle(state.vault[key][index])}”?`))
+        return;
+      state.vault[key].splice(index, 1);
+      markDirty();
+      render();
+      setStatus(
+        `${COLLECTIONS[key].singular} deleted. Saved on this device.`,
+        "success",
+      );
+    }),
+  );
+}
+
+function renderSearch() {
+  const query = ui.globalQuery.trim().toLowerCase();
+  const matches = Object.entries(COLLECTIONS).flatMap(([key, config]) =>
+    state.vault[key]
+      .map((item, index) => ({ key, config, item, index }))
+      .filter(({ item }) => itemMatches(item, query)),
+  );
+  viewContainer.innerHTML = `${pageHeading("Find your next thread.", `Search across your projects, skills, documents, and chats.`)}<section class="panel" aria-label="Search results"><div class="panel-heading"><h2>${matches.length} ${matches.length === 1 ? "result" : "results"} for “${escapeHtml(ui.globalQuery.trim())}”</h2></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, config.title, "result-row")).join("") : emptyState("search", "Nothing found yet", "Try a name, a tag, or a word from your notes.")}</section>`;
+  bindWorkspaceActions();
 }
 
 function validateVaultJson(text) {
@@ -670,7 +874,12 @@ function validateVaultJson(text) {
       errors.push(`"${key}" should be an array.`);
     }
   }
-  if (parsed.meta !== undefined && (typeof parsed.meta !== "object" || Array.isArray(parsed.meta))) {
+  if (
+    parsed.meta !== undefined &&
+    (!parsed.meta ||
+      typeof parsed.meta !== "object" ||
+      Array.isArray(parsed.meta))
+  ) {
     errors.push('"meta" should be an object.');
   }
   return { ok: errors.length === 0, errors, parsed };
@@ -678,17 +887,19 @@ function validateVaultJson(text) {
 
 function renderBuild() {
   viewContainer.innerHTML = `
+    ${pageHeading("Build / Repair", "Inspect your vault, validate changes, and keep your workspace healthy.")}
     <section class="vault-panel" aria-labelledby="vault-heading">
       <div class="panel-heading">
         <h2 id="vault-heading">Vault data (raw JSON)</h2>
         <div class="actions">
           <button class="button" id="validate-button" type="button">Validate</button>
           <button class="button" id="repair-button" type="button">Repair</button>
-          <button class="button" id="reload-button" type="button">Reload from GitHub</button>
+          <button class="button button-primary" id="apply-json" type="button">Apply changes</button>
+          <button class="button" id="reload-button" type="button" ${!localStorage.getItem(TOKEN_KEY) ? "disabled" : ""}>Reload from GitHub</button>
         </div>
       </div>
       <textarea id="vault-editor" aria-label="Vault data JSON" spellcheck="false">${escapeHtml(
-        JSON.stringify(state.vault, null, 2)
+        JSON.stringify(state.vault, null, 2),
       )}</textarea>
       <p class="diagnostics" id="diagnostics" data-kind="ok"></p>
     </section>`;
@@ -696,34 +907,63 @@ function renderBuild() {
   const editor = viewContainer.querySelector("#vault-editor");
   const diagnostics = viewContainer.querySelector("#diagnostics");
 
-  viewContainer.querySelector("#validate-button").addEventListener("click", () => {
-    const { ok, errors } = validateVaultJson(editor.value);
-    diagnostics.dataset.kind = ok ? "ok" : "error";
-    diagnostics.textContent = ok
-      ? "JSON is valid and matches the vault shape."
-      : errors.join("\n");
-  });
-
-  viewContainer.querySelector("#repair-button").addEventListener("click", () => {
-    const { parsed } = validateVaultJson(editor.value);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  viewContainer.querySelector("#apply-json").addEventListener("click", () => {
+    const { ok, errors, parsed } = validateVaultJson(editor.value);
+    if (!ok) {
       diagnostics.dataset.kind = "error";
-      diagnostics.textContent = "Cannot repair: JSON must be an object. Fix it manually or reload from GitHub.";
+      diagnostics.textContent = errors.join("\n");
       return;
     }
-    const repaired = normalizeVault(parsed);
-    state.vault = repaired;
+    state.vault = normalizeVault(parsed);
     markDirty();
     render();
-    setStatus("Vault repaired into the standard shape. Review it, then save.", "success");
+    setStatus(
+      "JSON changes applied and saved on this device. Save to sync with GitHub.",
+      "success",
+    );
   });
 
-  viewContainer.querySelector("#reload-button").addEventListener("click", () => {
-    if (state.dirty && !window.confirm("Reloading discards unsaved changes. Continue?")) {
-      return;
-    }
-    loadVault();
-  });
+  viewContainer
+    .querySelector("#validate-button")
+    .addEventListener("click", () => {
+      const { ok, errors } = validateVaultJson(editor.value);
+      diagnostics.dataset.kind = ok ? "ok" : "error";
+      diagnostics.textContent = ok
+        ? "JSON is valid and matches the vault shape."
+        : errors.join("\n");
+    });
+
+  viewContainer
+    .querySelector("#repair-button")
+    .addEventListener("click", () => {
+      const { parsed } = validateVaultJson(editor.value);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        diagnostics.dataset.kind = "error";
+        diagnostics.textContent =
+          "Cannot repair: JSON must be an object. Fix it manually or reload from GitHub.";
+        return;
+      }
+      const repaired = normalizeVault(parsed);
+      state.vault = repaired;
+      markDirty();
+      render();
+      setStatus(
+        "Vault repaired into the standard shape. Review it, then save.",
+        "success",
+      );
+    });
+
+  viewContainer
+    .querySelector("#reload-button")
+    .addEventListener("click", () => {
+      if (
+        state.dirty &&
+        !window.confirm("Reloading discards unsaved changes. Continue?")
+      ) {
+        return;
+      }
+      loadVault();
+    });
 }
 
 let constellationCleanup = null;
@@ -744,10 +984,12 @@ async function renderConstellation() {
   };
 
   viewContainer.innerHTML = `
+    ${pageHeading("Constellation", "See how your skills and projects connect. Drag to orbit and scroll to zoom.")}
     <section class="panel constellation-panel" aria-labelledby="constellation-heading">
       <div class="constellation-controls">
         <h2 id="constellation-heading" class="visually-hidden">Constellation Finder</h2>
-        <button class="button" id="constellation-menu" type="button">☰ Views</button>
+        <button class="button" id="constellation-menu" type="button">← Overview</button>
+        <button class="button" id="constellation-motion" type="button" aria-pressed="false">Pause rotation</button>
         <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
       </div>
       <div id="constellation-canvas" class="constellation-canvas" role="img"
@@ -757,15 +999,35 @@ async function renderConstellation() {
 
   const container = viewContainer.querySelector("#constellation-canvas");
   const stats = viewContainer.querySelector("#constellation-stats");
+  viewContainer
+    .querySelector("#constellation-menu")
+    .addEventListener("click", () => navigate("home"));
+  if (!state.vault.skills.length && !state.vault.projects.length) {
+    container.innerHTML = emptyState(
+      "constellation",
+      "A universe of possibilities",
+      "Add skills and projects to start connecting your ideas.",
+      '<button class="button" type="button" data-add="projects">New project</button>',
+    );
+    stats.textContent =
+      "Skills and projects become stars; shared tags and links become connections.";
+    viewContainer.querySelector("#constellation-names").disabled = true;
+    viewContainer.querySelector("#constellation-motion").disabled = true;
+    bindWorkspaceActions();
+    return;
+  }
 
   let THREE;
   let OrbitControls;
   try {
     THREE = await import("three");
-    ({ OrbitControls } = await import("three/addons/controls/OrbitControls.js"));
+    ({ OrbitControls } = await import(
+      "three/addons/controls/OrbitControls.js"
+    ));
   } catch {
     stats.dataset.kind = "error";
-    stats.textContent = "The 3D engine could not be loaded. Check your internet connection, then switch views and back to retry.";
+    stats.textContent =
+      "The 3D engine could not be loaded. Check your internet connection, then switch views and back to retry.";
     return;
   }
   if (token.cancelled) {
@@ -775,11 +1037,11 @@ async function renderConstellation() {
   const KIND_COLOR = { skill: "#cfe8ff", project: "#ffe3b3" };
   const nodes = [
     ...state.vault.skills.map((item) => ({ item, kind: "skill" })),
-    ...state.vault.projects.map((item) => ({ item, kind: "project" }))
+    ...state.vault.projects.map((item) => ({ item, kind: "project" })),
   ].map((node) => ({
     ...node,
     label: itemTitle(node.item),
-    tags: normalizeTags(node.item.tags)
+    tags: normalizeTags(node.item.tags),
   }));
 
   const labelIndex = new Map();
@@ -803,10 +1065,11 @@ async function renderConstellation() {
   const edges = [];
   const hasEdge = new Set();
   const addEdge = (a, b) => {
-    if (a === b || hasEdge.has(`${a}-${b}`)) {
+    const edgeKey = `${Math.min(a, b)}-${Math.max(a, b)}`;
+    if (a === b || hasEdge.has(edgeKey)) {
       return;
     }
-    hasEdge.add(`${a}-${b}`);
+    hasEdge.add(edgeKey);
     edges.push([a, b]);
   };
   for (let i = 0; i < nodes.length; i++) {
@@ -866,7 +1129,15 @@ async function renderConstellation() {
     }
   }
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  } catch {
+    stats.dataset.kind = "error";
+    stats.textContent =
+      "3D is unavailable in this browser. Your skills and projects are still available from the navigation.";
+    return;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   container.appendChild(renderer.domElement);
 
@@ -876,8 +1147,21 @@ async function renderConstellation() {
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.autoRotate = true;
+  controls.autoRotate = !window.matchMedia("(prefers-reduced-motion: reduce)")
+    .matches;
   controls.autoRotateSpeed = 0.35;
+  const motionButton = viewContainer.querySelector("#constellation-motion");
+  const updateMotionButton = () => {
+    motionButton.textContent = controls.autoRotate
+      ? "Pause rotation"
+      : "Resume rotation";
+    motionButton.setAttribute("aria-pressed", String(!controls.autoRotate));
+  };
+  updateMotionButton();
+  motionButton.addEventListener("click", () => {
+    controls.autoRotate = !controls.autoRotate;
+    updateMotionButton();
+  });
 
   // Star textures: soft glow for named stars, tiny dot for background sky.
   const glowTexture = (() => {
@@ -919,7 +1203,10 @@ async function renderConstellation() {
       skyPositions[i * 3 + 2] = v.z;
     }
     const skyGeometry = new THREE.BufferGeometry();
-    skyGeometry.setAttribute("position", new THREE.BufferAttribute(skyPositions, 3));
+    skyGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(skyPositions, 3),
+    );
     scene.add(
       new THREE.Points(
         skyGeometry,
@@ -930,9 +1217,9 @@ async function renderConstellation() {
           transparent: true,
           opacity: 0.5,
           depthWrite: false,
-          blending: THREE.AdditiveBlending
-        })
-      )
+          blending: THREE.AdditiveBlending,
+        }),
+      ),
     );
   }
 
@@ -953,11 +1240,20 @@ async function renderConstellation() {
     const layerPositions = new Float32Array(indexes.length * 3);
     const layerColors = new Float32Array(indexes.length * 3);
     indexes.forEach((nodeIndex, slot) => {
-      layerPositions.set(positions.slice(nodeIndex * 3, nodeIndex * 3 + 3), slot * 3);
-      layerColors.set(new THREE.Color(KIND_COLOR[nodes[nodeIndex].kind]).toArray(), slot * 3);
+      layerPositions.set(
+        positions.slice(nodeIndex * 3, nodeIndex * 3 + 3),
+        slot * 3,
+      );
+      layerColors.set(
+        new THREE.Color(KIND_COLOR[nodes[nodeIndex].kind]).toArray(),
+        slot * 3,
+      );
     });
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(layerPositions, 3));
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(layerPositions, 3),
+    );
     geometry.setAttribute("color", new THREE.BufferAttribute(layerColors, 3));
     geometry.userData.nodeIndexes = indexes;
     pointGeometries.push(geometry);
@@ -969,8 +1265,8 @@ async function renderConstellation() {
         vertexColors: true,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending
-      })
+        blending: THREE.AdditiveBlending,
+      }),
     );
     scene.add(points);
     pointLayers.push(points);
@@ -983,23 +1279,26 @@ async function renderConstellation() {
     linePositions.set(positions.slice(b * 3, b * 3 + 3), index * 6 + 3);
   });
   const lineGeometry = new THREE.BufferGeometry();
-  lineGeometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
+  lineGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(linePositions, 3),
+  );
   scene.add(
     new THREE.LineSegments(
       lineGeometry,
       new THREE.LineBasicMaterial({
         color: 0x9db9e8,
         transparent: true,
-        opacity: 0.32
-      })
-    )
+        opacity: 0.32,
+      }),
+    ),
   );
 
   // Celestial graticule: meridian + parallel rings, like a real star chart.
   const gridMaterial = new THREE.LineBasicMaterial({
     color: 0x4a6491,
     transparent: true,
-    opacity: 0.16
+    opacity: 0.16,
   });
   const gridGeometries = [];
   {
@@ -1058,32 +1357,31 @@ async function renderConstellation() {
         map: new THREE.CanvasTexture(canvas),
         transparent: true,
         opacity: 0.92,
-        depthTest: false
-      })
+        depthTest: false,
+      }),
     );
     sprite.scale.set(9.5, 1.35, 1);
     sprite.position.set(
       positions[nodeIndex * 3] + 1.6,
       positions[nodeIndex * 3 + 1] + 1.1,
-      positions[nodeIndex * 3 + 2]
+      positions[nodeIndex * 3 + 2],
     );
     scene.add(sprite);
     return sprite;
   });
   let namesVisible = true;
-  viewContainer.querySelector("#constellation-names").addEventListener("click", (event) => {
-    namesVisible = !namesVisible;
-    labelSprites.forEach((sprite) => {
-      sprite.visible = namesVisible;
+  viewContainer
+    .querySelector("#constellation-names")
+    .addEventListener("click", (event) => {
+      namesVisible = !namesVisible;
+      labelSprites.forEach((sprite) => {
+        sprite.visible = namesVisible;
+      });
+      event.currentTarget.textContent = namesVisible
+        ? "Hide names"
+        : "Show names";
+      event.currentTarget.setAttribute("aria-pressed", String(namesVisible));
     });
-    event.currentTarget.textContent = namesVisible ? "Hide names" : "Show names";
-    event.currentTarget.setAttribute("aria-pressed", String(namesVisible));
-  });
-
-  const panel = viewContainer.querySelector(".constellation-panel");
-  viewContainer.querySelector("#constellation-menu").addEventListener("click", () => {
-    navigate("home");
-  });
 
   function resize() {
     const width = container.clientWidth || 600;
@@ -1123,7 +1421,9 @@ async function renderConstellation() {
       if (hit) {
         const nodeIndex = layer.geometry.userData.nodeIndexes[hit.index];
         const node = nodes[nodeIndex];
-        const shared = edges.filter(([a, b]) => a === nodeIndex || b === nodeIndex).length;
+        const shared = edges.filter(
+          ([a, b]) => a === nodeIndex || b === nodeIndex,
+        ).length;
         stats.textContent = `✦ ${node.label} (${node.kind}) — ${node.tags.length} tags · ${shared} lines`;
         break;
       }
@@ -1145,6 +1445,13 @@ async function renderConstellation() {
       sprite.material.map.dispose();
       sprite.material.dispose();
     });
+    scene.traverse((object) => {
+      object.geometry?.dispose();
+      if (object.material && !Array.isArray(object.material))
+        object.material.dispose();
+    });
+    glowTexture.dispose();
+    dotTexture.dispose();
     renderer.dispose();
     renderer.domElement.remove();
   };
@@ -1164,7 +1471,10 @@ loginButton.addEventListener("click", () => {
 });
 
 window.addEventListener("message", (event) => {
-  if (event.origin !== window.location.origin || event.data?.type !== "myvault-oauth") {
+  if (
+    event.origin !== window.location.origin ||
+    event.data?.type !== "myvault-oauth"
+  ) {
     return;
   }
   if (event.data.error) {
@@ -1173,7 +1483,8 @@ window.addEventListener("message", (event) => {
   }
   loginButton.textContent = "Sign out";
   setStatus("Signed in with GitHub.", "success");
-  loadVault();
+  updateSaveButton();
+  loadVault({ silent: true });
 });
 
 handleOAuthCallback();
@@ -1184,7 +1495,14 @@ function applySidebarState() {
   const collapsed = localStorage.getItem(SIDEBAR_KEY) === "1";
   document.body.classList.toggle("sidebar-collapsed", collapsed);
   if (sidebarCollapseButton) {
-    sidebarCollapseButton.textContent = collapsed ? ">" : "< Collapse";
+    sidebarCollapseButton.innerHTML = collapsed
+      ? "→"
+      : "← <span>Collapse sidebar</span>";
+    sidebarCollapseButton.setAttribute(
+      "aria-label",
+      collapsed ? "Expand sidebar" : "Collapse sidebar",
+    );
+    sidebarCollapseButton.setAttribute("aria-expanded", String(!collapsed));
   }
   return collapsed;
 }
@@ -1192,13 +1510,53 @@ applySidebarState();
 sidebarCollapseButton?.addEventListener("click", () => {
   const collapsed = document.body.classList.toggle("sidebar-collapsed");
   localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
-  sidebarCollapseButton.textContent = collapsed ? ">" : "< Collapse";
+  applySidebarState();
   window.dispatchEvent(new Event("resize"));
 });
 
-document.body.classList.toggle("constellation-mode", state.view === "constellation");
+document.querySelectorAll("[data-icon]").forEach((el) => {
+  el.innerHTML = icon(el.dataset.icon);
+});
+document.querySelectorAll(".nav-link").forEach((el) => {
+  el.setAttribute("aria-label", VIEWS[el.dataset.view].title);
+  el.title = VIEWS[el.dataset.view].title;
+});
+document
+  .querySelector(".brand")
+  .addEventListener("click", () => navigate("home"));
+document.querySelector("#workspace-date").textContent =
+  new Date().toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+document.querySelector("#global-search").addEventListener("input", (event) => {
+  ui.globalQuery = event.target.value;
+  navigate(ui.globalQuery.trim() ? "search" : "home");
+});
+window.addEventListener("hashchange", () => {
+  const view = location.hash.slice(1);
+  if (VIEWS[view] && view !== "search") navigate(view);
+});
 window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && state.view === "constellation") {
+  const editing = event.target.closest(
+    "input, textarea, select, [contenteditable], dialog",
+  );
+  if (
+    event.key === "/" &&
+    !editing &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    document.querySelector("#global-search").focus();
+  }
+  if (
+    event.key === "Escape" &&
+    state.view === "constellation" &&
+    !document.querySelector("#item-dialog").open
+  ) {
     navigate("home");
   }
 });
@@ -1208,8 +1566,17 @@ if (localStorage.getItem(TOKEN_KEY)) {
 }
 
 const cached = readCache();
+const initialView = location.hash.slice(1);
+if (VIEWS[initialView] && initialView !== "search") state.view = initialView;
+viewTitle.textContent = VIEWS[state.view].title;
+document.title = `${VIEWS[state.view].title} · MyVault OS`;
+document.querySelectorAll(".nav-link").forEach((el) => {
+  if (el.dataset.view === state.view) el.setAttribute("aria-current", "page");
+  else el.removeAttribute("aria-current");
+});
 if (cached) {
   state.vault = cached;
+  state.dirty = localStorage.getItem(DIRTY_KEY) === "1";
   render();
   if (localStorage.getItem(TOKEN_KEY)) {
     setStatus("Loaded from local cache. Refreshing from GitHub…");
@@ -1222,5 +1589,7 @@ if (cached) {
 } else {
   state.vault = structuredClone(DEFAULT_VAULT);
   render();
-  setStatus("New local vault started. Sign in with GitHub to sync it to your myvault-data repo.");
+  setStatus(
+    "New local vault started. Sign in with GitHub to sync it to your myvault-data repo.",
+  );
 }
