@@ -8,6 +8,10 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Features
 
 - Personal dashboard for skills, projects, documents, and chats
+- Responsive overview with active projects, recent items, and quick capture
+- Search across the vault (`/` shortcut), filter projects and skills, and sort records
+- Keyboard-accessible add/edit dialogs that preserve imported metadata and links
+- Clear local/synced status with pending changes preserved across refreshes
 - Structured views with add, edit, delete, and search — no JSON editing needed for day-to-day use
 - Build/Repair view with raw JSON access, validation, and one-click shape repair
 - GitHub OAuth popup sign-in, with API requests routed through the MyVault Worker
@@ -33,6 +37,8 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Project layout
 
 - `index.html`, `app.js`, `manifest.json` — the PWA frontend (GitHub Pages)
+- `styles.css` — responsive workspace styling and reduced-motion support
+- `test/app.test.cjs` — frontend data and synchronization checks (`node --test test/app.test.cjs`)
 - `worker/` — Cloudflare Worker that proxies GitHub OAuth and the Contents API (`npm test` runs the vitest suite)
 
 ## Live app
@@ -42,5 +48,11 @@ https://anthonymankaho.github.io/myvault-os
 ## Screenshot
 
 _Screenshot coming soon._
+
+## Frontend validation
+
+Run `node --check app.js` and `node --test test/app.test.cjs` with Node.js 18 or newer. Serve the repository with any static HTTP server to preview it. GitHub OAuth still uses the configured production callback and Worker; a local preview does not establish a production sign-in session.
+
+The app opens on the overview by default. The constellation remains available in navigation, with persistent access to other views and a rotation toggle. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
 
 Built with Kimi + Qwen AI.
