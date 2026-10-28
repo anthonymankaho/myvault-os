@@ -134,7 +134,7 @@ describe("MyVault API Worker", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toEqual({ ok: true, created: false });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(authorization);
     const [putUrl, putOptions] = fetchMock.mock.calls[1];
@@ -147,6 +147,52 @@ describe("MyVault API Worker", () => {
       sha: "file-sha"
     });
     expect(JSON.parse(decodeBase64(JSON.parse(putOptions.body).content))).toEqual(vault);
+  });
+
+  it("creates the vault file on first save when GitHub reports it missing", async () => {
+    const vault = { skills: [], meta: { owner: "anthonymankaho" } };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ content: "created" }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(
+      makeRequest("save", { vault }, "******"),
+      {}
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, created: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [putUrl, putOptions] = fetchMock.mock.calls[1];
+    expect(putUrl).toBe(CONTENTS_URL);
+    expect(putOptions.method).toBe("PUT");
+    const putBody = JSON.parse(putOptions.body);
+    expect(putBody.message).toBe("Create vault");
+    expect(putBody.sha).toBeUndefined();
+    expect(JSON.parse(decodeBase64(putBody.content))).toEqual(vault);
+  });
+
+  it("echoes the CORS origin for allowed origins and the default otherwise", async () => {
+    const allowed = await worker.fetch(
+      new Request("https://myvault-api.example/", {
+        method: "OPTIONS",
+        headers: { Origin: "https://anthonymankaho.github.io" }
+      }),
+      {}
+    );
+    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://anthonymankaho.github.io"
+    );
+
+    const disallowed = await worker.fetch(
+      new Request("https://myvault-api.example/", {
+        method: "OPTIONS",
+        headers: { Origin: "https://evil.example" }
+      }),
+      {}
+    );
+    expect(disallowed.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
   });
 
   it("exchanges an OAuth code using only the configured secret", async () => {
