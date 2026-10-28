@@ -1,4 +1,4 @@
-const API = "https://myvault-api.anthonymankaho.workers.dev";
+const API = "https://myvault-api.anthonym-354.workers.dev";
 const CLIENT_ID = "Ov23liJh92zfUJkRnUX7";
 const TOKEN_KEY = "myvault_token";
 const STATE_KEY = "myvault_oauth_state";
