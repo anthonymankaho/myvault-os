@@ -78,7 +78,7 @@ const VIEWS = {
 
 const state = {
   vault: null,
-  view: "home",
+  view: "constellation",
   dirty: false,
   savedAt: null
 };
@@ -747,6 +747,7 @@ async function renderConstellation() {
       <div class="panel-heading">
         <h2 id="constellation-heading">Constellation Finder</h2>
         <div class="actions">
+          <button class="button" id="constellation-fullscreen" type="button">⛶ Fullscreen</button>
           <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
         </div>
       </div>
@@ -1046,9 +1047,19 @@ async function renderConstellation() {
     event.currentTarget.setAttribute("aria-pressed", String(namesVisible));
   });
 
+  const panel = viewContainer.querySelector(".constellation-panel");
+  viewContainer.querySelector("#constellation-fullscreen").addEventListener("click", (event) => {
+    const full = panel.classList.toggle("full");
+    event.currentTarget.textContent = full ? "✕ Exit fullscreen" : "⛶ Fullscreen";
+    resize();
+  });
+
   function resize() {
     const width = container.clientWidth || 600;
-    const height = Math.max(340, Math.min(600, window.innerHeight * 0.6));
+    const full = panel.classList.contains("full");
+    const height = full
+      ? Math.max(360, window.innerHeight - 190)
+      : Math.max(340, Math.min(600, window.innerHeight * 0.6));
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
