@@ -462,6 +462,20 @@
           display: block;
         }
 
+        .constellation-panel.full {
+          position: fixed;
+          inset: 0;
+          z-index: 60;
+          overflow: auto;
+          background: #060a16;
+          padding: 20px 24px;
+          border-radius: 0;
+        }
+
+        .constellation-panel.full .constellation-canvas {
+          min-height: calc(100vh - 190px);
+        }
+
         .topbar {
           flex-direction: column;
         }
@@ -481,12 +495,12 @@
       <aside class="sidebar">
         <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span>MyVault OS</span></div>
         <nav class="nav-list" aria-label="Main navigation">
-          <button class="nav-link" type="button" data-view="home" aria-current="page">🏠 Home</button>
+          <button class="nav-link" type="button" data-view="home">🏠 Home</button>
           <button class="nav-link" type="button" data-view="skills">🧠 Skills</button>
           <button class="nav-link" type="button" data-view="projects">📁 Projects</button>
           <button class="nav-link" type="button" data-view="docs">📝 Docs</button>
           <button class="nav-link" type="button" data-view="chats">💬 Chats</button>
-          <button class="nav-link" type="button" data-view="constellation">🌌 Constellation</button>
+          <button class="nav-link" type="button" data-view="constellation" aria-current="page">🌌 Constellation</button>
           <button class="nav-link" type="button" data-view="build">🔧 Build/Repair</button>
         </nav>
         <div class="sidebar-footer">Your personal workspace</div>
