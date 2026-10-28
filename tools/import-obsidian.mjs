@@ -60,6 +60,7 @@ function cleanMarkdown(text) {
 function parseNote(filePath) {
   const raw = readFileSync(filePath, "utf8");
   const { tags } = parseFrontmatter(raw);
+  const links = [...raw.matchAll(/\[\[([^\]]+)\]\]/g)].map((match) => match[1].trim());
   const noFrontmatter = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
   const heading = noFrontmatter.match(/^#\s+(.+)$/m);
   const title = cleanMarkdown(heading?.[1] ?? "") ||
@@ -81,7 +82,7 @@ function parseNote(filePath) {
     : topFolder === "Working Projects" ? "projects"
     : "docs";
 
-  return { collection, relPath, item: { title, tags, summary } };
+  return { collection, relPath, item: { title, tags, links, summary } };
 }
 
 // --- main ---
@@ -98,18 +99,23 @@ for (const key of ["skills", "projects", "docs", "cards", "chats"]) {
   if (!Array.isArray(vault[key])) vault[key] = [];
 }
 
-const importedPaths = new Set(
-  [...vault.skills, ...vault.projects, ...vault.docs]
-    .map((item) => item.sourcePath)
-    .filter(Boolean)
-);
+const allCollections = [...vault.skills, ...vault.projects, ...vault.docs];
+const importedPaths = new Set(allCollections.map((item) => item.sourcePath).filter(Boolean));
 
 let added = 0;
+let updated = 0;
 let skipped = 0;
 for (const file of files) {
   const note = parseNote(file);
-  if (importedPaths.has(note.relPath)) {
-    skipped++;
+  const existingItem = allCollections.find((item) => item.sourcePath === note.relPath);
+  if (existingItem) {
+    const newLinks = JSON.stringify(note.item.links);
+    if (JSON.stringify(existingItem.links ?? []) !== newLinks) {
+      existingItem.links = note.item.links;
+      updated++;
+    } else {
+      skipped++;
+    }
     continue;
   }
   const base = {
@@ -118,6 +124,7 @@ for (const file of files) {
     source: "obsidian",
     sourcePath: note.relPath,
     tags: note.tags,
+    links: note.item.links,
     notes: note.summary
   };
   if (note.collection === "docs") {
@@ -130,15 +137,17 @@ for (const file of files) {
   added++;
 }
 
-console.log(`New: ${added}, already imported: ${skipped}`);
-if (added === 0) {
+console.log(`New: ${added}, links updated: ${updated}, unchanged: ${skipped}`);
+if (added === 0 && updated === 0) {
   console.log("Nothing to import.");
   process.exit(0);
 }
 
 const content = Buffer.from(JSON.stringify(vault, null, 2), "utf8").toString("base64");
 const payload = JSON.stringify({
-  message: `Import ${added} notes from Obsidian Second Brain`,
+  message: added > 0
+    ? `Import ${added} notes from Obsidian Second Brain`
+    : `Refresh links for ${updated} Obsidian notes`,
   content,
   sha
 });
