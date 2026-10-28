@@ -31,7 +31,9 @@
       }
 
       button,
-      textarea {
+      textarea,
+      input,
+      select {
         font: inherit;
       }
 
@@ -106,9 +108,9 @@
       .topbar {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         gap: 16px;
-        margin-bottom: 36px;
+        margin-bottom: 18px;
       }
 
       h1 {
@@ -120,6 +122,12 @@
       .subtitle {
         margin: 8px 0 0;
         color: #8b949e;
+      }
+
+      .topbar-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
       }
 
       .button {
@@ -145,6 +153,24 @@
         background: #2ea043;
       }
 
+      .button-danger {
+        border-color: #6e2c33;
+        background: transparent;
+        color: #ff7b72;
+        min-height: 32px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+
+      .button-danger:hover {
+        border-color: #ff7b72;
+      }
+
+      .button[disabled] {
+        opacity: 0.55;
+        cursor: default;
+      }
+
       .status {
         min-height: 22px;
         margin: 0 0 20px;
@@ -168,6 +194,7 @@
       }
 
       .card,
+      .panel,
       .vault-panel {
         border: 1px solid #30363d;
         border-radius: 10px;
@@ -176,6 +203,15 @@
 
       .card {
         padding: 20px;
+      }
+
+      button.card {
+        text-align: left;
+        color: inherit;
+      }
+
+      button.card:hover {
+        border-color: #58a6ff;
       }
 
       .card-label {
@@ -190,8 +226,10 @@
         font-weight: 650;
       }
 
+      .panel,
       .vault-panel {
         padding: 20px;
+        margin-bottom: 20px;
       }
 
       .panel-heading {
@@ -214,6 +252,134 @@
         gap: 8px;
       }
 
+      .item-form {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+      }
+
+      .field label {
+        color: #8b949e;
+        font-size: 13px;
+      }
+
+      .field input,
+      .field select,
+      .field textarea,
+      .search-input {
+        padding: 9px 12px;
+        border: 1px solid #30363d;
+        border-radius: 7px;
+        background: #0d1117;
+        color: #e6edf3;
+      }
+
+      .field textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+
+      .field input:focus,
+      .field select:focus,
+      .field textarea:focus,
+      .search-input:focus {
+        border-color: #58a6ff;
+        outline: none;
+      }
+
+      .item-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        display: grid;
+        gap: 6px;
+        padding: 14px 16px;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        background: #0d1117;
+      }
+
+      .item-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .item-name {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .item-name a {
+        color: #58a6ff;
+        text-decoration: none;
+      }
+
+      .item-name a:hover {
+        text-decoration: underline;
+      }
+
+      .item-meta {
+        color: #8b949e;
+        font-size: 13px;
+      }
+
+      .item-notes {
+        margin: 0;
+        color: #c9d1d9;
+        font-size: 14px;
+        white-space: pre-wrap;
+      }
+
+      .item-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .item-actions .button {
+        min-height: 32px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border: 1px solid #30363d;
+        border-radius: 999px;
+        color: #8b949e;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .empty-state {
+        padding: 28px 16px;
+        border: 1px dashed #30363d;
+        border-radius: 8px;
+        color: #8b949e;
+        text-align: center;
+      }
+
+      .search-input {
+        width: 100%;
+        margin-bottom: 14px;
+      }
+
       #vault-editor {
         display: block;
         width: 100%;
@@ -229,6 +395,37 @@
         resize: vertical;
       }
 
+      .diagnostics {
+        margin: 14px 0 0;
+        padding: 12px 16px;
+        border-radius: 7px;
+        background: #0d1117;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+
+      .diagnostics:empty {
+        display: none;
+      }
+
+      .diagnostics[data-kind="ok"] {
+        color: #3fb950;
+      }
+
+      .diagnostics[data-kind="warn"] {
+        color: #d29922;
+      }
+
+      .diagnostics[data-kind="error"] {
+        color: #ff7b72;
+      }
+
+      .voice-note time {
+        color: #8b949e;
+        font-size: 12px;
+      }
+
       @media (max-width: 700px) {
         .app-shell {
           grid-template-columns: 1fr;
@@ -242,7 +439,7 @@
         }
 
         .nav-list {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
         main {
@@ -250,7 +447,7 @@
         }
 
         .topbar {
-          align-items: flex-start;
+          flex-direction: column;
         }
       }
     </style>
@@ -260,11 +457,12 @@
       <aside class="sidebar">
         <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span>MyVault OS</span></div>
         <nav class="nav-list" aria-label="Main navigation">
-          <button class="nav-link" type="button" data-view="Home" aria-current="page">🏠 Home</button>
-          <button class="nav-link" type="button" data-view="Agents">🤖 Agents</button>
-          <button class="nav-link" type="button" data-view="Docs">📝 Docs</button>
-          <button class="nav-link" type="button" data-view="Skills">🧠 Skills</button>
-          <button class="nav-link" type="button" data-view="Build/Repair">🔨 Build/Repair</button>
+          <button class="nav-link" type="button" data-view="home" aria-current="page">🏠 Home</button>
+          <button class="nav-link" type="button" data-view="skills">🧠 Skills</button>
+          <button class="nav-link" type="button" data-view="projects">📁 Projects</button>
+          <button class="nav-link" type="button" data-view="docs">📝 Docs</button>
+          <button class="nav-link" type="button" data-view="chats">💬 Chats</button>
+          <button class="nav-link" type="button" data-view="build">🔧 Build/Repair</button>
         </nav>
         <div class="sidebar-footer">Your personal workspace</div>
       </aside>
@@ -274,37 +472,13 @@
             <h1 id="view-title">Home</h1>
             <p class="subtitle">Your personal knowledge and project vault.</p>
           </div>
-          <button class="button" id="login-button" type="button">Sign in with GitHub</button>
+          <div class="topbar-actions">
+            <button class="button button-primary" id="save-button" type="button" disabled>Save</button>
+            <button class="button" id="login-button" type="button">Sign in with GitHub</button>
+          </div>
         </header>
         <p class="status" id="status" role="status" aria-live="polite">Sign in to load your vault.</p>
-        <section class="card-grid" aria-label="Vault overview">
-          <article class="card"><p class="card-label">Skills</p><p class="card-value" id="skills-count">0</p></article>
-          <article class="card"><p class="card-label">Projects</p><p class="card-value" id="projects-count">0</p></article>
-          <article class="card"><p class="card-label">Documents</p><p class="card-value" id="docs-count">0</p></article>
-          <article class="card"><p class="card-label">Chats</p><p class="card-value" id="chats-count">0</p></article>
-        </section>
-        <section class="vault-panel" aria-labelledby="vault-heading">
-          <div class="panel-heading">
-            <h2 id="vault-heading">Vault data</h2>
-            <div class="actions">
-              <button class="button" id="voice-button" type="button">🎙 Voice input</button>
-              <button class="button" id="load-button" type="button">Reload</button>
-              <button class="button button-primary" id="save-button" type="button">Save vault</button>
-            </div>
-          </div>
-          <textarea id="vault-editor" aria-label="Vault data JSON" spellcheck="false">{
-  "skills": [],
-  "projects": [],
-  "docs": [],
-  "cards": [],
-  "chats": [],
-  "meta": {
-    "created": "2026-10-25",
-    "owner": "anthonymankaho",
-    "version": 1
-  }
-}</textarea>
-        </section>
+        <div id="view"></div>
       </main>
     </div>
     <script src="app.js"></script>
