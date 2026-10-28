@@ -446,12 +446,36 @@
           padding-top: 24px;
         }
 
+        .constellation-canvas {
+          width: 100%;
+          border-radius: 12px;
+          background: radial-gradient(ellipse at center, #101a2e 0%, #05070d 75%);
+          cursor: grab;
+          overflow: hidden;
+        }
+
+        .constellation-canvas:active {
+          cursor: grabbing;
+        }
+
+        .constellation-canvas canvas {
+          display: block;
+        }
+
         .topbar {
           flex-direction: column;
         }
       }
     </style>
-  </head>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
@@ -462,6 +486,7 @@
           <button class="nav-link" type="button" data-view="projects">📁 Projects</button>
           <button class="nav-link" type="button" data-view="docs">📝 Docs</button>
           <button class="nav-link" type="button" data-view="chats">💬 Chats</button>
+          <button class="nav-link" type="button" data-view="constellation">🌌 Constellation</button>
           <button class="nav-link" type="button" data-view="build">🔧 Build/Repair</button>
         </nav>
         <div class="sidebar-footer">Your personal workspace</div>
