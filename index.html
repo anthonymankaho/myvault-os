@@ -516,6 +516,60 @@
           border-radius: 999px;
         }
 
+        .sidebar-collapse {
+          width: 100%;
+          padding: 9px 10px;
+          border: 1px solid #30363d;
+          border-radius: 8px;
+          background: transparent;
+          color: #8b949e;
+          font-size: 13px;
+          cursor: pointer;
+        }
+
+        .sidebar-collapse:hover {
+          background: #161b22;
+          color: #f0f6fc;
+        }
+
+        body.sidebar-collapsed .app-shell {
+          grid-template-columns: 64px minmax(0, 1fr);
+        }
+
+        body.sidebar-collapsed .sidebar {
+          padding: 28px 10px;
+          gap: 24px;
+          align-items: center;
+        }
+
+        body.sidebar-collapsed .brand {
+          padding: 0;
+        }
+
+        body.sidebar-collapsed .brand-text,
+        body.sidebar-collapsed .nav-label,
+        body.sidebar-collapsed .sidebar-footer {
+          display: none;
+        }
+
+        body.sidebar-collapsed .nav-list {
+          width: 100%;
+        }
+
+        body.sidebar-collapsed .nav-link {
+          padding: 11px 6px;
+          text-align: center;
+          font-size: 17px;
+        }
+
+        .constellation-canvas {
+          height: 560px;
+        }
+
+        body.constellation-mode .constellation-canvas {
+          height: 100vh;
+        }
+
         .topbar {
           flex-direction: column;
         }
@@ -533,17 +587,18 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span>MyVault OS</span></div>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span class="brand-text">MyVault OS</span></div>
         <nav class="nav-list" aria-label="Main navigation">
-          <button class="nav-link" type="button" data-view="home">🏠 Home</button>
-          <button class="nav-link" type="button" data-view="skills">🧠 Skills</button>
-          <button class="nav-link" type="button" data-view="projects">📁 Projects</button>
-          <button class="nav-link" type="button" data-view="docs">📝 Docs</button>
-          <button class="nav-link" type="button" data-view="chats">💬 Chats</button>
-          <button class="nav-link" type="button" data-view="constellation" aria-current="page">🌌 Constellation</button>
-          <button class="nav-link" type="button" data-view="build">🔧 Build/Repair</button>
+          <button class="nav-link" type="button" data-view="home">🏠 <span class="nav-label">Home</span></button>
+          <button class="nav-link" type="button" data-view="skills">🧠 <span class="nav-label">Skills</span></button>
+          <button class="nav-link" type="button" data-view="projects">📁 <span class="nav-label">Projects</span></button>
+          <button class="nav-link" type="button" data-view="docs">📝 <span class="nav-label">Docs</span></button>
+          <button class="nav-link" type="button" data-view="chats">💬 <span class="nav-label">Chats</span></button>
+          <button class="nav-link" type="button" data-view="constellation" aria-current="page">🌌 <span class="nav-label">Constellation</span></button>
+          <button class="nav-link" type="button" data-view="build">🔧 <span class="nav-label">Build/Repair</span></button>
         </nav>
         <div class="sidebar-footer">Your personal workspace</div>
+        <button class="sidebar-collapse" id="sidebar-collapse" type="button" aria-label="Toggle sidebar">⇤ Collapse</button>
       </aside>
       <main>
         <header class="topbar">
