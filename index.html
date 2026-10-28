@@ -462,18 +462,58 @@
           display: block;
         }
 
-        .constellation-panel.full {
+        .constellation-controls {
           position: fixed;
-          inset: 0;
-          z-index: 60;
-          overflow: auto;
-          background: #060a16;
-          padding: 20px 24px;
+          top: 12px;
+          right: 12px;
+          z-index: 70;
+          display: flex;
+          gap: 8px;
+          opacity: 0.3;
+          transition: opacity 0.2s ease;
+        }
+
+        .constellation-controls:hover {
+          opacity: 1;
+        }
+
+        body.constellation-mode {
+          overflow: hidden;
+        }
+
+        body.constellation-mode .sidebar,
+        body.constellation-mode .topbar,
+        body.constellation-mode .status {
+          display: none;
+        }
+
+        body.constellation-mode .app-shell {
+          display: block;
+        }
+
+        body.constellation-mode .constellation-panel {
+          border: none;
+          background: transparent;
+          box-shadow: none;
+          padding: 0;
+          margin: 0;
+        }
+
+        body.constellation-mode .constellation-canvas {
           border-radius: 0;
         }
 
-        .constellation-panel.full .constellation-canvas {
-          min-height: calc(100vh - 190px);
+        body.constellation-mode .constellation-stats {
+          position: fixed;
+          bottom: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 70;
+          width: max-content;
+          max-width: 92vw;
+          background: rgba(4, 8, 18, 0.72);
+          padding: 6px 16px;
+          border-radius: 999px;
         }
 
         .topbar {

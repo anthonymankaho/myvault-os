@@ -378,6 +378,7 @@ function render() {
 
 function navigate(view) {
   state.view = view;
+  document.body.classList.toggle("constellation-mode", view === "constellation");
   document.querySelectorAll(".nav-link").forEach((item) => item.removeAttribute("aria-current"));
   document
     .querySelector(`.nav-link[data-view="${view}"]`)
@@ -744,16 +745,14 @@ async function renderConstellation() {
 
   viewContainer.innerHTML = `
     <section class="panel constellation-panel" aria-labelledby="constellation-heading">
-      <div class="panel-heading">
-        <h2 id="constellation-heading">Constellation Finder</h2>
-        <div class="actions">
-          <button class="button" id="constellation-fullscreen" type="button">⛶ Fullscreen</button>
-          <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
-        </div>
+      <div class="constellation-controls">
+        <h2 id="constellation-heading" class="visually-hidden">Constellation Finder</h2>
+        <button class="button" id="constellation-menu" type="button">☰ Views</button>
+        <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
       </div>
       <div id="constellation-canvas" class="constellation-canvas" role="img"
         aria-label="Star chart of skills and projects"></div>
-      <p class="diagnostics" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
+      <p class="diagnostics constellation-stats" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
     </section>`;
 
   const container = viewContainer.querySelector("#constellation-canvas");
@@ -783,14 +782,48 @@ async function renderConstellation() {
     tags: normalizeTags(node.item.tags)
   }));
 
+  const labelIndex = new Map();
+  nodes.forEach((node, index) => {
+    const key = node.label.toLowerCase();
+    if (!labelIndex.has(key)) {
+      labelIndex.set(key, index);
+    }
+  });
+  const linkTarget = (value) => {
+    const name = String(value)
+      .split("|")[0]
+      .split("/")
+      .pop()
+      .split("#")[0]
+      .replace(/\.md$/i, "")
+      .trim()
+      .toLowerCase();
+    return labelIndex.get(name);
+  };
   const edges = [];
+  const hasEdge = new Set();
+  const addEdge = (a, b) => {
+    if (a === b || hasEdge.has(`${a}-${b}`)) {
+      return;
+    }
+    hasEdge.add(`${a}-${b}`);
+    edges.push([a, b]);
+  };
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       if (nodes[i].tags.some((tag) => nodes[j].tags.includes(tag))) {
-        edges.push([i, j]);
+        addEdge(i, j);
       }
     }
   }
+  nodes.forEach((node, index) => {
+    for (const link of node.item.links ?? []) {
+      const target = linkTarget(link);
+      if (target !== undefined) {
+        addEdge(index, target);
+      }
+    }
+  });
 
   // Layout: golden-spiral seed, then simple repulsion + spring relaxation.
   const count = nodes.length;
@@ -1048,17 +1081,16 @@ async function renderConstellation() {
   });
 
   const panel = viewContainer.querySelector(".constellation-panel");
-  viewContainer.querySelector("#constellation-fullscreen").addEventListener("click", (event) => {
-    const full = panel.classList.toggle("full");
-    event.currentTarget.textContent = full ? "✕ Exit fullscreen" : "⛶ Fullscreen";
+  viewContainer.querySelector("#constellation-menu").addEventListener("click", () => {
+    document.body.classList.toggle("constellation-mode");
     resize();
   });
 
   function resize() {
-    const width = container.clientWidth || 600;
-    const full = panel.classList.contains("full");
+    const full = document.body.classList.contains("constellation-mode");
+    const width = full ? window.innerWidth : container.clientWidth || 600;
     const height = full
-      ? Math.max(360, window.innerHeight - 190)
+      ? window.innerHeight
       : Math.max(340, Math.min(600, window.innerHeight * 0.6));
     renderer.setSize(width, height);
     camera.aspect = width / height;
@@ -1149,6 +1181,13 @@ window.addEventListener("message", (event) => {
 });
 
 handleOAuthCallback();
+
+document.body.classList.toggle("constellation-mode", state.view === "constellation");
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("constellation-mode")) {
+    document.querySelector("#constellation-menu")?.click();
+  }
+});
 
 if (localStorage.getItem(TOKEN_KEY)) {
   loginButton.textContent = "Sign out";
