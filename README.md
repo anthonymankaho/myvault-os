@@ -53,7 +53,7 @@ _Screenshot coming soon._
 
 Run `node --check app.js` and `node --test test/app.test.cjs` with Node.js 18 or newer. Serve the repository with any static HTTP server to preview it. GitHub OAuth still uses the configured production callback and Worker; a local preview does not establish a production sign-in session.
 
-The app opens on the overview by default. The constellation remains available in navigation, with persistent access to other views and a rotation toggle. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
+The app opens on the overview by default. The 3D constellation is a subtle, data-aware background across the workspace, with projects at the center and skills and other records around a 65° ring; it is not a separate navigation page. Reduced-motion preferences keep it still. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
 
 Built with Kimi + Qwen AI.
 

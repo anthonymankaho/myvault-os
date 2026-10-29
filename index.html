@@ -18,7 +18,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon-180.png" type="image/png" />
     <link rel="apple-touch-icon" href="icon-180.png" />
-    <link rel="stylesheet" href="styles.css?v=design-1" />
+    <link rel="stylesheet" href="styles.css?v=constellation-bg-1" />
     <link rel="stylesheet" href="qwen.css?v=1" />
     <script type="importmap">
       {
@@ -31,6 +31,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
+    <div id="constellation-background" class="constellation-background" aria-hidden="true"></div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Workspace">
         <a class="brand" href="#home" aria-label="MyVault OS overview"
@@ -72,10 +73,6 @@
             ><span class="nav-count" data-count="chats">0</span>
           </button>
           <span class="nav-section">EXPLORE</span>
-          <button class="nav-link" type="button" data-view="constellation">
-            <span data-icon="constellation"></span
-            ><span class="nav-label">Constellation</span>
-          </button>
           <button class="nav-link" type="button" data-view="build">
             <span data-icon="build"></span
             ><span class="nav-label">Build / Repair</span>
@@ -157,7 +154,7 @@
     <dialog id="item-dialog" aria-labelledby="dialog-title">
       <div id="dialog-content"></div>
     </dialog>
-    <script src="app.js?v=constellation-2"></script>
+    <script src="app.js?v=constellation-bg-1"></script>
     <script type="module" src="qwen.mjs?v=1"></script>
   </body>
 </html>
