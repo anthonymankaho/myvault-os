@@ -6,5 +6,10 @@
   "observability": {
     "enabled": true
   },
-  "upload_source_maps": true
+  "upload_source_maps": true,
+  "vars": {
+    "QWEN_BASE_URL": "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1",
+    "QWEN_MODEL": "qwen3.8-flash",
+    "QWEN_ALLOWED_GITHUB_USER": "anthonymankaho"
+  }
 }

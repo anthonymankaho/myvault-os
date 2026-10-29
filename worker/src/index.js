@@ -1,3 +1,5 @@
+import { handleQwen, AIError, readBoundedJSON } from "./qwen.js";
+
 const GITHUB_CONTENTS_URL =
   "https://api.github.com/repos/anthonymankaho/myvault-data/contents/vault.json";
 const GITHUB_OAUTH_URL = "https://github.com/login/oauth/access_token";
@@ -198,7 +200,7 @@ export default {
 
     let body;
     try {
-      body = await request.json();
+      body = await readBoundedJSON(request, 2097152);
     } catch {
       return errorResponse("Request body must be valid JSON.", 400, origin);
     }
@@ -210,6 +212,32 @@ export default {
     const payload = body.payload ?? {};
 
     switch (body.action) {
+      case 'qwen': {
+        if (origin && !ALLOWED_ORIGINS.has(origin)) return errorResponse('Origin is not allowed.', 403, origin);
+        try {
+          const reply = await handleQwen(payload, request.headers.get('Authorization'), env);
+          return new Response(JSON.stringify(reply), {
+            headers: { ...corsHeaders(origin), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+          });
+        } catch (error) {
+          const known = error instanceof AIError;
+          return new Response(
+            JSON.stringify({
+              error: known ? error.message : 'Qwen is temporarily unavailable.',
+              code: known ? error.code : 'AI_UNAVAILABLE',
+            }),
+            {
+              status: known ? error.status : 503,
+              headers: {
+                ...corsHeaders(origin),
+                'Content-Type': 'application/json; charset=utf-8',
+                'Cache-Control': 'no-store',
+                ...(known && error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {}),
+              },
+            },
+          );
+        }
+      }
       case "auth":
         return handleAuth(payload, env, origin);
       case "load":
