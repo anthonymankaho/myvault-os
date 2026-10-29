@@ -76,7 +76,6 @@ const VIEWS = {
       { title: config.title },
     ]),
   ),
-  constellation: { title: "Constellation" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
 };
@@ -430,15 +429,11 @@ function startVoiceInput() {
 }
 
 function render() {
-  if (constellationCleanup) {
-    constellationCleanup();
-    constellationCleanup = null;
-  }
-
   if (!state.vault) {
     viewContainer.innerHTML = "";
     return;
   }
+  updateConstellationBackground();
   updateSaveButton();
   document.querySelectorAll("[data-count]").forEach((el) => {
     el.textContent = state.vault[el.dataset.count].length;
@@ -447,9 +442,6 @@ function render() {
   switch (state.view) {
     case "home":
       renderHome();
-      break;
-    case "constellation":
-      renderConstellation();
       break;
     case "build":
       renderBuild();
@@ -502,8 +494,6 @@ const ICON_PATHS = {
   docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
   chats:
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
-  constellation:
-    '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="4" r="2"/><circle cx="13" cy="17" r="3"/><path d="m7 6 10-2M6 8l5 7m8-9-5 8"/>',
   build:
     '<path d="m14 6 4 4m-12 4 4 4M3 21l7-7m3-6L7 2 2 7l6 6m5 0 8 8m-4-8a6 6 0 0 0 5-8l-4 4-3-3 4-4a6 6 0 0 0-8 5"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
@@ -618,7 +608,7 @@ function renderHome() {
         )
         .join(
           "",
-        )}<circle cx="50" cy="18" r="1" fill="currentColor"/><circle cx="224" cy="15" r="1" fill="currentColor"/></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connect the dots.</h2><p>Explore the relationships between your skills and projects in your constellation.</p><button class="button" type="button" data-navigate="constellation">Explore constellation ↗</button></section>
+        )}<circle cx="50" cy="18" r="1" fill="currentColor"/><circle cx="224" cy="15" r="1" fill="currentColor"/></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connect the dots.</h2><p>Projects anchor a 65° orbit of skills and other records, visible as a quiet background throughout your workspace.</p><span class="constellation-background-badge">Live background</span></section>
       <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><h2 id="voice-heading">Voice notes</h2><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>${notes.length ? `<div class="item-list">${notes.map((note) => `<div class="item voice-note"><p class="item-notes">${escapeHtml(note.text)}</p><div class="item-top">${note.at ? `<time>${escapeHtml(formatTime(note.at))}</time>` : ""}<button class="button-danger" type="button" data-delete-voice="${note.rawIndex}" aria-label="Delete voice note">Delete</button></div></div>`).join("")}</div>` : '<p class="voice-empty">A passing thought? Say it out loud.<br>Capture a note and come back to it later.</p>'}</section>
     </div></div>`;
   bindWorkspaceActions();
@@ -974,6 +964,8 @@ function renderBuild() {
 }
 
 let constellationCleanup = null;
+let constellationDataKey = "";
+const CONSTELLATION_COLLECTIONS = ["projects", "skills", "docs", "chats", "cards"];
 
 function normalizeTags(value) {
   const list = Array.isArray(value)
@@ -984,63 +976,35 @@ function normalizeTags(value) {
   return list.filter(Boolean).map((tag) => String(tag).toLowerCase());
 }
 
-async function renderConstellation() {
-  const token = {};
+async function updateConstellationBackground() {
+  const container = document.querySelector("#constellation-background");
+  if (!container) return;
+  const dataKey = JSON.stringify(
+    CONSTELLATION_COLLECTIONS.flatMap((kind) =>
+      state.vault[kind].map((item) => [
+        kind,
+        item.id ?? "",
+        itemTitle(item),
+        normalizeTags(item.tags),
+        item.links ?? [],
+      ]),
+    ),
+  );
+  if (dataKey === constellationDataKey) return;
+  constellationDataKey = dataKey;
+  constellationCleanup?.();
+  container.replaceChildren();
+  const token = { cancelled: false };
+  let disposeResources = () => {};
   constellationCleanup = () => {
     token.cancelled = true;
+    disposeResources();
   };
 
-  viewContainer.innerHTML = `
-    ${pageHeading("Constellation", "Projects anchor the center. Skills and other vault records orbit on a 65° ring. Drag to orbit and scroll to zoom.")}
-    <section class="panel constellation-panel" aria-labelledby="constellation-heading">
-      <div class="constellation-controls">
-        <h2 id="constellation-heading" class="visually-hidden">Constellation Finder</h2>
-        <button class="button" id="constellation-menu" type="button">← Overview</button>
-        <button class="button" id="constellation-motion" type="button" aria-pressed="false">Pause rotation</button>
-        <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
-      </div>
-      <div class="constellation-legend" aria-label="Constellation groups">
-        <span><i class="legend-project" aria-hidden="true"></i>Projects · center</span>
-        <span><i class="legend-skill" aria-hidden="true"></i>Skills · 65° ring</span>
-        <span><i class="legend-other" aria-hidden="true"></i>Other records · 65° ring</span>
-      </div>
-      <div id="constellation-canvas" class="constellation-canvas" role="img"
-        aria-label="Star chart with projects in the center and skills and other vault records on a 65 degree ring"></div>
-      <p class="diagnostics constellation-stats" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
-    </section>`;
-
-  const container = viewContainer.querySelector("#constellation-canvas");
-  const stats = viewContainer.querySelector("#constellation-stats");
-  viewContainer
-    .querySelector("#constellation-menu")
-    .addEventListener("click", () => navigate("home"));
-  const constellationCollections = ["projects", "skills", "docs", "chats", "cards"];
-  if (!constellationCollections.some((key) => state.vault[key].length)) {
-    container.innerHTML = emptyState(
-      "constellation",
-      "A universe of possibilities",
-      "Add a project, skill, document, or chat to start connecting your ideas.",
-      '<button class="button" type="button" data-add="projects">New project</button>',
-    );
-    stats.textContent =
-      "Projects sit at the center; skills and other records follow the inclined ring.";
-    viewContainer.querySelector("#constellation-names").disabled = true;
-    viewContainer.querySelector("#constellation-motion").disabled = true;
-    bindWorkspaceActions();
-    return;
-  }
-
   let THREE;
-  let OrbitControls;
   try {
     THREE = await import("three");
-    ({ OrbitControls } = await import(
-      "three/addons/controls/OrbitControls.js"
-    ));
   } catch {
-    stats.dataset.kind = "error";
-    stats.textContent =
-      "The 3D engine could not be loaded. Check your internet connection, then switch views and back to retry.";
     return;
   }
   if (token.cancelled) {
@@ -1061,7 +1025,7 @@ async function renderConstellation() {
     chats: "#8ed0bc",
     cards: "#e6a98e",
   };
-  const nodes = constellationCollections.flatMap((kind) =>
+  const nodes = CONSTELLATION_COLLECTIONS.flatMap((kind) =>
     state.vault[kind].map((item) => ({ item, kind })),
   ).map((node) => ({
     ...node,
@@ -1152,35 +1116,18 @@ async function renderConstellation() {
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   } catch {
-    stats.dataset.kind = "error";
-    stats.textContent =
-      "3D is unavailable in this browser. Your skills and projects are still available from the navigation.";
     return;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
+  const starSystem = new THREE.Group();
+  scene.add(starSystem);
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 600);
   camera.position.set(0, 6, 56);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.autoRotate = !window.matchMedia("(prefers-reduced-motion: reduce)")
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
     .matches;
-  controls.autoRotateSpeed = 0.35;
-  const motionButton = viewContainer.querySelector("#constellation-motion");
-  const updateMotionButton = () => {
-    motionButton.textContent = controls.autoRotate
-      ? "Pause rotation"
-      : "Resume rotation";
-    motionButton.setAttribute("aria-pressed", String(!controls.autoRotate));
-  };
-  updateMotionButton();
-  motionButton.addEventListener("click", () => {
-    controls.autoRotate = !controls.autoRotate;
-    updateMotionButton();
-  });
 
   // Star textures: soft glow for named stars, tiny dot for background sky.
   const glowTexture = (() => {
@@ -1287,7 +1234,7 @@ async function renderConstellation() {
         blending: THREE.AdditiveBlending,
       }),
     );
-    scene.add(points);
+    starSystem.add(points);
     pointLayers.push(points);
   }
 
@@ -1302,7 +1249,7 @@ async function renderConstellation() {
     "position",
     new THREE.BufferAttribute(linePositions, 3),
   );
-  scene.add(
+  starSystem.add(
     new THREE.LineSegments(
       lineGeometry,
       new THREE.LineBasicMaterial({
@@ -1348,19 +1295,19 @@ async function renderConstellation() {
       if (plane === "tilt2") geometry.rotateX(-Math.PI / 3);
       if (plane === "xy") geometry.rotateY(Math.PI / 2.6);
       gridGeometries.push(geometry);
-      scene.add(new THREE.LineLoop(geometry, gridMaterial));
+      starSystem.add(new THREE.LineLoop(geometry, gridMaterial));
     }
     // Meridians.
     for (let m = 0; m < 4; m++) {
       const geometry = makeRing("xy");
       geometry.rotateY((m / 4) * Math.PI);
       gridGeometries.push(geometry);
-      scene.add(new THREE.LineLoop(geometry, gridMaterial));
+      starSystem.add(new THREE.LineLoop(geometry, gridMaterial));
     }
     const orbitGeometry = makeRing("xz");
     orbitGeometry.rotateX((65 * Math.PI) / 180);
     gridGeometries.push(orbitGeometry);
-    scene.add(
+    starSystem.add(
       new THREE.LineLoop(
         orbitGeometry,
         new THREE.LineBasicMaterial({
@@ -1388,7 +1335,7 @@ async function renderConstellation() {
       new THREE.SpriteMaterial({
         map: new THREE.CanvasTexture(canvas),
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.58,
         depthTest: false,
       }),
     );
@@ -1398,79 +1345,36 @@ async function renderConstellation() {
       positions[nodeIndex * 3 + 1] + 1.1,
       positions[nodeIndex * 3 + 2],
     );
-    scene.add(sprite);
+    starSystem.add(sprite);
     return sprite;
   });
-  let namesVisible = true;
-  viewContainer
-    .querySelector("#constellation-names")
-    .addEventListener("click", (event) => {
-      namesVisible = !namesVisible;
-      labelSprites.forEach((sprite) => {
-        sprite.visible = namesVisible;
-      });
-      event.currentTarget.textContent = namesVisible
-        ? "Hide names"
-        : "Show names";
-      event.currentTarget.setAttribute("aria-pressed", String(namesVisible));
-    });
 
   function resize() {
-    const width = container.clientWidth || 600;
-    const height = container.clientHeight || 560;
+    const width = window.innerWidth || 600;
+    const height = window.innerHeight || 560;
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    if (reducedMotion) renderer.render(scene, camera);
   }
   resize();
   window.addEventListener("resize", resize);
-
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Points = { threshold: 1.5 };
-  const pointer = new THREE.Vector2(-10, -10);
-  renderer.domElement.addEventListener("pointermove", (event) => {
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  });
-
-  stats.dataset.kind = "ok";
-  stats.textContent = [
-    `${centerIndexes.length} projects at center`,
-    `${nodes.filter((n) => n.kind === "skills").length} skills`,
-    `${nodes.filter((n) => !["projects", "skills"].includes(n.kind)).length} other records`,
-    `${edges.length} constellation lines`,
-  ].join(" · ") + " — drag to orbit, scroll to zoom, hover a star.";
 
   let frame = 0;
   function animate() {
     if (token.cancelled) {
       return;
     }
-    frame = requestAnimationFrame(animate);
-    controls.update();
-    raycaster.setFromCamera(pointer, camera);
-    for (const layer of pointLayers) {
-      const hit = raycaster.intersectObject(layer)[0];
-      if (hit) {
-        const nodeIndex = layer.geometry.userData.nodeIndexes[hit.index];
-        const node = nodes[nodeIndex];
-        const shared = edges.filter(
-          ([a, b]) => a === nodeIndex || b === nodeIndex,
-        ).length;
-        stats.textContent = `✦ ${node.label} (${node.kind}) — ${node.tags.length} tags · ${shared} lines`;
-        break;
-      }
-    }
+    if (!document.hidden && !reducedMotion) starSystem.rotation.y += 0.00035;
     renderer.render(scene, camera);
+    if (!reducedMotion) frame = requestAnimationFrame(animate);
   }
   animate();
 
-  constellationCleanup = () => {
+  disposeResources = () => {
     token.cancelled = true;
     cancelAnimationFrame(frame);
     window.removeEventListener("resize", resize);
-    controls.dispose();
     pointGeometries.forEach((geometry) => geometry.dispose());
     lineGeometry.dispose();
     gridGeometries.forEach((geometry) => geometry.dispose());
@@ -1586,13 +1490,6 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     document.querySelector("#global-search").focus();
   }
-  if (
-    event.key === "Escape" &&
-    state.view === "constellation" &&
-    !document.querySelector("dialog[open]")
-  ) {
-    navigate("home");
-  }
 });
 
 if (localStorage.getItem(TOKEN_KEY)) {
@@ -1618,6 +1515,7 @@ globalThis.myVaultAIBridge = Object.freeze({
 const cached = readCache();
 const initialView = location.hash.slice(1);
 if (VIEWS[initialView] && initialView !== "search") state.view = initialView;
+else if (initialView === "constellation") history.replaceState(null, "", "#home");
 viewTitle.textContent = VIEWS[state.view].title;
 document.title = `${VIEWS[state.view].title} · MyVault OS`;
 document.querySelectorAll(".nav-link").forEach((el) => {
