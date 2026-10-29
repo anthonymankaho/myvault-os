@@ -19,6 +19,7 @@
     <link rel="icon" href="icon-180.png" type="image/png" />
     <link rel="apple-touch-icon" href="icon-180.png" />
     <link rel="stylesheet" href="styles.css?v=design-1" />
+    <link rel="stylesheet" href="qwen.css?v=1" />
     <script type="importmap">
       {
         "imports": {
@@ -103,6 +104,15 @@
             Workspace <span>/</span> <strong id="view-title">Home</strong>
           </div>
           <div class="utility-actions">
+            <button
+              class="button button-quiet"
+              id="ask-qwen"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="qwen-panel"
+            >
+              Ask Qwen
+            </button>
             <span class="sync-indicator" id="sync-indicator"
               >Local workspace</span
             ><button
@@ -147,6 +157,7 @@
     <dialog id="item-dialog" aria-labelledby="dialog-title">
       <div id="dialog-content"></div>
     </dialog>
-    <script src="app.js?v=design-1"></script>
+    <script src="app.js?v=qwen-1"></script>
+    <script type="module" src="qwen.mjs?v=1"></script>
   </body>
 </html>

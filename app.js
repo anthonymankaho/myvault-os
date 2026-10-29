@@ -151,7 +151,7 @@ function normalizeVault(raw) {
   return vault;
 }
 
-async function call(action, payload = {}) {
+async function call(action, payload = {}, { signal } = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers = { "Content-Type": "application/json" };
 
@@ -161,13 +161,20 @@ async function call(action, payload = {}) {
 
   const response = await fetch(API, {
     method: "POST",
+    signal,
     headers,
     body: JSON.stringify({ action, payload }),
   });
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(result.error || `Request failed (${response.status})`);
+    const error = new Error(
+      result.error || `Request failed (${response.status})`,
+    );
+    error.code = result.code;
+    error.status = response.status;
+    error.retryAfter = Number(response.headers.get("Retry-After")) || 0;
+    throw error;
   }
 
   return result;
@@ -1555,7 +1562,7 @@ window.addEventListener("keydown", (event) => {
   if (
     event.key === "Escape" &&
     state.view === "constellation" &&
-    !document.querySelector("#item-dialog").open
+    !document.querySelector("dialog[open]")
   ) {
     navigate("home");
   }
@@ -1564,6 +1571,22 @@ window.addEventListener("keydown", (event) => {
 if (localStorage.getItem(TOKEN_KEY)) {
   loginButton.textContent = "Sign out";
 }
+
+// Narrow bridge for the optional AI panel. It never exposes credentials.
+globalThis.myVaultAIBridge = Object.freeze({
+  getVault: () => state.vault,
+  isSignedIn: () => Boolean(localStorage.getItem(TOKEN_KEY)),
+  getRevision: () => state.revision,
+  uid,
+  call,
+  escapeHtml,
+  applyLocalVault(nextVault, message) {
+    state.vault = normalizeVault(nextVault);
+    markDirty();
+    render();
+    setStatus(message, "success");
+  },
+});
 
 const cached = readCache();
 const initialView = location.hash.slice(1);
