@@ -41,7 +41,7 @@ async function timedJSON(url, options, milliseconds, maxBytes) {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), milliseconds);
 	try {
-		const response = await fetch(url, { ...options, redirect: 'error', signal: controller.signal });
+		const response = await fetch(url, { ...options, redirect: 'manual', signal: controller.signal });
 		if (!response.ok) {
 			// Never return/log upstream response bodies: they can contain credentials.
 			if (response.body) await response.body.cancel();

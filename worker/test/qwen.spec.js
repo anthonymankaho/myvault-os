@@ -65,9 +65,11 @@ describe('Qwen API', () => {
 		expect(await response.json()).toEqual(reply([op]));
 		expect(mock.mock.calls[0][0]).toBe('https://api.github.com/user');
 		expect(mock.mock.calls[0][1].headers.Authorization).toBe(TOKEN);
+		expect(mock.mock.calls[0][1].redirect).toBe('manual');
 		const [url, options] = mock.mock.calls[1];
 		expect(url).toBe(BASE + '/chat/completions');
 		expect(options.headers.Authorization).toBe(`Bearer ${KEY}`);
+		expect(options.redirect).toBe('manual');
 		expect(options.body).not.toContain(TOKEN);
 		expect(options.body).not.toContain('do-not-send');
 		const body = JSON.parse(options.body);
@@ -149,6 +151,15 @@ describe('Qwen API', () => {
 	it('handles unavailable configuration', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(Response.json({ login: 'anthonymankaho' })));
 		expect((await worker.fetch(request(), {})).status).toBe(503);
+	});
+	it('does not follow provider redirects or forward credentials to their destinations', async () => {
+		const mock = vi.fn().mockResolvedValueOnce(Response.json({ login: 'anthonymankaho' }))
+			.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: 'https://other.example' } }));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request(), ENV);
+		expect(response.status).toBe(502);
+		expect(mock).toHaveBeenCalledTimes(2);
+		expect(mock.mock.calls[1][1].redirect).toBe('manual');
 	});
 	it('times out an upstream request', async () => {
 		vi.useFakeTimers();
