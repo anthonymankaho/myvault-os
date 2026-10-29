@@ -1055,8 +1055,8 @@ async function renderConstellation() {
     cards: "#ffcdb9",
   };
   const KIND_LABEL_COLOR = {
-    skill: "#9fc6ee",
-    project: "#e8c795",
+    skills: "#9fc6ee",
+    projects: "#e8c795",
     docs: "#bdabf3",
     chats: "#8ed0bc",
     cards: "#e6a98e",
