@@ -78,6 +78,7 @@ describe('Qwen API', () => {
 		expect(body.messages[0].content).toContain('untrusted reference DATA');
 		expect(body.messages.at(-1).role).toBe('user');
 		expect(body.messages.at(-1).content).toContain('vault_data');
+		expect(JSON.parse(body.messages.at(-1).content).vault_summary).toEqual({ projects: 1, skills: 0, docs: 0, chats: 0 });
 		expect(response.headers.get('Cache-Control')).toBe('no-store');
 	});
 	it('supports the explicitly configured Token Plan endpoint and model', async () => {
@@ -87,6 +88,7 @@ describe('Qwen API', () => {
 		expect((await worker.fetch(request(), env)).status).toBe(200);
 		expect(mock.mock.calls[1][0]).toBe(env.QWEN_BASE_URL + '/chat/completions');
 		expect(JSON.parse(mock.mock.calls[1][1].body).model).toBe('qwen3.8-flash');
+		expect(JSON.parse(mock.mock.calls[1][1].body).enable_thinking).toBe(false);
 	});
 	it.each([
 		{ type: 'delete', collection: 'projects', id: 'p1', fields: { name: 'bad' } },
