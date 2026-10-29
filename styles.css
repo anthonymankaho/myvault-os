@@ -113,6 +113,9 @@ summary:focus-visible {
   grid-template-columns: 232px minmax(0, 1fr);
   min-height: 100vh;
 }
+body.constellation-home .workspace {
+  display: none;
+}
 .sidebar {
   position: sticky;
   top: 0;

@@ -69,7 +69,8 @@ const COLLECTIONS = {
 };
 
 const VIEWS = {
-  home: { title: "Home" },
+  home: { title: "Constellation" },
+  control: { title: "Control" },
   ...Object.fromEntries(
     Object.entries(COLLECTIONS).map(([key, config]) => [
       key,
@@ -429,6 +430,7 @@ function startVoiceInput() {
 }
 
 function render() {
+  document.body.classList.toggle("constellation-home", state.view === "home");
   if (!state.vault) {
     viewContainer.innerHTML = "";
     return;
@@ -441,6 +443,9 @@ function render() {
 
   switch (state.view) {
     case "home":
+      viewContainer.innerHTML = "";
+      break;
+    case "control":
       renderHome();
       break;
     case "build":
@@ -489,6 +494,8 @@ function recentItems() {
 
 const ICON_PATHS = {
   home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  constellation:
+    '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="4" r="2"/><circle cx="13" cy="17" r="3"/><path d="m7 6 10-2M6 8l5 7m8-9-5 8"/>',
   projects: '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3z"/>',
   skills: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
   docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
