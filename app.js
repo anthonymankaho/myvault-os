@@ -530,7 +530,7 @@ function openRecordButton(
   detail,
   className = "recent-row",
 ) {
-  return `<button class="${className}" data-open-collection="${collection}" data-open-index="${index}" type="button"><span class="row-icon">${icon(collection)}</span><span class="row-text"><span class="row-title">${escapeHtml(itemTitle(item))}</span><span class="row-detail">${escapeHtml(detail)}</span></span><span class="row-arrow" aria-hidden="true">↗</span></button>`;
+  return `<button class="${className}" data-open-collection="${collection}" data-open-index="${index}" type="button"><span class="row-icon">${icon(collection)}</span><span class="row-text"><span class="row-title">${escapeHtml(itemTitle(item))}</span><span class="row-detail">${escapeHtml(detail)}</span></span><span class="row-arrow">›</span></button>`;
 }
 
 function bindWorkspaceActions() {
@@ -571,9 +571,9 @@ function renderHome() {
   const recent = recentItems();
   viewContainer.innerHTML = `
     ${pageHeading(greeting, "A little clarity for everything you’re building.", `<div class="date-chip">${icon("calendar")}${escapeHtml(new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))}</div>`)}
-    <section class="card-grid" aria-label="Vault overview">${["projects", "skills", "docs", "chats"].map((key) => `<button class="card" type="button" data-navigate="${key}"><span class="card-top"><span class="card-icon">${icon(key)}</span><span class="card-arrow" aria-hidden="true">↗</span></span><p class="card-label">${COLLECTIONS[key].title}</p><p class="card-value">${state.vault[key].length}</p><span class="card-caption">${captions[key]}</span></button>`).join("")}</section>
+    <section class="card-grid" aria-label="Vault overview">${["projects", "skills", "docs", "chats"].map((key) => `<button class="card" type="button" data-navigate="${key}"><span class="card-top"><span class="card-icon">${icon(key)}</span><span class="card-arrow">›</span></span><span class="card-label">${escapeHtml(captions[key])}</span><p class="card-value">${state.vault[key].length}</p><span class="card-caption">${escapeHtml(key === "projects" ? "active projects" : key)}</span></button>`).join("")}</section>
     <div class="dashboard-grid"><div>
-      <section class="panel" aria-labelledby="projects-heading"><div class="panel-heading"><div><h2 id="projects-heading">In focus</h2><p class="section-caption">Your active projects, all in one place</p></div><button class="text-button" type="button" data-navigate="projects">All projects ↗</button></div>
+      <section class="panel" aria-labelledby="projects-heading"><div class="panel-heading"><div><h2 id="projects-heading">In focus</h2><p class="section-caption">Your active projects, all in one place.</p></div></div>
         ${
           active.length
             ? active
@@ -596,32 +596,22 @@ function renderHome() {
               )
         }
       </section>
-      <section class="panel" aria-labelledby="recent-heading"><div class="panel-heading"><div><h2 id="recent-heading">Recently added</h2><p class="section-caption">Pick up a thread from your vault</p></div><span class="item-meta">${recent.length} items</span></div><div class="recent-list">
-        ${recent.length ? recent.map(({ collection, config, item }) => openRecordButton(collection, state.vault[collection].indexOf(item), item, `${config.title} · ${formatTime(item.created) || "Imported item"}`)).join("") : emptyState("docs", "Your workspace starts here", "Add your first skill, document, project, or chat using Quick capture.")}
-      </div></section>
+      <section class="panel" aria-labelledby="recent-heading"><div class="panel-heading"><div><h2 id="recent-heading">Recently added</h2><p class="section-caption">Pick up a thread from your vault.</p></div></div>
+        ${recent.length ? recent.map(({ collection, config, item }) => openRecordButton(collection, state.vault[collection].indexOf(item), item, `${config.title} · ${formatTime(item.created) || "just now"}`).replace(/\n/g, "")).join("") : emptyState("search", "Nothing new yet", "Add a skill, project, doc, or chat to begin.")}
+      </section>
     </div><div>
-      <section class="panel" aria-labelledby="capture-heading"><div class="panel-heading"><div><h2 id="capture-heading">Quick capture</h2><p class="section-caption">Give your next thought a home</p></div>${icon("plus")}</div><div class="quick-actions">${["projects", "skills", "docs", "chats"].map((key) => `<button class="quick-action" type="button" data-add="${key}">${icon(key)}<span>New ${COLLECTIONS[key].singular}</span></button>`).join("")}</div></section>
-      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 54 53 34-63 75 28-38 45-71-10L80 30l88-10M25 70l109 13 109-35" stroke="currentColor" opacity=".3"/>${[
-        [25, 70],
-        [80, 30],
-        [134, 83],
-        [168, 20],
-        [243, 48],
-        [205, 93],
-      ]
-        .map(
-          ([x, y]) =>
-            `<circle cx="${x}" cy="${y}" r="9" fill="currentColor" opacity=".06"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`,
-        )
-        .join(
-          "",
-        )}<circle cx="50" cy="18" r="1" fill="currentColor"/><circle cx="224" cy="15" r="1" fill="currentColor"/></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connect the dots.</h2><p>Projects anchor a 65° orbit of skills and other records, visible as a quiet background throughout your workspace.</p><span class="constellation-background-badge">Live background</span></section>
-      <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><h2 id="voice-heading">Voice notes</h2><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>${notes.length ? `<div class="item-list">${notes.map((note) => `<div class="item voice-note"><p class="item-notes">${escapeHtml(note.text)}</p><div class="item-top">${note.at ? `<time>${escapeHtml(formatTime(note.at))}</time>` : ""}<button class="button-danger" type="button" data-delete-voice="${note.rawIndex}" aria-label="Delete voice note">Delete</button></div></div>`).join("")}</div>` : '<p class="voice-empty">A passing thought? Say it out loud.<br>Capture a note and come back to it later.</p>'}</section>
+      <section class="panel" aria-labelledby="capture-heading"><div class="panel-heading"><div><h2 id="capture-heading">Quick capture</h2><p class="section-caption">Give your next thought a home.</p></div></div>
+        <div class="quick-actions">${["projects", "skills", "docs", "chats"].map((key) => `<button class="quick-action" type="button" data-add="${key}">${icon(key)}<span>${escapeHtml(COLLECTIONS[key].title)}</span></button>`).join("")}</div>
+      </section>
+      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 28 18 40-32 45 22 30 25 18-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/><g>${[[25, 70],[80, 30],[108, 48],[149, 16],[194, 38],[243, 48],[205, 93]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="currentColor" opacity=".12"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`).join("")}</g></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connected thinking</h2><p>Watch your projects, skills, documents, and conversations link into a living constellation.</p><button class="button button-primary" type="button" data-navigate="home">Open constellation</button></section>
+      <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><div><h2 id="voice-heading">Voice notes</h2></div><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>
+        ${notes.length ? `<div class="item-list">${notes.map((note) => `<article class="item voice-note"><div class="item-top"><h3 class="item-name">${escapeHtml(note.text.slice(0, 50) || "Voice note")}</h3><button class="button button-danger" type="button" data-delete-voice="${note.rawIndex}">Delete</button></div><p class="item-notes">${escapeHtml(note.text)}</p><time>${escapeHtml(new Date(note.at || Date.now()).toLocaleString())}</time></article>`).join("")}</div>` : emptyState("voice", "Quiet for now", "Add a quick voice memo and it will stay with this workspace.")}
+      </section>
     </div></div>`;
   bindWorkspaceActions();
   viewContainer
     .querySelector("#voice-button")
-    .addEventListener("click", startVoiceInput);
+    ?.addEventListener("click", startVoiceInput);
   viewContainer.querySelectorAll("[data-delete-voice]").forEach((button) =>
     button.addEventListener("click", () => {
       if (!window.confirm("Delete this voice note?")) return;
@@ -643,9 +633,9 @@ function fieldHtml(field, item = {}) {
   if (field.type === "select") {
     const options = ["", ...field.options];
     if (value && !options.includes(value)) options.push(value);
-    return `<div class="field">${label}<select id="field-${field.key}" name="${field.key}">${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option || "Choose…")}</option>`).join("")}</select></div>`;
+    return `<div class="field">${label}<select id="field-${field.key}" name="${field.key}">${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option || "—")}</option>`).join("")}</select></div>`;
   }
-  return `<div class="field">${label}<input id="field-${field.key}" name="${field.key}" type="${field.type ?? "text"}" value="${escapeHtml(value)}"${required}${field.type === "url" ? ' placeholder="https://…"' : ""}></div>`;
+  return `<div class="field">${label}<input id="field-${field.key}" name="${field.key}" type="${field.type ?? "text"}" value="${escapeHtml(value)}"${required}${field.type === "url" ? ' placeholder="https://"' : ""}></div>`;
 }
 
 function openItemDialog(key, index = null) {
@@ -653,7 +643,7 @@ function openItemDialog(key, index = null) {
   const editingItem = index === null ? null : state.vault[key][index];
   const dialog = document.querySelector("#item-dialog");
   const content = document.querySelector("#dialog-content");
-  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${config.title}</p><h2 id="dialog-title">${editingItem ? "Edit" : "New"} ${config.singular}</h2><p>Saved on this device. Sync to GitHub when you’re ready.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form" id="item-form"><div class="form-row">${config.fields.map((field) => fieldHtml(field, editingItem ?? {})).join("")}</div><p class="form-help" id="form-feedback" role="status">* Required field</p><div class="form-footer"><button class="button" type="button" id="cancel-edit">Cancel</button><button class="button button-primary" type="submit">${editingItem ? "Save changes" : `Add ${config.singular}`}</button></div></form>`;
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">${config.title}</p><h2 id="dialog-title">${editingItem ? "Edit" : "New"} ${config.singular}</h2><p>Saved on this device. Sync when ready.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form" novalidate><div class="form-row">${config.fields.map((field) => fieldHtml(field, editingItem ?? {})).join("")}</div><p class="form-help" id="form-feedback"></p><div class="form-footer"><button class="button button-quiet" id="cancel-edit" type="button">Cancel</button><button class="button button-primary" type="submit">${editingItem ? "Save" : "Create"}</button></div></form>`;
   const form = content.querySelector("form");
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -676,7 +666,6 @@ function openItemDialog(key, index = null) {
         .map((tag) => tag.trim())
         .filter(Boolean);
     if (editingItem) {
-      // Replace editable fields only, preserving import metadata and links.
       for (const field of config.fields) {
         delete editingItem[field.key];
         if (data[field.key] !== "") editingItem[field.key] = data[field.key];
@@ -694,7 +683,7 @@ function openItemDialog(key, index = null) {
     dialog.close();
     render();
     setStatus(
-      `${config.singular[0].toUpperCase() + config.singular.slice(1)} ${editingItem ? "updated" : "added"}. Saved on this device${localStorage.getItem(TOKEN_KEY) ? "; save changes to sync with GitHub." : ". Sign in to sync with GitHub."}`,
+      `${config.singular[0].toUpperCase() + config.singular.slice(1)} ${editingItem ? "updated" : "added"}. Saved on this device${localStorage.getItem(TOKEN_KEY) ? "; save changes to sync with GitHub" : ""}.`,
       "success",
     );
   });
@@ -764,7 +753,7 @@ function renderItems(key) {
         ...(Array.isArray(item.tags) ? item.tags : normalizeTags(item.tags)),
       ].filter(Boolean);
       const url = safeUrl(item.url);
-      return `<article class="item"><div class="item-top"><h2 class="item-name">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(itemTitle(item))} ↗</a>` : escapeHtml(itemTitle(item))}</h2><div class="item-actions"><button class="button" type="button" data-edit="${index}" aria-label="Edit ${escapeHtml(itemTitle(item))}">Edit</button><button class="button-danger" type="button" data-delete="${index}" aria-label="Delete ${escapeHtml(itemTitle(item))}">Delete</button></div></div><div class="record-badges">${badges.map((value) => `<span class="badge" data-value="${escapeHtml(value)}">${escapeHtml(value)}</span>`).join("")}</div>${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}${item.sourcePath ? `<p class="row-detail">${escapeHtml(item.sourcePath)}</p>` : ""}</article>`;
+      return `<article class="item"><div class="item-top"><h2 class="item-name">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(itemTitle(item))} ↗</a>` : escapeHtml(itemTitle(item))}</h2><div class="item-actions"><button class="button button-quiet" type="button" data-edit="${index}">Edit</button><button class="button button-danger" type="button" data-delete="${index}">Delete</button></div></div><div class="item-meta">${escapeHtml(item.created ? new Date(item.created).toLocaleDateString() : "")}${badges.length ? `<span>•</span>${badges.map((badge) => `<span class="badge" data-value="${escapeHtml(badge)}">${escapeHtml(badge)}</span>`).join("")}` : ""}</div>${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}</article>`;
     })
     .join("")}</div>`;
 }
@@ -786,7 +775,7 @@ function renderCollection(key) {
         ]),
       ]
     : [];
-  viewContainer.innerHTML = `${pageHeading(config.title, descriptions[key], `<button class="button button-primary" type="button" data-add="${key}">${icon("plus")} New ${config.singular}</button>`)}<section class="panel" aria-label="${config.title}"><div class="collection-toolbar"><label class="visually-hidden" for="collection-search">Search ${config.title.toLowerCase()}</label><input class="search-input" id="collection-search" type="search" placeholder="Search ${config.title.toLowerCase()}…" value="${escapeHtml(ui.queries[key] ?? "")}">${field ? `<label class="visually-hidden" for="collection-filter">Filter by ${field.label.toLowerCase()}</label><select id="collection-filter"><option value="">All ${field.label === "Status" ? "statuses" : "levels"}</option>${filterValues.map((value) => `<option value="${escapeHtml(value)}" ${ui.filters[key] === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}</select>` : ""}<label class="visually-hidden" for="collection-sort">Sort items</label><select id="collection-sort"><option value="newest">Newest first</option><option value="name" ${ui.sorts[key] === "name" ? "selected" : ""}>Name A–Z</option></select></div><p class="results-count" id="results-count" role="status"></p><div id="collection-items"></div></section>`;
+  viewContainer.innerHTML = `${pageHeading(config.title, descriptions[key], `<button class="button button-primary" type="button" data-add="${key}">${icon("plus")} New ${config.singular}</button>`)}` + `<section class="panel"><div class="collection-toolbar"><input class="search-input" id="collection-search" type="search" placeholder="Search ${config.title.toLowerCase()}" value="${escapeHtml(ui.queries[key] ?? "")}"><select id="collection-filter"><option value="">All ${config.title.toLowerCase()}</option>${filterValues.map((option) => `<option value="${escapeHtml(option)}" ${ui.filters[key] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select><select id="collection-sort"><option value="recent" ${ui.sorts[key] === "recent" || !ui.sorts[key] ? "selected" : ""}>Most recent</option><option value="name" ${ui.sorts[key] === "name" ? "selected" : ""}>Name</option></select></div><p class="results-count" id="results-count"></p><div id="collection-items"></div></section>`;
   refreshCollectionItems(key);
   viewContainer
     .querySelector("#collection-search")
@@ -856,7 +845,7 @@ function renderSearch() {
       .map((item, index) => ({ key, config, item, index }))
       .filter(({ item }) => itemMatches(item, query)),
   );
-  viewContainer.innerHTML = `${pageHeading("Find your next thread.", `Search across your projects, skills, documents, and chats.`)}<section class="panel" aria-label="Search results"><div class="panel-heading"><h2>${matches.length} ${matches.length === 1 ? "result" : "results"} for “${escapeHtml(ui.globalQuery.trim())}”</h2></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, config.title, "result-row")).join("") : emptyState("search", "Nothing found yet", "Try a name, a tag, or a word from your notes.")}</section>`;
+  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`)).join("") : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
   bindWorkspaceActions();
 }
 
@@ -1026,8 +1015,8 @@ async function updateConstellationBackground() {
     cards: "#ffcdb9",
   };
   const KIND_LABEL_COLOR = {
-    skills: "#9fc6ee",
-    projects: "#e8c795",
+    skills: "#cfe6ff",
+    projects: "#ffd9a8",
     docs: "#bdabf3",
     chats: "#8ed0bc",
     cards: "#e6a98e",
@@ -1084,8 +1073,6 @@ async function updateConstellationBackground() {
     }
   });
 
-  // Projects form the compact center. Skills and all other known records
-  // share an inclined orbital ring around the project core.
   const count = nodes.length;
   const positions = new Float32Array(count * 3);
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -1126,6 +1113,7 @@ async function updateConstellationBackground() {
     return;
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.domElement.classList.add("constellation-canvas");
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -1136,15 +1124,14 @@ async function updateConstellationBackground() {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
     .matches;
 
-  // Star textures: soft glow for named stars, tiny dot for background sky.
   const glowTexture = (() => {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 64;
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
     gradient.addColorStop(0, "rgba(255,255,255,1)");
-    gradient.addColorStop(0.3, "rgba(255,255,255,0.85)");
-    gradient.addColorStop(0.6, "rgba(255,255,255,0.25)");
+    gradient.addColorStop(0.3, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.6, "rgba(255,255,255,0.55)");
     gradient.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 64, 64);
@@ -1162,7 +1149,6 @@ async function updateConstellationBackground() {
     return new THREE.CanvasTexture(canvas);
   })();
 
-  // Background sky: ~350 faint anonymous stars on a larger sphere.
   {
     const skyCount = 350;
     const skyPositions = new Float32Array(skyCount * 3);
@@ -1184,11 +1170,11 @@ async function updateConstellationBackground() {
       new THREE.Points(
         skyGeometry,
         new THREE.PointsMaterial({
-          size: 0.55,
+          size: 0.7,
           map: dotTexture,
           color: 0x93a7c9,
           transparent: true,
-          opacity: 0.5,
+          opacity: 0.65,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         }),
@@ -1196,13 +1182,12 @@ async function updateConstellationBackground() {
     );
   }
 
-  // Named stars, bucketed into three magnitudes by tag count.
   const magnitudeOf = (node) => {
     if (node.tags.length >= 3) return 0;
     if (node.tags.length >= 1) return 1;
     return 2;
   };
-  const magnitudeSize = [3.4, 2.3, 1.5];
+  const magnitudeSize = [6.5, 4.5, 3.0];
   const pointLayers = [];
   const pointGeometries = [];
   for (let mag = 0; mag < 3; mag++) {
@@ -1245,7 +1230,6 @@ async function updateConstellationBackground() {
     pointLayers.push(points);
   }
 
-  // Constellation lines.
   const linePositions = new Float32Array(edges.length * 6);
   edges.forEach(([a, b], index) => {
     linePositions.set(positions.slice(a * 3, a * 3 + 3), index * 6);
@@ -1260,18 +1244,17 @@ async function updateConstellationBackground() {
     new THREE.LineSegments(
       lineGeometry,
       new THREE.LineBasicMaterial({
-        color: 0x9db9e8,
+        color: 0xbdd6ff,
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.6,
       }),
     ),
   );
 
-  // Celestial graticule: meridian + parallel rings, like a real star chart.
   const gridMaterial = new THREE.LineBasicMaterial({
-    color: 0x4a6491,
+    color: 0x5d7cae,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.3,
   });
   const gridGeometries = [];
   {
@@ -1295,7 +1278,6 @@ async function updateConstellationBackground() {
       geometry.setAttribute("position", new THREE.BufferAttribute(ring, 3));
       return geometry;
     };
-    // Equator + tropics-style parallels.
     for (const plane of ["xz", "tilt1", "tilt2", "xy"]) {
       const geometry = makeRing(plane === "xy" ? "xy" : "xz");
       if (plane === "tilt1") geometry.rotateX(Math.PI / 3);
@@ -1304,7 +1286,6 @@ async function updateConstellationBackground() {
       gridGeometries.push(geometry);
       starSystem.add(new THREE.LineLoop(geometry, gridMaterial));
     }
-    // Meridians.
     for (let m = 0; m < 4; m++) {
       const geometry = makeRing("xy");
       geometry.rotateY((m / 4) * Math.PI);
@@ -1326,27 +1307,26 @@ async function updateConstellationBackground() {
     );
   }
 
-  // Name labels beside stars, toggleable like a planetarium.
   const labelSprites = nodes.map((node, nodeIndex) => {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
-    canvas.height = 72;
+    canvas.height = 80;
     const ctx = canvas.getContext("2d");
-    ctx.font = "400 30px Georgia, 'Times New Roman', serif";
+    ctx.font = "600 34px Georgia, 'Times New Roman', serif";
     ctx.textAlign = "left";
     ctx.fillStyle = KIND_LABEL_COLOR[node.kind];
     ctx.shadowColor = "rgba(2,6,18,0.95)";
     ctx.shadowBlur = 8;
-    ctx.fillText(node.label.slice(0, 30), 8, 46);
+    ctx.fillText(node.label.slice(0, 30), 8, 52);
     const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: new THREE.CanvasTexture(canvas),
         transparent: true,
-        opacity: 0.58,
+        opacity: 1,
         depthTest: false,
       }),
     );
-    sprite.scale.set(9.5, 1.35, 1);
+    sprite.scale.set(11, 1.6, 1);
     sprite.position.set(
       positions[nodeIndex * 3] + 1.6,
       positions[nodeIndex * 3 + 1] + 1.1,
@@ -1503,7 +1483,6 @@ if (localStorage.getItem(TOKEN_KEY)) {
   loginButton.textContent = "Sign out";
 }
 
-// Narrow bridge for the optional AI panel. It never exposes credentials.
 globalThis.myVaultAIBridge = Object.freeze({
   getVault: () => state.vault,
   isSignedIn: () => Boolean(localStorage.getItem(TOKEN_KEY)),
