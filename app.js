@@ -991,7 +991,7 @@ async function renderConstellation() {
   };
 
   viewContainer.innerHTML = `
-    ${pageHeading("Constellation", "See how your skills and projects connect. Drag to orbit and scroll to zoom.")}
+    ${pageHeading("Constellation", "Projects anchor the center. Skills and other vault records orbit on a 65° ring. Drag to orbit and scroll to zoom.")}
     <section class="panel constellation-panel" aria-labelledby="constellation-heading">
       <div class="constellation-controls">
         <h2 id="constellation-heading" class="visually-hidden">Constellation Finder</h2>
@@ -999,8 +999,13 @@ async function renderConstellation() {
         <button class="button" id="constellation-motion" type="button" aria-pressed="false">Pause rotation</button>
         <button class="button" id="constellation-names" type="button" aria-pressed="true">Hide names</button>
       </div>
+      <div class="constellation-legend" aria-label="Constellation groups">
+        <span><i class="legend-project" aria-hidden="true"></i>Projects · center</span>
+        <span><i class="legend-skill" aria-hidden="true"></i>Skills · 65° ring</span>
+        <span><i class="legend-other" aria-hidden="true"></i>Other records · 65° ring</span>
+      </div>
       <div id="constellation-canvas" class="constellation-canvas" role="img"
-        aria-label="Star chart of skills and projects"></div>
+        aria-label="Star chart with projects in the center and skills and other vault records on a 65 degree ring"></div>
       <p class="diagnostics constellation-stats" id="constellation-stats" data-kind="ok">Loading 3D engine…</p>
     </section>`;
 
@@ -1009,15 +1014,16 @@ async function renderConstellation() {
   viewContainer
     .querySelector("#constellation-menu")
     .addEventListener("click", () => navigate("home"));
-  if (!state.vault.skills.length && !state.vault.projects.length) {
+  const constellationCollections = ["projects", "skills", "docs", "chats", "cards"];
+  if (!constellationCollections.some((key) => state.vault[key].length)) {
     container.innerHTML = emptyState(
       "constellation",
       "A universe of possibilities",
-      "Add skills and projects to start connecting your ideas.",
+      "Add a project, skill, document, or chat to start connecting your ideas.",
       '<button class="button" type="button" data-add="projects">New project</button>',
     );
     stats.textContent =
-      "Skills and projects become stars; shared tags and links become connections.";
+      "Projects sit at the center; skills and other records follow the inclined ring.";
     viewContainer.querySelector("#constellation-names").disabled = true;
     viewContainer.querySelector("#constellation-motion").disabled = true;
     bindWorkspaceActions();
@@ -1041,11 +1047,23 @@ async function renderConstellation() {
     return;
   }
 
-  const KIND_COLOR = { skill: "#cfe8ff", project: "#ffe3b3" };
-  const nodes = [
-    ...state.vault.skills.map((item) => ({ item, kind: "skill" })),
-    ...state.vault.projects.map((item) => ({ item, kind: "project" })),
-  ].map((node) => ({
+  const KIND_COLOR = {
+    skills: "#cfe8ff",
+    projects: "#ffe3b3",
+    docs: "#d7c8ff",
+    chats: "#a8e8d7",
+    cards: "#ffcdb9",
+  };
+  const KIND_LABEL_COLOR = {
+    skill: "#9fc6ee",
+    project: "#e8c795",
+    docs: "#bdabf3",
+    chats: "#8ed0bc",
+    cards: "#e6a98e",
+  };
+  const nodes = constellationCollections.flatMap((kind) =>
+    state.vault[kind].map((item) => ({ item, kind })),
+  ).map((node) => ({
     ...node,
     label: itemTitle(node.item),
     tags: normalizeTags(node.item.tags),
@@ -1095,46 +1113,40 @@ async function renderConstellation() {
     }
   });
 
-  // Layout: golden-spiral seed, then simple repulsion + spring relaxation.
+  // Projects form the compact center. Skills and all other known records
+  // share an inclined orbital ring around the project core.
   const count = nodes.length;
   const positions = new Float32Array(count * 3);
   const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < count; i++) {
-    const y = 1 - (i / Math.max(1, count - 1)) * 2;
-    const radius = Math.sqrt(1 - y * y);
-    const theta = golden * i;
-    positions[i * 3] = Math.cos(theta) * radius * 16;
-    positions[i * 3 + 1] = y * 16;
-    positions[i * 3 + 2] = Math.sin(theta) * radius * 16;
-  }
-  for (let iter = 0; iter < 220; iter++) {
-    for (let i = 0; i < count; i++) {
-      for (let j = i + 1; j < count; j++) {
-        let dx = positions[i * 3] - positions[j * 3];
-        let dy = positions[i * 3 + 1] - positions[j * 3 + 1];
-        let dz = positions[i * 3 + 2] - positions[j * 3 + 2];
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
-        const push = 26 / (dist * dist);
-        dx /= dist;
-        dy /= dist;
-        dz /= dist;
-        positions[i * 3] += dx * push;
-        positions[i * 3 + 1] += dy * push;
-        positions[i * 3 + 2] += dz * push;
-        positions[j * 3] -= dx * push;
-        positions[j * 3 + 1] -= dy * push;
-        positions[j * 3 + 2] -= dz * push;
-      }
-    }
-    for (const [a, b] of edges) {
-      for (let axis = 0; axis < 3; axis++) {
-        const diff = positions[b * 3 + axis] - positions[a * 3 + axis];
-        const pull = diff * 0.018;
-        positions[a * 3 + axis] += pull;
-        positions[b * 3 + axis] -= pull;
-      }
-    }
-  }
+  const centerIndexes = [];
+  const ringIndexes = [];
+  nodes.forEach((node, index) =>
+    (node.kind === "projects" ? centerIndexes : ringIndexes).push(index),
+  );
+  const projectRadius = Math.min(8, Math.max(3.5, Math.sqrt(centerIndexes.length) * 1.15));
+  centerIndexes.forEach((nodeIndex, slot) => {
+    const y = 1 - (2 * (slot + 0.5)) / centerIndexes.length;
+    const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
+    const radius = centerIndexes.length === 1
+      ? 0
+      : projectRadius * Math.cbrt((slot + 0.5) / centerIndexes.length);
+    const angle = golden * slot;
+    positions[nodeIndex * 3] = Math.cos(angle) * horizontal * radius;
+    positions[nodeIndex * 3 + 1] = y * radius;
+    positions[nodeIndex * 3 + 2] = Math.sin(angle) * horizontal * radius;
+  });
+  const ringRadius = 22;
+  const ringTilt = (65 * Math.PI) / 180;
+  ringIndexes.forEach((nodeIndex, slot) => {
+    const angle = golden * slot;
+    const radius = ringRadius + ((slot % 5) - 2) * 0.35;
+    const normalOffset = Math.sin(slot * 2.17) * 0.7;
+    positions[nodeIndex * 3] = Math.cos(angle) * radius;
+    positions[nodeIndex * 3 + 1] =
+      -Math.sin(angle) * radius * Math.sin(ringTilt) + normalOffset * Math.cos(ringTilt);
+    positions[nodeIndex * 3 + 2] =
+      Math.sin(angle) * radius * Math.cos(ringTilt) + normalOffset * Math.sin(ringTilt);
+  });
 
   let renderer;
   try {
@@ -1345,6 +1357,19 @@ async function renderConstellation() {
       gridGeometries.push(geometry);
       scene.add(new THREE.LineLoop(geometry, gridMaterial));
     }
+    const orbitGeometry = makeRing("xz");
+    orbitGeometry.rotateX((65 * Math.PI) / 180);
+    gridGeometries.push(orbitGeometry);
+    scene.add(
+      new THREE.LineLoop(
+        orbitGeometry,
+        new THREE.LineBasicMaterial({
+          color: 0x71b49d,
+          transparent: true,
+          opacity: 0.38,
+        }),
+      ),
+    );
   }
 
   // Name labels beside stars, toggleable like a planetarium.
@@ -1355,7 +1380,7 @@ async function renderConstellation() {
     const ctx = canvas.getContext("2d");
     ctx.font = "400 30px Georgia, 'Times New Roman', serif";
     ctx.textAlign = "left";
-    ctx.fillStyle = node.kind === "skill" ? "#9fc6ee" : "#e8c795";
+    ctx.fillStyle = KIND_LABEL_COLOR[node.kind];
     ctx.shadowColor = "rgba(2,6,18,0.95)";
     ctx.shadowBlur = 8;
     ctx.fillText(node.label.slice(0, 30), 8, 46);
@@ -1410,10 +1435,12 @@ async function renderConstellation() {
   });
 
   stats.dataset.kind = "ok";
-  stats.textContent =
-    `${nodes.filter((n) => n.kind === "skill").length} skills · ` +
-    `${nodes.filter((n) => n.kind === "project").length} projects · ` +
-    `${edges.length} constellation lines — drag to orbit, scroll to zoom, hover a star.`;
+  stats.textContent = [
+    `${centerIndexes.length} projects at center`,
+    `${nodes.filter((n) => n.kind === "skills").length} skills`,
+    `${nodes.filter((n) => !["projects", "skills"].includes(n.kind)).length} other records`,
+    `${edges.length} constellation lines`,
+  ].join(" · ") + " — drag to orbit, scroll to zoom, hover a star.";
 
   let frame = 0;
   function animate() {

@@ -931,6 +931,37 @@ dialog::backdrop {
   gap: 10px;
   margin-bottom: 15px;
 }
+.constellation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: -2px 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.constellation-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.constellation-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
+.legend-project {
+  color: #ffe3b3;
+  background: #ffe3b3;
+}
+.legend-skill {
+  color: #cfe8ff;
+  background: #cfe8ff;
+}
+.legend-other {
+  color: #d7c8ff;
+  background: linear-gradient(135deg, #d7c8ff 0 50%, #a8e8d7 50% 100%);
+}
 .constellation-canvas {
   width: 100%;
   height: clamp(360px, 60vh, 680px);
