@@ -18,7 +18,7 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon-180.png" type="image/png" />
     <link rel="apple-touch-icon" href="icon-180.png" />
-    <link rel="stylesheet" href="styles.css?v=constellation-bg-1" />
+    <link rel="stylesheet" href="styles.css?v=constellation-control-1" />
     <link rel="stylesheet" href="qwen.css?v=1" />
     <script type="importmap">
       {
@@ -34,7 +34,7 @@
     <div id="constellation-background" class="constellation-background" aria-hidden="true"></div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Workspace">
-        <a class="brand" href="#home" aria-label="MyVault OS overview"
+        <a class="brand" href="#home" aria-label="MyVault OS constellation background"
           ><span class="brand-mark" aria-hidden="true">⬡</span
           ><span class="brand-text"
             >MyVault<span class="brand-os">OS</span></span
@@ -50,8 +50,12 @@
             data-view="home"
             aria-current="page"
           >
+            <span data-icon="constellation"></span
+            ><span class="nav-label">Constellation</span>
+          </button>
+          <button class="nav-link" type="button" data-view="control">
             <span data-icon="home"></span
-            ><span class="nav-label">Overview</span>
+            ><span class="nav-label">Control</span>
           </button>
           <span class="nav-section">YOUR VAULT</span>
           <button class="nav-link" type="button" data-view="projects">
@@ -154,7 +158,7 @@
     <dialog id="item-dialog" aria-labelledby="dialog-title">
       <div id="dialog-content"></div>
     </dialog>
-    <script src="app.js?v=constellation-bg-1"></script>
+    <script src="app.js?v=constellation-control-1"></script>
     <script type="module" src="qwen.mjs?v=1"></script>
   </body>
 </html>
