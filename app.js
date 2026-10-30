@@ -603,7 +603,7 @@ function renderHome() {
       <section class="panel" aria-labelledby="capture-heading"><div class="panel-heading"><div><h2 id="capture-heading">Quick capture</h2><p class="section-caption">Give your next thought a home.</p></div></div>
         <div class="quick-actions">${["projects", "skills", "docs", "chats"].map((key) => `<button class="quick-action" type="button" data-add="${key}">${icon(key)}<span>${escapeHtml(COLLECTIONS[key].title)}</span></button>`).join("")}</div>
       </section>
-      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 28 18 40-32 45 22 30 25 18-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/><g>${[[25, 70],[80, 30],[108, 48],[149, 16],[194, 38],[243, 48],[205, 93]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="currentColor" opacity=".12"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`).join("")}</g></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connected thinking</h2><p>Watch your projects, skills, documents, and conversations link into a living constellation.</p><button class="button button-primary" type="button" data-navigate="home">Open constellation</button></section>
+      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 28 18 40-32 45 22 30 25 18-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/><g>${[[25, 70],[80, 30],[108, 48],[149, 16],[194, 38],[243, 48],[205, 93]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="currentColor" opacity=".12"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`).join("")}</g></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connected thinking</h2><p>Projects anchor the center while skills follow a 65° orbit. Only explicit vault links form connections.</p><button class="button button-primary" type="button" data-navigate="home">Open constellation</button></section>
       <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><div><h2 id="voice-heading">Voice notes</h2></div><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>
         ${notes.length ? `<div class="item-list">${notes.map((note) => `<article class="item voice-note"><div class="item-top"><h3 class="item-name">${escapeHtml(note.text.slice(0, 50) || "Voice note")}</h3><button class="button button-danger" type="button" data-delete-voice="${note.rawIndex}">Delete</button></div><p class="item-notes">${escapeHtml(note.text)}</p><time>${escapeHtml(new Date(note.at || Date.now()).toLocaleString())}</time></article>`).join("")}</div>` : emptyState("voice", "Quiet for now", "Add a quick voice memo and it will stay with this workspace.")}
       </section>
@@ -961,7 +961,8 @@ function renderBuild() {
 
 let constellationCleanup = null;
 let constellationDataKey = "";
-const CONSTELLATION_COLLECTIONS = ["projects", "skills", "docs", "chats", "cards"];
+let constellationRequest = 0;
+const CONSTELLATION_COLLECTIONS = ["projects", "skills"];
 
 function normalizeTags(value) {
   const list = Array.isArray(value)
@@ -972,7 +973,113 @@ function normalizeTags(value) {
   return list.filter(Boolean).map((tag) => String(tag).toLowerCase());
 }
 
+function constellationAlias(value) {
+  return String(value ?? "")
+    .split("|")[0]
+    .split("/")
+    .pop()
+    .split("#")[0]
+    .replace(/\.md$/i, "")
+    .replace(/^(skill|project|reference)\s*[:\-–—]\s*/i, "")
+    .normalize("NFKD")
+    .replace(/[^a-z0-9\p{L}]+/giu, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function buildConstellationModel() {
+  const nodes = CONSTELLATION_COLLECTIONS.flatMap((kind) =>
+    state.vault[kind].map((item, index) => {
+      const name = itemTitle(item);
+      const id = String(item.id || `missing-${index}`);
+      const description = String(item.notes ?? "").replace(/^#+\s*/gm, "").trim();
+      const meta = kind === "projects"
+        ? String(item.status || "Project")
+        : String(item.level || "Skill");
+      return {
+        key: `${kind === "projects" ? "project" : "skill"}:${id}`,
+        id,
+        kind,
+        name,
+        meta,
+        description: description.slice(0, 320),
+        links: Array.isArray(item.links) ? item.links : [],
+        safeName: escapeHtml(name),
+        safeMeta: escapeHtml(meta),
+        safeDescription: escapeHtml(description.slice(0, 320)),
+      };
+    }),
+  );
+  const aliases = new Map();
+  nodes.forEach((node, index) => {
+    const values = [node.name, constellationAlias(node.name)];
+    values.forEach((value) => {
+      const alias = constellationAlias(value);
+      if (alias && !aliases.has(alias)) aliases.set(alias, index);
+    });
+  });
+  const edges = [];
+  const edgeKeys = new Set();
+  nodes.forEach((node, source) => {
+    node.links.forEach((link) => {
+      const target = aliases.get(constellationAlias(link));
+      if (target === undefined || target === source) return;
+      const edgeKey = `${Math.min(source, target)}:${Math.max(source, target)}`;
+      if (edgeKeys.has(edgeKey)) return;
+      edgeKeys.add(edgeKey);
+      edges.push({ source, target });
+    });
+  });
+  return { nodes, edges };
+}
+
 async function updateConstellationBackground() {
+  const container = document.querySelector("#constellation-background");
+  if (!container || !state.vault) return;
+  const dataKey = JSON.stringify(
+    CONSTELLATION_COLLECTIONS.flatMap((kind) =>
+      state.vault[kind].map((item) => [
+        kind,
+        item.id ?? "",
+        itemTitle(item),
+        item.status ?? item.level ?? "",
+        item.notes ?? "",
+        item.links ?? [],
+      ]),
+    ),
+  );
+  if (dataKey === constellationDataKey) return;
+  constellationDataKey = dataKey;
+  constellationCleanup?.();
+  constellationCleanup = null;
+  const request = ++constellationRequest;
+  const model = buildConstellationModel();
+  try {
+    const { createMyVaultConstellation } = await import("./constellation.mjs?v=2");
+    if (request !== constellationRequest) return;
+    const constellation = createMyVaultConstellation({
+      container,
+      ...model,
+      onOpen(node) {
+        const index = state.vault[node.kind].findIndex(
+          (item) => String(item.id || "") === node.id,
+        );
+        if (index < 0) {
+          setStatus("That vault record is no longer available.", "error");
+          return;
+        }
+        navigate(node.kind);
+        openItemDialog(node.kind, index);
+      },
+    });
+    constellationCleanup = () => constellation.dispose();
+  } catch (error) {
+    console.error("Constellation could not start", error);
+    container.innerHTML = '<p class="constellation-load-error">The interactive constellation is unavailable. Open Projects or Skills from the side control.</p>';
+  }
+}
+
+async function updateLegacyConstellationBackground() {
   const container = document.querySelector("#constellation-background");
   if (!container) return;
   const dataKey = JSON.stringify(
