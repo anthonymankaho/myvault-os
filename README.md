@@ -53,7 +53,7 @@ _Screenshot coming soon._
 
 Run `node --check app.js` and `node --test test/app.test.cjs` with Node.js 18 or newer. Serve the repository with any static HTTP server to preview it. GitHub OAuth still uses the configured production callback and Worker; a local preview does not establish a production sign-in session.
 
-The app opens on a background-only constellation landing view with the side navigation. Select **Control** to open the former overview dashboard and workspace controls. The 3D constellation follows the current vault, with projects at the center and skills and other records around a 65° ring; reduced-motion preferences keep it still. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
+The app opens on an interactive constellation landing view with the side navigation. Select **Control** to open the former overview dashboard and workspace controls. The Kimi-inspired 3D renderer uses only the current vault's projects and skills: projects form the center, skills follow a 65° orbit, and only explicit vault links create graph edges. Search, labels, rotation, signals, zoom, touch orbiting, and direct record opening are available; reduced-motion preferences start rotation and signals disabled. Documents and chats remain in their existing views and never become constellation stars. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
 
 Built with Kimi + Qwen AI.
 
