@@ -20,6 +20,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 - Voice notes with the browser Web Speech API
 - Installable progressive web app for iPad and other devices
 - Vanilla HTML, CSS, and JavaScript; no build step or framework
+- Monthly Task workspace with date-safe Hong Kong scheduling, Excel preview/import, rollover, completion tracking, and local backup/restore
 
 ## Vault shape
 
@@ -62,6 +63,12 @@ Built with Kimi + Qwen AI.
 Use **Ask Qwen** in the utility bar after signing in with GitHub. The assistant receives a compact snapshot of the current local vault, including unsaved changes. It can answer questions or propose creates and updates for projects, skills, documents, and chats. Each proposal shows its fields or old/new differences. Choose operations, check the confirmation box, and press **Apply selected**. **Discard** changes nothing. **Undo last AI apply** is available while no newer vault edits have been made. Applying updates the local cache once; GitHub synchronization still requires the existing **Save changes** button.
 
 Conversation history is held in memory only and disappears on page reload. Context excludes vault metadata, cards, imported source paths, and unknown fields; note context is capped at 1,200 characters per item. Replies and operations are validated on the server and again before Apply. Updates use IDs and preserve creation times and fields outside the proposal. The assistant cannot delete records.
+
+## Monthly Task
+
+The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.
+
+The browser parses Excel locally with SheetJS; workbook contents are not sent to the parser service. Reminders are in-app only (there are no closed-tab push notifications), and rollover holiday coverage is explicitly marked for manual verification.
 
 ### Worker configuration
 

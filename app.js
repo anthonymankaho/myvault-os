@@ -11,6 +11,7 @@ const DEFAULT_VAULT = {
   docs: [],
   cards: [],
   chats: [],
+  tasks: [],
   meta: {
     created: new Date().toISOString().slice(0, 10),
     owner: "anthonymankaho",
@@ -77,6 +78,7 @@ const VIEWS = {
       { title: config.title },
     ]),
   ),
+  tasks: { title: "Monthly Task" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
 };
@@ -132,18 +134,41 @@ function itemTitle(item) {
   return item?.name ?? item?.title ?? "Untitled";
 }
 
+function normalizeTask(raw) {
+  const task = raw && typeof raw === "object" ? { ...raw } : {};
+  return {
+    id: String(task.id || uid()),
+    planningMonth: /^\d{4}-\d{2}$/.test(String(task.planningMonth || ""))
+      ? String(task.planningMonth)
+      : hkDateKey().slice(0, 7),
+    company: String(task.company || "OTHER").trim(),
+    description: String(task.description || ""),
+    scheduledDate: /^\d{4}-\d{2}-\d{2}$/.test(String(task.scheduledDate || ""))
+      ? String(task.scheduledDate)
+      : hkDateKey(),
+    status: task.status === "Completed" ? "Completed" : "Not Started",
+    docResult: String(task.docResult || ""),
+    completedAt: task.status === "Completed" ? task.completedAt || new Date().toISOString() : null,
+    createdAt: task.createdAt || task.created || new Date().toISOString(),
+    updatedAt: task.updatedAt || task.createdAt || task.created || new Date().toISOString(),
+    source: task.source && typeof task.source === "object" ? { ...task.source } : undefined,
+    carriedFromTaskId: task.carriedFromTaskId ? String(task.carriedFromTaskId) : undefined,
+  };
+}
+
 function normalizeVault(raw) {
   const vault = {
     ...DEFAULT_VAULT,
     ...(raw && typeof raw === "object" ? raw : {}),
   };
-  for (const key of ["skills", "projects", "docs", "cards", "chats"]) {
+  for (const key of ["skills", "projects", "docs", "cards", "chats", "tasks"]) {
     vault[key] = Array.isArray(vault[key])
       ? vault[key].map((item) =>
           item && typeof item === "object" ? item : { name: String(item) },
         )
       : [];
   }
+  vault.tasks = vault.tasks.map(normalizeTask);
   vault.meta =
     vault.meta && typeof vault.meta === "object" && !Array.isArray(vault.meta)
       ? vault.meta
@@ -204,6 +229,7 @@ function applyVault(vault, { fromCache = false } = {}) {
   writeCache();
   updateSaveButton();
   render();
+  refreshDailyReminder();
   if (fromCache) {
     setStatus("Loaded from local cache.", "success");
   } else {
@@ -454,6 +480,9 @@ function render() {
     case "search":
       renderSearch();
       break;
+    case "tasks":
+      renderTasks();
+      break;
     default:
       renderCollection(state.view);
   }
@@ -501,6 +530,8 @@ const ICON_PATHS = {
   docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
   chats:
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
+  tasks:
+    '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m5.5 8 .8.8L7.8 7"/>',
   build:
     '<path d="m14 6 4 4m-12 4 4 4M3 21l7-7m3-6L7 2 2 7l6 6m5 0 8 8m-4-8a6 6 0 0 0 5-8l-4 4-3-3 4-4a6 6 0 0 0-8 5"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
@@ -609,6 +640,11 @@ function renderHome() {
       </section>
     </div></div>`;
   bindWorkspaceActions();
+  const dashboard = viewContainer.querySelector(".dashboard-grid");
+  if (dashboard) {
+    dashboard.insertAdjacentHTML("beforebegin", renderTaskHomeWidget());
+    bindTaskHomeWidget();
+  }
   viewContainer
     .querySelector("#voice-button")
     ?.addEventListener("click", startVoiceInput);
@@ -849,6 +885,375 @@ function renderSearch() {
   bindWorkspaceActions();
 }
 
+const TASK_STATUS = ["Not Started", "Completed"];
+const TASK_SCOPES = [
+  ["today", "Today / 今日"],
+  ["overdue", "Overdue / 逾期"],
+  ["upcoming", "Upcoming / 即將到期"],
+  ["monthly", "Monthly / 每月"],
+  ["completed", "Completed / 已完成"],
+];
+ui.taskScope = ui.taskScope || "today";
+ui.taskMonth = ui.taskMonth || hkDateKey().slice(0, 7);
+ui.taskCompany = ui.taskCompany || "";
+ui.taskStatus = ui.taskStatus || "";
+ui.taskQuery = ui.taskQuery || "";
+
+function hkDateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function shiftMonth(month, delta) {
+  const [year, value] = String(month).split("-").map(Number);
+  const date = new Date(Date.UTC(year || 2000, (value || 1) - 1 + delta, 1));
+  return date.toISOString().slice(0, 7);
+}
+
+function addDateDays(dateKey, days) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function taskMonths() {
+  return [...new Set([hkDateKey().slice(0, 7), ...state.vault.tasks.map((task) => task.planningMonth)])]
+    .filter(Boolean)
+    .sort()
+    .reverse();
+}
+
+function taskCounts() {
+  const today = hkDateKey();
+  const next = addDateDays(today, 7);
+  const incomplete = state.vault.tasks.filter((task) => task.status !== "Completed");
+  const monthTasks = state.vault.tasks.filter((task) => task.planningMonth === ui.taskMonth);
+  return {
+    today: incomplete.filter((task) => task.scheduledDate === today).length,
+    overdue: incomplete.filter((task) => task.scheduledDate < today).length,
+    upcoming: incomplete.filter((task) => task.scheduledDate > today && task.scheduledDate <= next).length,
+    completed: monthTasks.filter((task) => task.status === "Completed").length,
+    monthly: monthTasks.length,
+  };
+}
+
+let lastReminderDate = "";
+function refreshDailyReminder() {
+  if (!state.vault) return;
+  const today = hkDateKey();
+  if (lastReminderDate === today) return;
+  lastReminderDate = today;
+  const counts = taskCounts();
+  if (counts.today || counts.overdue) {
+    setStatus(`Daily reminder / 每日提醒: ${counts.today} due today, ${counts.overdue} overdue.`, "warning");
+  }
+}
+
+function renderTaskHomeWidget() {
+  const today = hkDateKey();
+  const incomplete = state.vault.tasks.filter((task) => task.status !== "Completed");
+  const overdue = incomplete.filter((task) => task.scheduledDate < today).sort(taskSort).slice(0, 3);
+  const dueToday = incomplete.filter((task) => task.scheduledDate === today).sort(taskSort).slice(0, 3);
+  const items = [...overdue, ...dueToday];
+  const label = overdue.length ? `${overdue.length} overdue · ${dueToday.length} due today` : `${dueToday.length} due today`;
+  return `<section class="panel monthly-task-widget" aria-labelledby="monthly-task-widget-heading"><div class="panel-heading"><div><p class="eyebrow">DAILY WORKFLOW / 每日工作</p><h2 id="monthly-task-widget-heading">Monthly Task</h2><p class="section-caption">${escapeHtml(label)} · Asia/Hong_Kong</p></div><button class="text-button" type="button" data-task-home-scope="today">Open tasks ↗</button></div>${items.length ? `<div class="task-home-list">${items.map((task) => `<button class="task-home-row" type="button" data-task-home-id="${escapeHtml(task.id)}"><span class="task-status-dot ${task.scheduledDate < today ? "is-overdue" : ""}"></span><span>${escapeHtml(task.description)}</span><time>${escapeHtml(task.scheduledDate)}</time></button>`).join("")}</div>` : '<p class="voice-empty">No incomplete tasks due today or overdue.</p>'}</section>`;
+}
+
+function bindTaskHomeWidget() {
+  viewContainer.querySelector("[data-task-home-scope]")?.addEventListener("click", () => {
+    ui.taskScope = "today";
+    navigate("tasks");
+  });
+  viewContainer.querySelectorAll("[data-task-home-id]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const index = state.vault.tasks.findIndex((task) => task.id === button.dataset.taskHomeId);
+      if (index >= 0) openTaskDialog(index);
+    }),
+  );
+}
+
+function taskSort(a, b) {
+  return String(a.scheduledDate).localeCompare(String(b.scheduledDate)) ||
+    String(a.company).localeCompare(String(b.company)) ||
+    String(a.createdAt).localeCompare(String(b.createdAt)) ||
+    String(a.id).localeCompare(String(b.id));
+}
+
+function filteredTasks() {
+  const today = hkDateKey();
+  const next = addDateDays(today, 7);
+  const query = ui.taskQuery.trim().toLowerCase();
+  return state.vault.tasks
+    .map((task, index) => ({ task, index }))
+    .filter(({ task }) => {
+      if (ui.taskScope === "today" && !(task.status !== "Completed" && task.scheduledDate === today)) return false;
+      if (ui.taskScope === "overdue" && !(task.status !== "Completed" && task.scheduledDate < today)) return false;
+      if (ui.taskScope === "upcoming" && !(task.status !== "Completed" && task.scheduledDate > today && task.scheduledDate <= next)) return false;
+      if (ui.taskScope === "monthly" && task.planningMonth !== ui.taskMonth) return false;
+      if (ui.taskScope === "completed" && task.status !== "Completed") return false;
+      if (ui.taskCompany && task.company !== ui.taskCompany) return false;
+      if (ui.taskStatus && task.status !== ui.taskStatus) return false;
+      if (query && !`${task.company} ${task.description} ${task.docResult}`.toLowerCase().includes(query)) return false;
+      return true;
+    })
+    .sort(({ task: a }, { task: b }) => taskSort(a, b));
+}
+
+function taskRowHtml(task, today) {
+  const overdue = task.status !== "Completed" && task.scheduledDate < today;
+  const action = task.status === "Completed"
+    ? `<button class="button button-quiet" type="button" data-task-reopen="${escapeHtml(task.id)}">Reopen / 重開</button>`
+    : `<button class="button button-primary" type="button" data-task-complete="${escapeHtml(task.id)}">Complete / 完成</button>`;
+  return `<article class="item task-row ${overdue ? "is-overdue" : ""} ${task.status === "Completed" ? "is-completed" : ""}"><div class="item-top"><div><p class="task-company">${escapeHtml(task.company)} · ${escapeHtml(task.planningMonth)}</p><h2 class="item-name">${escapeHtml(task.description)}</h2></div><div class="item-actions"><span class="badge task-date-badge">${overdue ? "Overdue / 逾期 · " : ""}${escapeHtml(task.scheduledDate)}</span><button class="button button-quiet" type="button" data-task-edit="${escapeHtml(task.id)}">Edit / 編輯</button></div></div><p class="task-status-text"><span class="task-status-dot ${overdue ? "is-overdue" : ""}"></span>${escapeHtml(task.status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始")}${task.completedAt ? ` · ${escapeHtml(hkDateKey(task.completedAt))}` : ""}</p>${task.docResult ? `<p class="item-notes"><strong>Doc / Result:</strong><br>${escapeHtml(task.docResult).replaceAll("\n", "<br>")}</p>` : ""}<div class="task-row-actions">${action}<button class="button button-danger" type="button" data-task-delete="${escapeHtml(task.id)}">Delete / 刪除</button></div></article>`;
+}
+
+function renderTasks() {
+  const counts = taskCounts();
+  const companies = [...new Set(state.vault.tasks.map((task) => task.company).filter(Boolean))].sort();
+  const today = hkDateKey();
+  const rows = filteredTasks();
+  viewContainer.innerHTML = `${pageHeading("Monthly Task / 工作任務", "Keep monthly work visible, date-safe, and easy to complete.", `<div class="task-header-actions"><button class="button button-primary" type="button" id="add-task">${icon("plus")} Add Task / 新增</button><button class="button" type="button" id="import-task">Import Excel / 匯入</button><input id="task-file" type="file" accept=".xlsx,.xls" hidden><button class="button" type="button" id="rollover-task">Create Next Month / 建立下月</button></div>`)}<section class="task-summary" aria-label="Task counts"><button type="button" data-task-scope="today"><strong>${counts.today}</strong><span>Today outstanding / 今日未完成</span></button><button type="button" data-task-scope="overdue"><strong>${counts.overdue}</strong><span>Overdue / 逾期</span></button><button type="button" data-task-scope="monthly"><strong>${counts.completed} / ${counts.monthly}</strong><span>Monthly completed / total</span></button></section><section class="panel task-panel"><div class="task-tabs" role="tablist" aria-label="Task views">${TASK_SCOPES.map(([key, label]) => `<button type="button" role="tab" aria-selected="${ui.taskScope === key}" class="${ui.taskScope === key ? "is-active" : ""}" data-task-scope="${key}">${label}</button>`).join("")}</div><div class="task-filters"><label>Month / 月<select id="task-month">${taskMonths().map((month) => `<option value="${month}" ${month === ui.taskMonth ? "selected" : ""}>${month}</option>`).join("")}</select></label><label>Company / 公司<select id="task-company"><option value="">All / 全部</option>${companies.map((company) => `<option value="${escapeHtml(company)}" ${company === ui.taskCompany ? "selected" : ""}>${escapeHtml(company)}</option>`).join("")}</select></label><label>Status / 狀態<select id="task-status"><option value="">All / 全部</option>${TASK_STATUS.map((status) => `<option value="${status}" ${status === ui.taskStatus ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></label><label class="task-keyword">Keyword / 關鍵字<input id="task-query" type="search" placeholder="Search tasks…" value="${escapeHtml(ui.taskQuery)}"></label><div class="task-file-actions"><button class="button button-quiet" type="button" id="export-task-csv">Export CSV</button><button class="button button-quiet" type="button" id="backup-task-json">Backup JSON</button><button class="button button-quiet" type="button" id="restore-task-json">Restore JSON</button><input id="task-json-file" type="file" accept=".json" hidden></div></div><p class="results-count" role="status">${rows.length} task${rows.length === 1 ? "" : "s"} · ${escapeHtml(ui.taskScope)} · ${escapeHtml(today)} Hong Kong time</p><div class="task-list">${rows.length ? rows.map(({ task }) => taskRowHtml(task, today)).join("") : emptyState("tasks", "No tasks in this view", "Try another filter or import the NOV2026 workbook.")}</div></section>`;
+  bindTaskActions();
+}
+
+function bindTaskActions() {
+  viewContainer.querySelectorAll("[data-task-scope]").forEach((button) => button.addEventListener("click", () => { ui.taskScope = button.dataset.taskScope; renderTasks(); }));
+  viewContainer.querySelector("#task-month")?.addEventListener("change", (event) => { ui.taskMonth = event.target.value; renderTasks(); });
+  viewContainer.querySelector("#task-company")?.addEventListener("change", (event) => { ui.taskCompany = event.target.value; renderTasks(); });
+  viewContainer.querySelector("#task-status")?.addEventListener("change", (event) => { ui.taskStatus = event.target.value; renderTasks(); });
+  viewContainer.querySelector("#task-query")?.addEventListener("input", (event) => { ui.taskQuery = event.target.value; renderTasks(); });
+  viewContainer.querySelector("#add-task")?.addEventListener("click", () => openTaskDialog());
+  viewContainer.querySelector("#import-task")?.addEventListener("click", () => viewContainer.querySelector("#task-file").click());
+  viewContainer.querySelector("#task-file")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (file) importTaskWorkbook(file); event.target.value = ""; });
+  viewContainer.querySelector("#rollover-task")?.addEventListener("click", openTaskRolloverPreview);
+  viewContainer.querySelector("#export-task-csv")?.addEventListener("click", exportTasksCsv);
+  viewContainer.querySelector("#backup-task-json")?.addEventListener("click", backupTasksJson);
+  viewContainer.querySelector("#restore-task-json")?.addEventListener("click", () => viewContainer.querySelector("#task-json-file").click());
+  viewContainer.querySelector("#task-json-file")?.addEventListener("change", (event) => { const file = event.target.files?.[0]; if (file) restoreTasksJson(file); event.target.value = ""; });
+  viewContainer.querySelectorAll("[data-task-edit]").forEach((button) => button.addEventListener("click", () => openTaskDialog(state.vault.tasks.findIndex((task) => task.id === button.dataset.taskEdit))));
+  viewContainer.querySelectorAll("[data-task-complete], [data-task-reopen]").forEach((button) => button.addEventListener("click", () => updateTaskStatus(button.dataset.taskComplete || button.dataset.taskReopen, Boolean(button.dataset.taskComplete))));
+  viewContainer.querySelectorAll("[data-task-delete]").forEach((button) => button.addEventListener("click", () => deleteTask(button.dataset.taskDelete)));
+}
+
+function openTaskDialog(index = null, defaults = {}) {
+  const editing = index !== null && index >= 0 ? state.vault.tasks[index] : null;
+  const task = editing || { planningMonth: ui.taskMonth, scheduledDate: hkDateKey(), company: "OTHER", status: "Not Started", ...defaults };
+  const dialog = document.querySelector("#item-dialog");
+  const content = document.querySelector("#dialog-content");
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY TASK / 工作任務</p><h2 id="dialog-title">${editing ? "Edit task / 編輯任務" : "Add task / 新增任務"}</h2><p>Dates are date-only and calculated in Asia/Hong_Kong.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form task-form"><div class="form-row"><div class="field"><label for="task-planning-month">Planning month / 計劃月份 *</label><input id="task-planning-month" name="planningMonth" type="month" value="${escapeHtml(task.planningMonth)}" required></div><div class="field"><label for="task-company-field">Company / 公司 *</label><input id="task-company-field" name="company" value="${escapeHtml(task.company)}" required></div><div class="field"><label for="task-date-field">Scheduled date / 排程日期 *</label><input id="task-date-field" name="scheduledDate" type="date" value="${escapeHtml(task.scheduledDate)}" required></div><div class="field"><label for="task-status-field">Status / 狀態</label><select id="task-status-field" name="status">${TASK_STATUS.map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></div><div class="field field-wide"><label for="task-description-field">Description / 任務描述 *</label><textarea id="task-description-field" name="description" required>${escapeHtml(task.description)}</textarea></div><div class="field field-wide"><label for="task-result-field">Doc / Result / 文件或結果</label><textarea id="task-result-field" name="docResult" placeholder="Files, references, amounts, notes, or results…">${escapeHtml(task.docResult)}</textarea></div></div><p class="form-help" id="task-form-feedback">Completion does not require an attachment.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="submit">${editing ? "Save changes / 儲存" : "Create task / 建立"}</button></div></form>`;
+  const form = content.querySelector("form");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const feedback = content.querySelector("#task-form-feedback");
+    data.company = String(data.company || "").trim();
+    data.description = String(data.description || "").trim();
+    if (!data.company || !data.description || !/^\d{4}-\d{2}$/.test(data.planningMonth) || !/^\d{4}-\d{2}-\d{2}$/.test(data.scheduledDate)) {
+      feedback.textContent = "Company, description, planning month, and date are required.";
+      feedback.dataset.kind = "error";
+      return;
+    }
+    const now = new Date().toISOString();
+    if (editing) {
+      Object.assign(editing, data, { updatedAt: now });
+      editing.completedAt = data.status === "Completed" ? editing.completedAt || now : null;
+    } else {
+      state.vault.tasks.push(normalizeTask({ ...data, id: uid(), createdAt: now, updatedAt: now, completedAt: data.status === "Completed" ? now : null }));
+    }
+    markDirty();
+    dialog.close();
+    render();
+    setStatus(`Task ${editing ? "updated" : "created"}. Saved on this device.`, "success");
+  });
+  content.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
+  content.querySelector("#cancel-edit").addEventListener("click", () => dialog.close());
+  dialog.showModal();
+}
+
+function updateTaskStatus(id, complete) {
+  const task = state.vault.tasks.find((item) => item.id === id);
+  if (!task) return;
+  task.status = complete ? "Completed" : "Not Started";
+  task.completedAt = complete ? new Date().toISOString() : null;
+  task.updatedAt = new Date().toISOString();
+  markDirty();
+  render();
+  setStatus(complete ? "Task completed locally." : "Task reopened locally; Doc / Result preserved.", "success");
+}
+
+function deleteTask(id) {
+  const index = state.vault.tasks.findIndex((task) => task.id === id);
+  if (index < 0) return;
+  const task = state.vault.tasks[index];
+  if (!window.confirm(`Delete “${task.description}”?`)) return;
+  state.vault.tasks.splice(index, 1);
+  markDirty();
+  render();
+  setStatus("Task deleted locally.", "success");
+}
+
+function parseTaskDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return hkDateKey(value);
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(Date.UTC(1899, 11, 30) + value * 86400000).toISOString().slice(0, 10);
+  const text = String(value ?? "").trim();
+  const match = /^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/.exec(text);
+  if (match) return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+function parsePlanningMonth(value, fallback = "") {
+  const text = String(value ?? "").trim();
+  const match = /^(\d{4})[\/-](\d{1,2})$/.exec(text);
+  return match ? `${match[1]}-${match[2].padStart(2, "0")}` : fallback;
+}
+
+function importFingerprint(task) {
+  const source = task.source || {};
+  return [source.workbook, source.worksheet, source.row, task.company, task.description, task.scheduledDate].map((value) => String(value ?? "").trim().toLowerCase()).join("|");
+}
+
+async function importTaskWorkbook(file) {
+  if (!globalThis.XLSX) {
+    setStatus("Excel importer is unavailable. Reload the page and try again.", "error");
+    return;
+  }
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true, cellNF: false, cellText: false });
+    const worksheetName = "NOV2026";
+    const sheet = workbook.Sheets[worksheetName];
+    if (!sheet) throw new Error(`Worksheet ${worksheetName} was not found.`);
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
+    const planningMonth = parsePlanningMonth(rows[0]?.[0], "2026-11");
+    const batch = uid();
+    const imported = [];
+    const invalid = [];
+    const ambiguous = [];
+    for (let rowIndex = 1; rowIndex < Math.min(rows.length, 47); rowIndex += 1) {
+      const row = rows[rowIndex] || [];
+      const company = String(row[0] ?? "").trim();
+      const description = String(row[1] ?? "").trim();
+      const scheduledDate = parseTaskDate(row[2]);
+      const historicalStatus = String(row[3] ?? "").trim();
+      if (!company && !description && !row[2] && !historicalStatus) continue;
+      if (!company || !description || !scheduledDate) {
+        invalid.push({ row: rowIndex + 1, reason: "Missing company, description, or valid date." });
+        continue;
+      }
+      let status = "Not Started";
+      let docResult = "";
+      if (/^completed\b/i.test(historicalStatus)) status = "Completed";
+      else if (/^(not\s*started|pending)\b/i.test(historicalStatus)) status = "Not Started";
+      else if (historicalStatus) {
+        ambiguous.push({ row: rowIndex + 1, value: historicalStatus });
+        docResult = historicalStatus;
+      }
+      imported.push(normalizeTask({ id: uid(), planningMonth, company, description, scheduledDate, status, docResult, completedAt: status === "Completed" ? new Date().toISOString() : null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: { workbook: file.name, worksheet: worksheetName, row: rowIndex + 1, importBatch: batch } }));
+    }
+    const existing = new Map(state.vault.tasks.map((task) => [importFingerprint(task), task]));
+    const duplicates = imported.filter((task) => existing.has(importFingerprint(task)) && JSON.stringify({ company: existing.get(importFingerprint(task)).company, description: existing.get(importFingerprint(task)).description, scheduledDate: existing.get(importFingerprint(task)).scheduledDate }) === JSON.stringify({ company: task.company, description: task.description, scheduledDate: task.scheduledDate }));
+    const conflicts = imported.filter((task) => existing.has(importFingerprint(task)) && !duplicates.includes(task));
+    openTaskImportPreview({ file, planningMonth, imported, duplicates, conflicts, invalid, ambiguous });
+  } catch (error) {
+    setStatus(`Excel import failed: ${error.message}`, "error");
+  }
+}
+
+function openTaskImportPreview(result) {
+  const dialog = document.querySelector("#item-dialog");
+  const content = document.querySelector("#dialog-content");
+  const previewRows = result.imported.slice(0, 12).map((task) => `<tr><td>${escapeHtml(task.company)}</td><td>${escapeHtml(task.description)}</td><td>${escapeHtml(task.scheduledDate)}</td><td>${escapeHtml(task.status)}</td></tr>`).join("");
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">IMPORT PREVIEW / 匯入預覽</p><h2 id="dialog-title">${escapeHtml(result.file.name)}</h2><p>${result.imported.length} rows mapped from NOV2026. Rows 50–55 are not imported.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><div class="import-summary"><span>New: <strong>${result.imported.length - result.duplicates.length}</strong></span><span>Exact duplicates: <strong>${result.duplicates.length}</strong></span><span>Invalid: <strong>${result.invalid.length}</strong></span><span>Ambiguous status: <strong>${result.ambiguous.length}</strong></span></div>${result.ambiguous.length ? `<p class="form-help" data-kind="warning">Ambiguous status text is preserved in Doc / Result and imported as Not Started for review.</p>` : ""}${result.invalid.length ? `<p class="form-help" data-kind="error">Skipped rows: ${result.invalid.map((item) => `${item.row} (${escapeHtml(item.reason)})`).join(", ")}</p>` : ""}<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Company</th><th>Description</th><th>Date</th><th>Status</th></tr></thead><tbody>${previewRows}</tbody></table></div><p class="form-help">Exact re-imports will not duplicate tasks. Existing saved results and completion statuses are never overwritten.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="button" id="confirm-task-import">Import ${result.imported.length - result.duplicates.length} new tasks</button></div>`;
+  content.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
+  content.querySelector("#cancel-edit").addEventListener("click", () => dialog.close());
+  content.querySelector("#confirm-task-import").addEventListener("click", () => {
+    const duplicateFingerprints = new Set(result.duplicates.map(importFingerprint));
+    const existingFingerprints = new Set(state.vault.tasks.map(importFingerprint));
+    const toAdd = result.imported.filter((task) => !duplicateFingerprints.has(importFingerprint(task)) && !existingFingerprints.has(importFingerprint(task)));
+    state.vault.tasks.push(...toAdd);
+    if (toAdd.length) markDirty();
+    ui.taskMonth = result.planningMonth;
+    ui.taskScope = "monthly";
+    dialog.close();
+    render();
+    setStatus(`${toAdd.length} tasks imported locally. Review them before saving to GitHub.`, "success");
+  });
+  dialog.showModal();
+}
+
+function openTaskRolloverPreview() {
+  const sourceMonth = ui.taskMonth;
+  const targetMonth = shiftMonth(sourceMonth, 1);
+  const candidates = state.vault.tasks.filter((task) => task.planningMonth === sourceMonth && task.status !== "Completed");
+  const dialog = document.querySelector("#item-dialog");
+  const content = document.querySelector("#dialog-content");
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY ROLLOVER / 每月延續</p><h2 id="dialog-title">${escapeHtml(sourceMonth)} → ${escapeHtml(targetMonth)}</h2><p>Select recurring unfinished tasks. New tasks reset to Not Started and clear Doc / Result. Weekend dates move forward; Hong Kong holiday coverage is not verified.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><div class="rollover-list">${candidates.length ? candidates.map((task) => `<label><input type="checkbox" name="rollover" value="${escapeHtml(task.id)}" checked><span><strong>${escapeHtml(task.company)}</strong> ${escapeHtml(task.description)}<small>${escapeHtml(task.scheduledDate)} → ${escapeHtml(rolloverDate(task.scheduledDate, targetMonth))}</small></span></label>`).join("") : '<p class="voice-empty">No unfinished tasks are available for rollover.</p>'}</div><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="button" id="confirm-rollover" ${candidates.length ? "" : "disabled"}>Create selected tasks</button></div>`;
+  content.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
+  content.querySelector("#cancel-edit").addEventListener("click", () => dialog.close());
+  content.querySelector("#confirm-rollover").addEventListener("click", () => {
+    const selected = [...content.querySelectorAll("input[name=rollover]:checked")].map((input) => input.value);
+    const existingCarry = new Set(state.vault.tasks.map((task) => `${task.carriedFromTaskId || ""}|${task.planningMonth}`));
+    const now = new Date().toISOString();
+    const additions = candidates.filter((task) => selected.includes(task.id) && !existingCarry.has(`${task.id}|${targetMonth}`)).map((task) => normalizeTask({ id: uid(), planningMonth: targetMonth, company: task.company, description: task.description, scheduledDate: rolloverDate(task.scheduledDate, targetMonth), status: "Not Started", docResult: "", createdAt: now, updatedAt: now, carriedFromTaskId: task.id, source: { rolloverFrom: sourceMonth, rolloverTo: targetMonth, holidayCoverage: "unverified" } }));
+    state.vault.tasks.push(...additions);
+    if (additions.length) markDirty();
+    dialog.close();
+    render();
+    setStatus(`${additions.length} next-month tasks created locally. Review dates before saving.`, "success");
+  });
+  dialog.showModal();
+}
+
+function rolloverDate(dateKey, targetMonth) {
+  const [, month, day] = String(dateKey).split("-").map(Number);
+  const [year, target] = targetMonth.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, target, 0)).getUTCDate();
+  const date = new Date(Date.UTC(year, target - 1, Math.min(day || 1, lastDay)));
+  while ([0, 6].includes(date.getUTCDay())) date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function downloadText(filename, text, type = "text/plain") {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([text], { type }));
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 0);
+}
+
+function exportTasksCsv() {
+  const headers = ["id", "planningMonth", "company", "description", "scheduledDate", "status", "docResult", "completedAt", "createdAt", "updatedAt"];
+  const csv = [headers, ...state.vault.tasks.map((task) => headers.map((header) => `"${String(task[header] ?? "").replaceAll('"', '""')}"`))].map((row) => row.join(",")).join("\r\n");
+  downloadText(`myvault-monthly-tasks-${hkDateKey()}.csv`, csv, "text/csv;charset=utf-8");
+}
+
+function backupTasksJson() {
+  downloadText(`myvault-tasks-backup-${hkDateKey()}.json`, JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), tasks: state.vault.tasks }, null, 2), "application/json");
+}
+
+async function restoreTasksJson(file) {
+  try {
+    const parsed = JSON.parse(await file.text());
+    const tasks = Array.isArray(parsed) ? parsed : parsed.tasks;
+    if (!Array.isArray(tasks)) throw new Error("Backup does not contain a tasks array.");
+    if (!window.confirm(`Restore ${tasks.length} tasks? Existing task records will be replaced.`)) return;
+    state.vault.tasks = tasks.map(normalizeTask);
+    markDirty();
+    render();
+    setStatus(`${tasks.length} tasks restored locally.`, "success");
+  } catch (error) {
+    setStatus(`Task restore failed: ${error.message}`, "error");
+  }
+}
+
 function validateVaultJson(text) {
   let parsed;
   try {
@@ -862,7 +1267,7 @@ function validateVaultJson(text) {
     errors.push("Vault must be a JSON object.");
     return { ok: false, errors, parsed };
   }
-  for (const key of ["skills", "projects", "docs", "cards", "chats"]) {
+  for (const key of ["skills", "projects", "docs", "cards", "chats", "tasks"]) {
     if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {
       errors.push(`"${key}" should be an array.`);
     }
@@ -1585,6 +1990,12 @@ window.addEventListener("keydown", (event) => {
     document.querySelector("#global-search").focus();
   }
 });
+window.addEventListener("focus", () => {
+  if (!state.vault) return;
+  const before = lastReminderDate;
+  refreshDailyReminder();
+  if (before && before !== lastReminderDate) render();
+});
 
 if (localStorage.getItem(TOKEN_KEY)) {
   loginButton.textContent = "Sign out";
@@ -1625,6 +2036,7 @@ if (cached) {
   } else {
     setStatus("Loaded from local cache. Sign in to sync with GitHub.");
   }
+  refreshDailyReminder();
 } else if (localStorage.getItem(TOKEN_KEY)) {
   loadVault();
 } else {
@@ -1633,4 +2045,5 @@ if (cached) {
   setStatus(
     "New local vault started. Sign in with GitHub to sync it to your myvault-data repo.",
   );
+  refreshDailyReminder();
 }
