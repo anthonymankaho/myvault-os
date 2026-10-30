@@ -225,6 +225,15 @@ function readCache() {
 
 function applyVault(vault, { fromCache = false } = {}) {
   state.vault = normalizeVault(vault);
+  const currentMonth = hkDateKey().slice(0, 7);
+  const taskMonthsAvailable = [...new Set(state.vault.tasks.map((task) => task.planningMonth))]
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  if (taskMonthsAvailable.length && !taskMonthsAvailable.includes(currentMonth)) {
+    ui.taskMonth = taskMonthsAvailable[0];
+    ui.taskScope = "monthly";
+  }
   state.dirty = false;
   writeCache();
   updateSaveButton();
