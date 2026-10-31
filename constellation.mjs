@@ -201,15 +201,15 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     host3d.hidden = true; stage.hidden = false;
     threeButton.disabled = false; threeButton.textContent = 'Try 3D';
   }
-  async function enter3d() {
+  async function enter3d({ focus = true } = {}) {
     const request = ++threeRequest;
     threeButton.disabled = true; threeButton.textContent = 'Loading 3D…'; notice.hidden = true;
     try {
-      const module = await Promise.race([import('./constellation-3d.mjs?v=3'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
+      const module = await Promise.race([import('./constellation-3d.mjs?v=4'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
       if (disposed || request !== threeRequest) return;
       host3d.hidden = false; stage.hidden = true;
       threeD = module.createMyVaultConstellation({ container: host3d.querySelector('[data-three-host]'), nodes: realNodes, edges: realEdges, onOpen });
-      host3d.querySelector('[data-map-action="2d"]').focus();
+      if (focus) host3d.querySelector('[data-map-action="2d"]').focus();
     } catch {
       if (disposed || request !== threeRequest) return;
       leave3d();
@@ -226,6 +226,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     if (!action) return;
     if (action === 'dashboard') onNavigate?.('control');
     if (action === 'create') onCreate?.('projects');
+    if (action === 'create-skill') onCreate?.('skills');
     if (action === 'demo') setDemo(true);
     if (action === 'exit-demo') setDemo(false);
     if (action === 'browse') { browse = !browse; draw(); }
@@ -287,5 +288,16 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
   bind(svg, 'pointerup', end); bind(svg, 'pointercancel', (event) => { dragged = true; end(event); });
   bind(svg, 'wheel', (event) => { event.preventDefault(); zoom = Math.max(0.5, Math.min(3, zoom * (event.deltaY > 0 ? 0.94 : 1.06))); transform(); }, { passive: false });
   draw();
-  return { dispose() { disposed = true; leave3d(); controller.abort(); container.replaceChildren(); } };
+  // Start 3D on the first visit, without moving keyboard focus during navigation.
+  let attemptedDefault = false;
+  const startDefault = () => {
+    if (!disposed && !attemptedDefault && document.body.classList.contains('constellation-home')) {
+      attemptedDefault = true;
+      enter3d({ focus: false });
+    }
+  };
+  const viewObserver = new MutationObserver(startDefault);
+  viewObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  startDefault();
+  return { dispose() { disposed = true; viewObserver.disconnect(); leave3d(); controller.abort(); container.replaceChildren(); } };
 }
