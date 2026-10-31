@@ -32,6 +32,7 @@ const COLLECTIONS = {
         options: ["Beginner", "Intermediate", "Advanced", "Expert"],
       },
       { key: "notes", label: "Notes", type: "textarea" },
+      { key: "links", label: "Connected projects or skills (one name per line)", type: "textarea" },
     ],
   },
   projects: {
@@ -46,6 +47,7 @@ const COLLECTIONS = {
         options: ["Idea", "Active", "Paused", "Done", "Archived"],
       },
       { key: "notes", label: "Notes", type: "textarea" },
+      { key: "links", label: "Connected projects or skills (one name per line)", type: "textarea" },
     ],
   },
   docs: {
@@ -71,7 +73,7 @@ const COLLECTIONS = {
 
 const VIEWS = {
   home: { title: "Constellation" },
-  control: { title: "Control" },
+  control: { title: "Dashboard" },
   ...Object.fromEntries(
     Object.entries(COLLECTIONS).map(([key, config]) => [
       key,
@@ -85,7 +87,7 @@ const VIEWS = {
 
 const state = {
   vault: null,
-  view: "home",
+  view: "control",
   dirty: false,
   savedAt: null,
   saving: false,
@@ -466,6 +468,11 @@ function startVoiceInput() {
 
 function render() {
   document.body.classList.toggle("constellation-home", state.view === "home");
+  const mapContainer = document.querySelector("#constellation-background");
+  if (mapContainer) {
+    mapContainer.inert = state.view !== "home";
+    mapContainer.setAttribute("aria-hidden", String(state.view !== "home"));
+  }
   if (!state.vault) {
     viewContainer.innerHTML = "";
     return;
@@ -643,7 +650,7 @@ function renderHome() {
       <section class="panel" aria-labelledby="capture-heading"><div class="panel-heading"><div><h2 id="capture-heading">Quick capture</h2><p class="section-caption">Give your next thought a home.</p></div></div>
         <div class="quick-actions">${["projects", "skills", "docs", "chats"].map((key) => `<button class="quick-action" type="button" data-add="${key}">${icon(key)}<span>${escapeHtml(COLLECTIONS[key].title)}</span></button>`).join("")}</div>
       </section>
-      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 28 18 40-32 45 22 30 25 18-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/><g>${[[25, 70],[80, 30],[108, 48],[149, 16],[194, 38],[243, 48],[205, 93]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="currentColor" opacity=".12"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`).join("")}</g></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connected thinking</h2><p>Projects anchor the center while skills follow a 65° orbit. Only explicit vault links form connections.</p><button class="button button-primary" type="button" data-navigate="home">Open constellation</button></section>
+      <section class="panel constellation-teaser" aria-labelledby="connect-heading"><div class="constellation-art" aria-hidden="true"><svg viewBox="0 0 280 110" fill="none"><path d="m25 70 55-40 28 18 40-32 45 22 30 25 18-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/><g>${[[25, 70],[80, 30],[108, 48],[149, 16],[194, 38],[243, 48],[205, 93]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="currentColor" opacity=".12"/><circle cx="${x}" cy="${y}" r="2.5" fill="currentColor"/>`).join("")}</g></svg></div><p class="eyebrow">The bigger picture</p><h2 id="connect-heading">Connected thinking</h2><p>See how your projects connect with the skills you are growing. Select a star to explore its linked records.</p><button class="button button-primary" type="button" data-navigate="home">Open constellation</button></section>
       <section class="panel" aria-labelledby="voice-heading"><div class="panel-heading"><div><h2 id="voice-heading">Voice notes</h2></div><button class="text-button" id="voice-button" type="button">${icon("voice")} Capture</button></div>
         ${notes.length ? `<div class="item-list">${notes.map((note) => `<article class="item voice-note"><div class="item-top"><h3 class="item-name">${escapeHtml(note.text.slice(0, 50) || "Voice note")}</h3><button class="button button-danger" type="button" data-delete-voice="${note.rawIndex}">Delete</button></div><p class="item-notes">${escapeHtml(note.text)}</p><time>${escapeHtml(new Date(note.at || Date.now()).toLocaleString())}</time></article>`).join("")}</div>` : emptyState("voice", "Quiet for now", "Add a quick voice memo and it will stay with this workspace.")}
       </section>
@@ -670,7 +677,7 @@ function renderHome() {
 
 function fieldHtml(field, item = {}) {
   const raw = item[field.key] ?? "";
-  const value = Array.isArray(raw) ? raw.join(", ") : raw;
+  const value = Array.isArray(raw) ? raw.join(field.key === "links" ? "\n" : ", ") : raw;
   const required = field.required ? " required autofocus" : "";
   const label = `<label for="field-${field.key}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>`;
   if (field.type === "textarea")
@@ -705,6 +712,8 @@ function openItemDialog(key, index = null) {
       if (typeof data[field.key] === "string")
         data[field.key] = data[field.key].trim();
     }
+    if (key === "projects" || key === "skills")
+      data.links = String(data.links || "").split(/\n/).map((link) => link.trim()).filter(Boolean);
     if (key === "docs")
       data.tags = data.tags
         .split(",")
@@ -1469,11 +1478,16 @@ async function updateConstellationBackground() {
   const request = ++constellationRequest;
   const model = buildConstellationModel();
   try {
-    const { createMyVaultConstellation } = await import("./constellation.mjs?v=2");
+    const { createMyVaultConstellation } = await import("./constellation.mjs?v=3");
     if (request !== constellationRequest) return;
     const constellation = createMyVaultConstellation({
       container,
       ...model,
+      onNavigate: navigate,
+      onCreate(kind) {
+        navigate(kind);
+        openItemDialog(kind);
+      },
       onOpen(node) {
         const index = state.vault[node.kind].findIndex(
           (item) => String(item.id || "") === node.id,
