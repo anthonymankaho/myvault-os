@@ -468,6 +468,7 @@ function startVoiceInput() {
 
 function render() {
   document.body.classList.toggle("constellation-home", state.view === "home");
+  document.querySelector(".skip-link")?.setAttribute("href", state.view === "home" ? "#orbit-main" : "#main");
   const mapContainer = document.querySelector("#constellation-background");
   if (mapContainer) {
     mapContainer.inert = state.view !== "home";
@@ -2042,7 +2043,10 @@ globalThis.myVaultAIBridge = Object.freeze({
 const cached = readCache();
 const initialView = location.hash.slice(1);
 if (VIEWS[initialView] && initialView !== "search") state.view = initialView;
-else if (initialView === "constellation") history.replaceState(null, "", "#home");
+else if (initialView === "constellation") {
+  state.view = "home";
+  history.replaceState(null, "", "#home");
+}
 viewTitle.textContent = VIEWS[state.view].title;
 document.title = `${VIEWS[state.view].title} · MyVault OS`;
 document.querySelectorAll(".nav-link").forEach((el) => {
