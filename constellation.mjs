@@ -101,7 +101,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
   let positions = layoutConstellation(nodes);
   let namePositions = layoutStarLabels(nodes, positions);
 
-  container.innerHTML = `<section class="constellation-stage orbit-stage" aria-label="Constellation map">
+  container.innerHTML = `<section id="orbit-main" tabindex="-1" class="constellation-stage orbit-stage" aria-label="Constellation map">
     <header class="orbit-header"><div><p class="orbit-eyebrow">YOUR CONNECTED WORKSPACE</p><h1>Everything, connected.</h1><p>Projects at the heart. Skills that help them grow.</p></div><button type="button" class="orbit-dashboard" data-map-action="dashboard">Dashboard ↗</button></header>
     <div class="orbit-discovery"><label class="visually-hidden" for="orbit-query">Search projects and skills</label><input id="orbit-query" type="search" placeholder="Find a project or skill…" autocomplete="off"><div class="orbit-filters" role="group" aria-label="Filter stars"><button type="button" data-map-filter="all" aria-pressed="true">All stars</button><button type="button" data-map-filter="projects" aria-pressed="false">Projects</button><button type="button" data-map-filter="skills" aria-pressed="false">Skills</button></div><button type="button" data-map-action="browse" aria-expanded="false" aria-controls="orbit-index">Browse records</button></div>
     <div class="orbit-summary" role="status" aria-live="polite"></div>
