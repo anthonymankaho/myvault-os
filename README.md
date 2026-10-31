@@ -54,7 +54,11 @@ _Screenshot coming soon._
 
 Run `node --check app.js` and `node --test test/app.test.cjs` with Node.js 18 or newer. Serve the repository with any static HTTP server to preview it. GitHub OAuth still uses the configured production callback and Worker; a local preview does not establish a production sign-in session.
 
-The app opens on an interactive constellation landing view with the side navigation. Select **Control** to open the former overview dashboard and workspace controls. The Kimi-inspired 3D renderer uses only the current vault's projects and skills: projects form the center, skills follow a 65° orbit, and only explicit vault links create graph edges. Search, labels, rotation, signals, zoom, touch orbiting, and direct record opening are available; reduced-motion preferences start rotation and signals disabled. Documents and chats remain in their existing views and never become constellation stars. Build / Repair includes an explicit **Apply changes** action for raw JSON edits before syncing.
+The app opens on **Dashboard**. Choose **Constellation** for a built-in, dependency-free SVG map: projects sit at the heart and skills orbit around them. Every skill name is shown in full by default, including large vaults; long names wrap. Search names, notes, and status/level, filter by record type, browse a keyboard-accessible record index, inspect connected records, and pan or zoom with touch, mouse, or the toolbar. Add connections by entering an existing project or skill name per line in a record's **Connected projects or skills** field. Only explicit links form edges.
+
+An empty vault offers **Create a project** and a clearly labelled **Explore a sample** preview. Sample records never enter the vault, storage, or GitHub sync. **Try 3D** loads the optional Three.js renderer only on demand. If its CDN, WebGL, or loading timeout fails, the working 2D map remains available. In 3D, all skill labels remain visible by default, rotation starts paused, a star tap inspects before opening, and rendering pauses off the constellation page. Documents and chats stay in their existing views and do not become stars. Build / Repair retains explicit **Apply changes** before syncing.
+
+Run `node --test test/*.test.*` for frontend, AI-contract, and constellation layout/search/link/wrapping checks.
 
 Built with Kimi + Qwen AI.
 

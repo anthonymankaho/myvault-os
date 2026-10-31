@@ -1,602 +1,291 @@
-import * as THREE from "three";
+// The everyday map has no network, canvas, or WebGL dependency.
+const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+const color = (node) => node.kind === 'projects' ? '#ffe3b3' : '#b9e8d1';
 
-const PROJECT_COLOR = "#ffe3b3";
-const SKILL_COLOR = "#b9e8d1";
-const FOV = 46;
-const DEG = Math.PI / 180;
-
-function hash01(value, salt = 0) {
-  let hash = 2166136261 ^ salt;
-  for (const character of String(value)) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
+export function wrapStarName(value, width = 26) {
+  const lines = [];
+  let remaining = String(value);
+  while (remaining.length > width) {
+    const space = remaining.lastIndexOf(' ', width);
+    const end = space > width / 2 ? space : width;
+    lines.push(remaining.slice(0, end));
+    remaining = remaining.slice(end).trimStart();
   }
-  return (hash >>> 0) / 4294967295;
+  if (remaining) lines.push(remaining);
+  return lines;
 }
 
-function buildPositions(nodes) {
-  const positions = new Float32Array(nodes.length * 3);
-  const projects = [];
-  const skills = [];
-  nodes.forEach((node, index) =>
-    (node.kind === "projects" ? projects : skills).push([node, index]),
-  );
-
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  const projectRadius = Math.min(15, Math.max(5, Math.sqrt(projects.length) * 2.1));
-  projects.forEach(([node, index], slot) => {
-    const t = projects.length === 1 ? 0.5 : (slot + 0.5) / projects.length;
-    const y = 1 - 2 * t;
-    const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
-    const radius = projects.length === 1 ? 0 : projectRadius * Math.cbrt(t);
-    const angle = golden * slot + hash01(node.key, 1) * 0.5;
-    positions[index * 3] = Math.cos(angle) * horizontal * radius;
-    positions[index * 3 + 1] = y * radius;
-    positions[index * 3 + 2] = Math.sin(angle) * horizontal * radius;
-  });
-
-  const orbitRadius = Math.max(31, Math.min(45, 29 + Math.sqrt(skills.length) * 1.45));
-  const tilt = 65 * DEG;
-  skills.forEach(([node, index], slot) => {
-    const angle = (slot / Math.max(skills.length, 1)) * Math.PI * 2 + hash01(node.key, 2) * 0.12;
-    const radialJitter = (hash01(node.key, 3) - 0.5) * 5.5;
-    const normalOffset = (hash01(node.key, 4) - 0.5) * 4.6;
-    const radius = orbitRadius + radialJitter;
-    const x = Math.cos(angle) * radius;
-    const flatZ = Math.sin(angle) * radius;
-    positions[index * 3] = x;
-    positions[index * 3 + 1] = -flatZ * Math.sin(tilt) + normalOffset * Math.cos(tilt);
-    positions[index * 3 + 2] = flatZ * Math.cos(tilt) + normalOffset * Math.sin(tilt);
-  });
-
-  return { positions, orbitRadius };
+export function layoutConstellation(nodes) {
+  const groups = ['projects', 'skills'].map((kind) => nodes.map((node, index) => ({ node, index })).filter(({ node }) => node.kind === kind));
+  const positions = new Array(nodes.length);
+  groups.forEach((group, kind) => group.forEach(({ index }, slot) => {
+    const ring = Math.floor(slot / 28);
+    const count = Math.min(28, group.length - ring * 28);
+    const angle = (slot % 28) / count * Math.PI * 2 - Math.PI / 2 + ring * 0.23;
+    const radius = kind === 0 ? (group.length === 1 ? 0 : 95 + ring * 36) : 235 + ring * 30;
+    positions[index] = { x: 500 + Math.cos(angle) * radius * 1.32, y: 310 + Math.sin(angle) * radius };
+  }));
+  return positions;
 }
 
-function makeRing(THREERef, radius, segments = 160) {
-  const points = new Float32Array(segments * 3);
-  for (let index = 0; index < segments; index += 1) {
-    const angle = (index / segments) * Math.PI * 2;
-    points[index * 3] = Math.cos(angle) * radius;
-    points[index * 3 + 2] = Math.sin(angle) * radius;
-  }
-  const geometry = new THREERef.BufferGeometry();
-  geometry.setAttribute("position", new THREERef.BufferAttribute(points, 3));
-  return geometry;
-}
-
-function fitDistance(nodes, positions, width, height) {
-  let radius = 12;
-  nodes.forEach((_, index) => {
-    radius = Math.max(
-      radius,
-      Math.hypot(
-        positions[index * 3],
-        positions[index * 3 + 1],
-        positions[index * 3 + 2],
-      ),
-    );
-  });
-  const aspect = Math.max(0.25, width / Math.max(height, 1));
-  const vertical = FOV * DEG;
-  const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect);
-  const limiting = Math.min(vertical, horizontal);
-  return (radius * 1.18) / Math.sin(limiting / 2);
-}
-
-function markup(projectCount, skillCount) {
-  return `
-    <div class="constellation-stage" data-constellation-stage>
-      <div class="constellation-labels" data-constellation-labels aria-hidden="true"></div>
-      <header class="constellation-title">
-        <span>MYVAULT CONSTELLATION</span>
-        <strong>Projects &amp; skills</strong>
-      </header>
-      <div class="constellation-hud" aria-live="polite">
-        <span data-constellation-mode>FREE ORBIT</span>
-        <strong data-constellation-selection>No selection</strong>
-      </div>
-      <div class="constellation-search">
-        <label class="visually-hidden" for="constellation-query">Search projects and skills</label>
-        <span aria-hidden="true">⌕</span>
-        <input id="constellation-query" data-constellation-query type="search" autocomplete="off" placeholder="Search projects and skills…" />
-        <div class="constellation-results" data-constellation-results hidden></div>
-      </div>
-      <div class="constellation-legend" aria-label="Constellation legend">
-        <span><i style="--star-color:${PROJECT_COLOR}"></i>${projectCount} projects</span>
-        <span><i style="--star-color:${SKILL_COLOR}"></i>${skillCount} skills</span>
-      </div>
-      <div class="constellation-tools" aria-label="Constellation controls">
-        <button type="button" data-constellation-action="labels" aria-pressed="true">Labels</button>
-        <button type="button" data-constellation-action="signals" aria-pressed="true">Signals</button>
-        <button type="button" data-constellation-action="rotate" aria-pressed="true">Rotate</button>
-        <span aria-hidden="true"></span>
-        <button type="button" data-constellation-action="zoom-out" aria-label="Zoom out">−</button>
-        <button type="button" data-constellation-zoom aria-label="Reset zoom">100%</button>
-        <button type="button" data-constellation-action="zoom-in" aria-label="Zoom in">+</button>
-        <button type="button" data-constellation-action="reset">Reset</button>
-      </div>
-      <p class="constellation-hint">Drag to orbit · Scroll or pinch to zoom · Select a star to open its MyVault record</p>
-      <aside class="constellation-detail" data-constellation-detail hidden aria-live="polite"></aside>
-      <div class="constellation-unavailable" data-constellation-unavailable hidden>
-        The interactive constellation is unavailable in this browser. Use the Projects and Skills pages from the side control.
-      </div>
-    </div>`;
-}
-
-export function createMyVaultConstellation({ container, nodes, edges, onOpen }) {
-  const abortController = new AbortController();
-  const { signal } = abortController;
-  const bind = (target, event, handler, options = {}) =>
-    target.addEventListener(event, handler, { ...options, signal });
-
-  container.innerHTML = markup(
-    nodes.filter((node) => node.kind === "projects").length,
-    nodes.filter((node) => node.kind === "skills").length,
-  );
-  const stage = container.querySelector("[data-constellation-stage]");
-  const labelsHost = container.querySelector("[data-constellation-labels]");
-  const queryInput = container.querySelector("[data-constellation-query]");
-  const resultsHost = container.querySelector("[data-constellation-results]");
-  const selectionText = container.querySelector("[data-constellation-selection]");
-  const detail = container.querySelector("[data-constellation-detail]");
-  const unavailable = container.querySelector("[data-constellation-unavailable]");
-  const zoomText = container.querySelector("[data-constellation-zoom]");
-  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  queryInput.value = "";
-
-  let renderer;
-  try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-  } catch {
-    unavailable.hidden = false;
-    return { dispose: () => abortController.abort() };
-  }
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-  renderer.domElement.classList.add("constellation-canvas");
-  renderer.domElement.setAttribute("aria-label", "Interactive project and skill constellation");
-  stage.prepend(renderer.domElement);
-
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x080e12, 0.0048);
-  const graph = new THREE.Group();
-  scene.add(graph);
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 1600);
-  const { positions, orbitRadius } = buildPositions(nodes);
-
-  const starCanvas = document.createElement("canvas");
-  starCanvas.width = starCanvas.height = 64;
-  const starContext = starCanvas.getContext("2d");
-  const starGradient = starContext.createRadialGradient(32, 32, 0, 32, 32, 32);
-  starGradient.addColorStop(0, "rgba(255,255,255,1)");
-  starGradient.addColorStop(0.18, "rgba(255,255,255,.95)");
-  starGradient.addColorStop(0.52, "rgba(255,255,255,.24)");
-  starGradient.addColorStop(1, "rgba(255,255,255,0)");
-  starContext.fillStyle = starGradient;
-  starContext.fillRect(0, 0, 64, 64);
-  const starTexture = new THREE.CanvasTexture(starCanvas);
-
-  const skyCount = 460;
-  const skyPositions = new Float32Array(skyCount * 3);
-  for (let index = 0; index < skyCount; index += 1) {
-    const radius = orbitRadius * (1.9 + hash01(index, 10) * 1.4);
-    const phi = Math.acos(2 * hash01(index, 11) - 1);
-    const theta = hash01(index, 12) * Math.PI * 2;
-    skyPositions[index * 3] = radius * Math.sin(phi) * Math.cos(theta);
-    skyPositions[index * 3 + 1] = radius * Math.cos(phi);
-    skyPositions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
-  }
-  const skyGeometry = new THREE.BufferGeometry();
-  skyGeometry.setAttribute("position", new THREE.BufferAttribute(skyPositions, 3));
-  const skyMaterial = new THREE.PointsMaterial({
-    size: 1.15,
-    map: starTexture,
-    color: 0x93a7c9,
-    transparent: true,
-    opacity: 0.45,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  scene.add(new THREE.Points(skyGeometry, skyMaterial));
-
-  const nodeColors = new Float32Array(nodes.length * 3);
-  const nodeSizes = new Float32Array(nodes.length);
-  nodes.forEach((node, index) => {
-    const color = new THREE.Color(node.kind === "projects" ? PROJECT_COLOR : SKILL_COLOR);
-    nodeColors.set(color.toArray(), index * 3);
-    nodeSizes[index] = node.kind === "projects" ? 1.45 : 1.08;
-  });
-  const nodeGeometry = new THREE.BufferGeometry();
-  nodeGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  nodeGeometry.setAttribute("color", new THREE.BufferAttribute(nodeColors, 3));
-  nodeGeometry.setAttribute("aSize", new THREE.BufferAttribute(nodeSizes, 1));
-  const nodeMaterial = new THREE.ShaderMaterial({
-    uniforms: { uPixels: { value: 400 }, uScale: { value: 7.3 } },
-    vertexShader: `
-      attribute float aSize;
-      varying vec3 vColor;
-      uniform float uPixels;
-      uniform float uScale;
-      void main() {
-        vColor = color;
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = aSize * uScale * uPixels / max(-mv.z, 1.0);
-        gl_Position = projectionMatrix * mv;
-      }`,
-    fragmentShader: `
-      varying vec3 vColor;
-      void main() {
-        float distanceToCenter = length(gl_PointCoord - 0.5) * 2.0;
-        if (distanceToCenter > 1.0) discard;
-        float core = smoothstep(0.68, 0.0, distanceToCenter);
-        float halo = pow(1.0 - distanceToCenter, 2.8);
-        vec3 color = vColor * (0.55 + core * 1.25) + vec3(core * 0.48);
-        gl_FragColor = vec4(color, core * 0.98 + halo * 0.48);
-      }`,
-    vertexColors: true,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const nodePoints = new THREE.Points(nodeGeometry, nodeMaterial);
-  nodePoints.frustumCulled = false;
-  graph.add(nodePoints);
-
-  const linePositions = new Float32Array(edges.length * 6);
-  const lineColors = new Float32Array(edges.length * 6);
-  edges.forEach((edge, index) => {
-    linePositions.set(positions.slice(edge.source * 3, edge.source * 3 + 3), index * 6);
-    linePositions.set(positions.slice(edge.target * 3, edge.target * 3 + 3), index * 6 + 3);
-    lineColors.set(new THREE.Color(nodes[edge.source].kind === "projects" ? PROJECT_COLOR : SKILL_COLOR).toArray(), index * 6);
-    lineColors.set(new THREE.Color(nodes[edge.target].kind === "projects" ? PROJECT_COLOR : SKILL_COLOR).toArray(), index * 6 + 3);
-  });
-  const lineGeometry = new THREE.BufferGeometry();
-  lineGeometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
-  lineGeometry.setAttribute("color", new THREE.BufferAttribute(lineColors, 3));
-  const lineMaterial = new THREE.LineBasicMaterial({
-    vertexColors: true,
-    transparent: true,
-    opacity: reducedMotion ? 0.22 : 0.3,
-    blending: THREE.AdditiveBlending,
-  });
-  graph.add(new THREE.LineSegments(lineGeometry, lineMaterial));
-
-  const guideMaterial = new THREE.LineBasicMaterial({ color: 0x5d7cae, transparent: true, opacity: 0.12 });
-  const orbitMaterial = new THREE.LineBasicMaterial({ color: 0x71b49d, transparent: true, opacity: 0.34 });
-  const guideGeometries = [];
-  [
-    [Math.PI / 3, 0, guideMaterial],
-    [-Math.PI / 3, 0, guideMaterial],
-    [Math.PI / 2, Math.PI / 2.6, guideMaterial],
-    [65 * DEG, 0, orbitMaterial],
-  ].forEach(([rotationX, rotationY, material]) => {
-    const geometry = makeRing(THREE, orbitRadius);
-    guideGeometries.push(geometry);
-    const ring = new THREE.LineLoop(geometry, material);
-    ring.rotation.set(rotationX, rotationY, 0);
-    graph.add(ring);
-  });
-
-  const labelPool = nodes.map((node) => {
-    const label = document.createElement("span");
-    label.className = "constellation-label";
-    label.textContent = node.name;
-    label.dataset.kind = node.kind;
-    labelsHost.appendChild(label);
-    return label;
-  });
-
-  let selectedIndex = -1;
-  let query = "";
-  let showLabels = true;
-  let spin = !reducedMotion;
-  let signals = !reducedMotion;
-  let animationFrame = 0;
-  let lastTime = performance.now();
-  let width = 1;
-  let height = 1;
-  let baseDistance = 100;
-  const cameraState = {
-    theta: 0.64,
-    phi: 1.18,
-    distance: 100,
-    targetTheta: 0.64,
-    targetPhi: 1.18,
-    targetDistance: 100,
-  };
-  const screenNodes = nodes.map(() => ({ x: -100, y: -100, depth: 2, radius: 9 }));
-  const vector = new THREE.Vector3();
-
-  function syncButtons() {
-    const stateByAction = { labels: showLabels, signals, rotate: spin };
-    Object.entries(stateByAction).forEach(([action, active]) => {
-      const button = container.querySelector(`[data-constellation-action="${action}"]`);
-      button?.setAttribute("aria-pressed", String(active));
-      button?.classList.toggle("is-active", active);
-    });
-  }
-
-  function updateZoom() {
-    zoomText.textContent = `${Math.round((baseDistance / cameraState.targetDistance) * 100)}%`;
-  }
-
-  function dolly(factor) {
-    cameraState.targetDistance = Math.max(baseDistance * 0.28, Math.min(baseDistance * 2.4, cameraState.targetDistance * factor));
-    updateZoom();
-  }
-
-  function resetCamera() {
-    cameraState.targetTheta = 0.64;
-    cameraState.targetPhi = 1.18;
-    cameraState.targetDistance = baseDistance;
-    selectedIndex = -1;
-    selectionText.textContent = "No selection";
-    detail.hidden = true;
-    updateZoom();
-  }
-
-  function renderResults() {
-    const normalized = query.trim().toLowerCase();
-    const matches = nodes
-      .map((node, index) => ({ node, index }))
-      .filter(({ node }) => !normalized || `${node.name} ${node.meta} ${node.description}`.toLowerCase().includes(normalized))
-      .slice(0, 24);
-    resultsHost.innerHTML = matches.length
-      ? `<p>${normalized ? `${matches.length} matches` : "Project & skill index"}</p>${matches.map(({ node, index }) => `<button type="button" data-constellation-result="${index}"><i data-kind="${node.kind}"></i><span>${node.safeName}</span><small>${node.kind === "projects" ? "Project" : "Skill"}</small></button>`).join("")}`
-      : "<p>No projects or skills match this search.</p>";
-  }
-
-  function selectNode(index, { open = false } = {}) {
-    const node = nodes[index];
-    if (!node) return;
-    selectedIndex = index;
-    selectionText.textContent = node.name;
-    detail.hidden = false;
-    detail.innerHTML = `
-      <button type="button" class="constellation-detail-close" aria-label="Close details">×</button>
-      <span><i data-kind="${node.kind}"></i>${node.kind === "projects" ? "PROJECT" : "SKILL"}</span>
-      <h2>${node.safeName}</h2>
-      <p>${node.safeMeta}</p>
-      <p>${node.safeDescription || "No notes yet."}</p>
-      <button type="button" class="constellation-open-record">Open in MyVault</button>`;
-    detail.querySelector(".constellation-detail-close").addEventListener("click", () => {
-      selectedIndex = -1;
-      selectionText.textContent = "No selection";
-      detail.hidden = true;
-    }, { signal });
-    detail.querySelector(".constellation-open-record").addEventListener("click", () => onOpen(node), { signal });
-    if (open) onOpen(node);
-  }
-
-  function resize() {
-    const bounds = stage.getBoundingClientRect();
-    width = Math.max(1, Math.round(bounds.width));
-    height = Math.max(1, Math.round(bounds.height));
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    nodeMaterial.uniforms.uPixels.value = height / (2 * Math.tan((FOV * DEG) / 2));
-    const nextBase = fitDistance(nodes, positions, width, height);
-    if (!Number.isFinite(baseDistance) || baseDistance === 100) {
-      baseDistance = nextBase;
-      cameraState.distance = nextBase;
-      cameraState.targetDistance = nextBase;
-    } else {
-      const ratio = cameraState.targetDistance / baseDistance;
-      baseDistance = nextBase;
-      cameraState.targetDistance = baseDistance * ratio;
-    }
-    updateZoom();
-  }
-
-  function updateProjection() {
-    graph.updateMatrixWorld();
-    nodes.forEach((node, index) => {
-      vector.set(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);
-      vector.applyMatrix4(graph.matrixWorld);
-      const distance = camera.position.distanceTo(vector);
-      vector.project(camera);
-      const screen = screenNodes[index];
-      screen.x = (vector.x * 0.5 + 0.5) * width;
-      screen.y = (-vector.y * 0.5 + 0.5) * height;
-      screen.depth = vector.z;
-      screen.radius = Math.max(10, (nodeSizes[index] * nodeMaterial.uniforms.uScale.value * nodeMaterial.uniforms.uPixels.value) / Math.max(distance, 1) * 0.42);
-    });
-  }
-
-  function closestNode(clientX, clientY) {
-    const bounds = stage.getBoundingClientRect();
-    const x = clientX - bounds.left;
-    const y = clientY - bounds.top;
-    let closest = -1;
-    let closestDepth = Infinity;
-    screenNodes.forEach((screen, index) => {
-      if (screen.depth > 1) return;
-      const dx = screen.x - x;
-      const dy = screen.y - y;
-      const radius = screen.radius + 9;
-      if (dx * dx + dy * dy <= radius * radius && screen.depth < closestDepth) {
-        closest = index;
-        closestDepth = screen.depth;
+export function layoutStarLabels(nodes, positions) {
+  const placed = [];
+  return nodes.map((node, index) => {
+    const lines = wrapStarName(node.name);
+    const width = Math.max(...lines.map((line) => Array.from(line).reduce((sum, char) => sum + (/[^\u0000-\u00ff]/.test(char) ? 12 : 6.8), 0)), 30) + 12;
+    const height = lines.length * 15 + 8;
+    const point = positions[index];
+    let box;
+    let center;
+    // Move labels, never hide them. Leader lines keep moved names tied to stars.
+    outer: for (let ring = 0; ring < 36; ring++) {
+      for (let slot = 0; slot < (ring ? 16 : 1); slot++) {
+        const angle = slot * Math.PI / 8 - Math.PI / 2;
+        center = { x: point.x + Math.cos(angle) * ring * 18, y: point.y - 28 - (lines.length - 1) * 7.5 + Math.sin(angle) * ring * 18 };
+        box = { left: center.x - width / 2, top: center.y - height / 2, width, height };
+        if (!placed.some((other) => box.left < other.left + other.width && box.left + width > other.left && box.top < other.top + other.height && box.top + height > other.top)) break outer;
       }
-    });
-    return closest;
+    }
+    placed.push(box);
+    return { ...center, lines, box };
+  });
+}
+
+export function matchingNodeIndexes(nodes, query = '', kind = 'all') {
+  const term = query.trim().toLocaleLowerCase();
+  return nodes.map((node, index) => ({ node, index })).filter(({ node }) =>
+    (kind === 'all' || node.kind === kind) && `${node.name} ${node.meta} ${node.description}`.toLocaleLowerCase().includes(term),
+  ).map(({ index }) => index);
+}
+
+export function validConstellationEdges(nodes, edges) {
+  const seen = new Set();
+  return edges.filter(({ source, target }) => {
+    if (!Number.isInteger(source) || !Number.isInteger(target) || !nodes[source] || !nodes[target] || source === target) return false;
+    const key = [source, target].sort((a, b) => a - b).join(':');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const DEMO_NODES = [
+  { name: 'A new idea', kind: 'projects', meta: 'Sample project', description: 'Projects bring your ideas, notes, and next steps together.' },
+  { name: 'Learning journal', kind: 'projects', meta: 'Sample project', description: 'Keep a project for something you want to learn.' },
+  { name: 'Writing', kind: 'skills', meta: 'Sample skill' },
+  { name: 'Planning', kind: 'skills', meta: 'Sample skill' },
+  { name: 'Research', kind: 'skills', meta: 'Sample skill' },
+  { name: 'Communication', kind: 'skills', meta: 'Sample skill' },
+  { name: 'Design', kind: 'skills', meta: 'Sample skill' },
+];
+const DEMO_EDGES = [{ source: 0, target: 2 }, { source: 0, target: 3 }, { source: 0, target: 6 }, { source: 1, target: 4 }, { source: 1, target: 5 }];
+
+export function createMyVaultConstellation({ container, nodes, edges, onOpen, onCreate, onNavigate }) {
+  const controller = new AbortController();
+  const { signal } = controller;
+  const bind = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal });
+  const realNodes = nodes;
+  const realEdges = validConstellationEdges(nodes, edges);
+  let demo = false;
+  let query = '';
+  let kind = 'all';
+  let selected = -1;
+  let zoom = 1;
+  let pan = { x: 0, y: 0 };
+  let labels = true;
+  let connections = true;
+  let browse = false;
+  let disposed = false;
+  let threeD = null;
+  let threeRequest = 0;
+  let positions = layoutConstellation(nodes);
+  let namePositions = layoutStarLabels(nodes, positions);
+
+  container.innerHTML = `<section class="constellation-stage orbit-stage" aria-label="Constellation map">
+    <header class="orbit-header"><div><p class="orbit-eyebrow">YOUR CONNECTED WORKSPACE</p><h1>Everything, connected.</h1><p>Projects at the heart. Skills that help them grow.</p></div><button type="button" class="orbit-dashboard" data-map-action="dashboard">Dashboard ↗</button></header>
+    <div class="orbit-discovery"><label class="visually-hidden" for="orbit-query">Search projects and skills</label><input id="orbit-query" type="search" placeholder="Find a project or skill…" autocomplete="off"><div class="orbit-filters" role="group" aria-label="Filter stars"><button type="button" data-map-filter="all" aria-pressed="true">All stars</button><button type="button" data-map-filter="projects" aria-pressed="false">Projects</button><button type="button" data-map-filter="skills" aria-pressed="false">Skills</button></div><button type="button" data-map-action="browse" aria-expanded="false" aria-controls="orbit-index">Browse records</button></div>
+    <div class="orbit-summary" role="status" aria-live="polite"></div>
+    <div class="orbit-viewport"><svg class="orbit-map" viewBox="0 0 1000 620" role="group" aria-label="Project and skill stars. Tab to a star; Enter to inspect it. Drag to pan; pinch or use controls to zoom."><g class="orbit-camera"></g></svg></div>
+    <div class="orbit-welcome" hidden></div>
+    <aside class="orbit-index" id="orbit-index" aria-label="Matching records" hidden></aside>
+    <aside class="orbit-detail" aria-label="Selected record" hidden></aside>
+    <footer class="orbit-footer"><p>Select a star to explore its connections.<br><span>Drag to pan · Pinch to zoom · / to search</span></p><div class="orbit-tools" role="group" aria-label="Map controls"><button type="button" data-map-action="labels" aria-pressed="true">Labels</button><button type="button" data-map-action="connections" aria-pressed="true">Links</button><button type="button" data-map-action="out" aria-label="Zoom out">−</button><button type="button" data-map-action="reset" aria-label="Reset map">100%</button><button type="button" data-map-action="in" aria-label="Zoom in">+</button><button type="button" data-map-action="3d">Try 3D</button></div></footer>
+    <p class="orbit-notice" role="status" hidden></p>
+  </section><div class="orbit-3d" hidden><div data-three-host></div><button type="button" class="orbit-return" data-map-action="2d">← Back to 2D map</button></div>`;
+  const stage = container.querySelector('.orbit-stage');
+  const svg = container.querySelector('.orbit-map');
+  const camera = container.querySelector('.orbit-camera');
+  const input = container.querySelector('#orbit-query');
+  const summary = container.querySelector('.orbit-summary');
+  const welcome = container.querySelector('.orbit-welcome');
+  const indexHost = container.querySelector('.orbit-index');
+  const detail = container.querySelector('.orbit-detail');
+  const notice = container.querySelector('.orbit-notice');
+  const host3d = container.querySelector('.orbit-3d');
+  const threeButton = container.querySelector('[data-map-action="3d"]');
+
+  function neighbors(index) {
+    return edges.flatMap((edge) => edge.source === index ? [edge.target] : edge.target === index ? [edge.source] : []);
   }
-
-  function drawLabels() {
-    const normalized = query.trim().toLowerCase();
-    const ranked = nodes
-      .map((node, index) => ({ node, index, score: edges.filter((edge) => edge.source === index || edge.target === index).length }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 18);
-    const wanted = new Set(showLabels ? ranked.map(({ index }) => index) : []);
-    if (selectedIndex >= 0) wanted.add(selectedIndex);
-    if (normalized) nodes.forEach((node, index) => node.name.toLowerCase().includes(normalized) && wanted.add(index));
-    const taken = [];
-    labelPool.forEach((label, index) => {
-      const screen = screenNodes[index];
-      let visible = wanted.has(index) && screen.depth < 1 && screen.x > -80 && screen.x < width + 80 && screen.y > -20 && screen.y < height + 30;
-      const labelWidth = Math.min(260, nodes[index].name.length * 6.5 + 16);
-      const box = [screen.x - labelWidth / 2, screen.y - 30, labelWidth, 20];
-      if (visible && taken.some((item) => box[0] < item[0] + item[2] && box[0] + box[2] > item[0] && box[1] < item[1] + item[3] && box[1] + box[3] > item[1])) visible = false;
-      if (visible) taken.push(box);
-      label.style.opacity = visible ? "1" : "0";
-      if (visible) label.style.transform = `translate(-50%, -50%) translate(${screen.x.toFixed(1)}px, ${(screen.y - 18).toFixed(1)}px)`;
-      label.classList.toggle("is-selected", index === selectedIndex);
-    });
+  function transform() {
+    camera.setAttribute('transform', `translate(${500 + pan.x} ${310 + pan.y}) scale(${zoom}) translate(-500 -310)`);
+    container.querySelector('[data-map-action="reset"]').textContent = `${Math.round(zoom * 100)}%`;
   }
-
-  function frame(now) {
-    animationFrame = requestAnimationFrame(frame);
-    const delta = Math.min(0.05, (now - lastTime) / 1000);
-    lastTime = now;
-    if (spin && !document.hidden) cameraState.targetTheta += delta * 0.075;
-    const smoothing = 1 - Math.pow(0.002, delta);
-    cameraState.theta += (cameraState.targetTheta - cameraState.theta) * smoothing;
-    cameraState.phi += (cameraState.targetPhi - cameraState.phi) * smoothing;
-    cameraState.distance += (cameraState.targetDistance - cameraState.distance) * smoothing;
-    camera.position.set(
-      cameraState.distance * Math.sin(cameraState.phi) * Math.cos(cameraState.theta),
-      cameraState.distance * Math.cos(cameraState.phi),
-      cameraState.distance * Math.sin(cameraState.phi) * Math.sin(cameraState.theta),
-    );
-    camera.lookAt(0, 0, 0);
-    lineMaterial.opacity = signals && !reducedMotion ? 0.24 + Math.sin(now * 0.0018) * 0.1 : 0.22;
-    updateProjection();
-    drawLabels();
-    renderer.render(scene, camera);
+  function draw() {
+    const matches = new Set(matchingNodeIndexes(nodes, query, kind));
+    const nearby = new Set(selected >= 0 ? [selected, ...neighbors(selected)] : []);
+    const projectCount = nodes.filter((node) => node.kind === 'projects').length;
+    summary.textContent = `${demo ? 'SAMPLE PREVIEW · ' : ''}${projectCount} projects · ${nodes.length - projectCount} skills · ${edges.length} links${query || kind !== 'all' ? ` · ${matches.size} matches` : ''}`;
+    const extent = Math.max(340, ...positions.map(({ x, y }) => Math.max(Math.abs(x - 500), Math.abs(y - 310))), ...namePositions.map(({ box }) => Math.max(Math.abs(box.top - 310), Math.abs(box.top + box.height - 310), Math.abs(box.left - 500) / 1.55, Math.abs(box.left + box.width - 500) / 1.55))) + 12;
+    svg.setAttribute('viewBox', `${500 - extent * 1.55} ${310 - extent} ${extent * 3.1} ${extent * 2}`);
+    camera.innerHTML = `<ellipse class="orbit-guide" cx="500" cy="310" rx="310" ry="235"/><ellipse class="orbit-guide orbit-guide-inner" cx="500" cy="310" rx="126" ry="95"/><text class="orbit-center-label" x="500" y="310" text-anchor="middle">${projectCount === 1 ? '' : 'YOUR PROJECTS'}</text>` +
+      (connections ? edges.map(({ source, target }) => {
+        const a = positions[source]; const b = positions[target];
+        const active = selected >= 0 && (source === selected || target === selected);
+        return `<line class="orbit-link${active ? ' is-connected' : ''}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" opacity="${matches.has(source) && matches.has(target) ? (selected < 0 || active ? 1 : 0.12) : 0.08}"/>`;
+      }).join('') : '') + nodes.map((node, index) => {
+        const { x, y } = positions[index];
+        const visible = matches.has(index);
+        const strong = selected === index;
+        const connected = nearby.has(index);
+        const opacity = !visible ? 0.1 : selected < 0 || connected ? 1 : 0.28;
+        const name = escape(node.name);
+        const label = namePositions[index];
+        const labelX = label.x - x; const labelY = label.y - y;
+        const lines = label.lines;
+        return `<g class="orbit-star${strong ? ' is-selected' : ''}" data-star="${index}" role="button" tabindex="${visible ? 0 : -1}" aria-label="${name}, ${node.kind === 'projects' ? 'project' : 'skill'}, ${neighbors(index).length} connections" aria-pressed="${strong}"${visible ? '' : ' aria-hidden="true"'} transform="translate(${x} ${y})" style="--star-color:${color(node)};opacity:${opacity}"><title>${name}</title><circle class="orbit-hit" r="24"/><circle class="orbit-halo" r="${node.kind === 'projects' ? 19 : 14}"/><circle class="orbit-dot" r="${node.kind === 'projects' ? 6 : 4}"/>${labels ? `${Math.abs(labelX) > 20 || Math.abs(labelY) > 45 ? `<line class="orbit-label-leader" x2="${labelX}" y2="${labelY}"/>` : ''}<text x="${labelX}" y="${labelY - (lines.length - 1) * 7.5}" text-anchor="middle">${lines.map((line, lineIndex) => `<tspan x="${labelX}" dy="${lineIndex ? 15 : 0}">${escape(line)}</tspan>`).join('')}</text>` : ''}</g>`;
+      }).join('');
+    transform();
+    welcome.hidden = nodes.length > 0;
+    welcome.innerHTML = `<span class="orbit-welcome-mark" aria-hidden="true">✧</span><p class="orbit-eyebrow">A LITTLE SPACE FOR YOUR NEXT IDEA</p><h2>Your constellation starts here.</h2><p>Add a project, then connect the skills that bring it to life. Your map grows with your vault.</p><div><button type="button" class="button button-primary" data-map-action="create">Create a project</button><button type="button" class="button" data-map-action="demo">Explore a sample</button></div><small>The sample is a preview only. It never changes your vault.</small>`;
+    container.querySelector('[data-map-action="3d"]').hidden = !realNodes.length || demo;
+    indexHost.hidden = !(browse || query);
+    container.querySelector('[data-map-action="browse"]').setAttribute('aria-expanded', String(!indexHost.hidden));
+    indexHost.innerHTML = `<h2>${demo ? 'Sample records' : 'Your records'} <span>${matches.size}</span></h2>${[...matches].map((index) => `<button type="button" data-select="${index}"><i style="background:${color(nodes[index])}"></i><span>${escape(nodes[index].name)}<small>${escape(nodes[index].meta || (nodes[index].kind === 'projects' ? 'Project' : 'Skill'))}</small></span><span aria-hidden="true">↗</span></button>`).join('') || '<p>No matches. Try a different name or filter.</p>'}${demo ? '<button type="button" data-map-action="exit-demo">Exit sample preview</button>' : ''}`;
+    stage.classList.toggle('is-demo', demo);
+    let demoExit = container.querySelector('.orbit-demo-exit');
+    if (demo && !demoExit) {
+      demoExit = document.createElement('button');
+      demoExit.type = 'button'; demoExit.className = 'orbit-demo-exit'; demoExit.dataset.mapAction = 'exit-demo'; demoExit.textContent = 'Exit sample preview';
+      stage.append(demoExit);
+    } else if (!demo) demoExit?.remove();
   }
-
-  const pointers = new Map();
-  let dragging = false;
-  let moved = 0;
-  let previousX = 0;
-  let previousY = 0;
-  let previousPinch = 0;
-  bind(renderer.domElement, "pointerdown", (event) => {
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    renderer.domElement.setPointerCapture(event.pointerId);
-    dragging = true;
-    moved = 0;
-    previousX = event.clientX;
-    previousY = event.clientY;
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      previousPinch = Math.hypot(a.x - b.x, a.y - b.y);
+  function select(index, focus = true) {
+    if (!nodes[index]) return;
+    selected = index;
+    const node = nodes[index];
+    const linked = neighbors(index);
+    detail.hidden = false;
+    detail.innerHTML = `<button type="button" class="orbit-close" data-map-action="close" aria-label="Close star details">×</button><p class="orbit-eyebrow">${demo ? 'SAMPLE ' : ''}${node.kind === 'projects' ? 'PROJECT' : 'SKILL'}</p><h2>${escape(node.name)}</h2><span class="orbit-meta">${escape(node.meta)}</span><p>${escape(node.description || 'No notes yet. Open the record to add a little context.')}</p><h3>${linked.length} connected ${linked.length === 1 ? 'record' : 'records'}</h3><div class="orbit-related">${linked.map((target) => `<button type="button" data-select="${target}">${escape(nodes[target].name)} ↗</button>`).join('') || '<p>Add links to this record to connect it with your other projects and skills.</p>'}</div>${demo ? '<p class="orbit-sample-note">Sample preview · Nothing is saved to your vault.</p>' : '<button type="button" class="button button-primary" data-map-action="open">Open record ↗</button>'}`;
+    draw();
+    if (focus) detail.querySelector('.orbit-close').focus();
+  }
+  function resetSelection() {
+    selected = -1; detail.hidden = true;
+  }
+  function setDemo(enabled) {
+    demo = enabled;
+    nodes = demo ? DEMO_NODES : realNodes;
+    edges = demo ? DEMO_EDGES : realEdges;
+    positions = layoutConstellation(nodes);
+    namePositions = layoutStarLabels(nodes, positions);
+    query = ''; input.value = ''; kind = 'all'; browse = false;
+    zoom = 1; pan = { x: 0, y: 0 }; resetSelection(); syncFilters(); draw();
+  }
+  function syncFilters() {
+    container.querySelectorAll('[data-map-filter]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.mapFilter === kind)));
+  }
+  function leave3d() {
+    threeRequest += 1;
+    threeD?.dispose(); threeD = null;
+    host3d.hidden = true; stage.hidden = false;
+    threeButton.disabled = false; threeButton.textContent = 'Try 3D';
+  }
+  async function enter3d() {
+    const request = ++threeRequest;
+    threeButton.disabled = true; threeButton.textContent = 'Loading 3D…'; notice.hidden = true;
+    try {
+      const module = await Promise.race([import('./constellation-3d.mjs?v=3'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
+      if (disposed || request !== threeRequest) return;
+      host3d.hidden = false; stage.hidden = true;
+      threeD = module.createMyVaultConstellation({ container: host3d.querySelector('[data-three-host]'), nodes: realNodes, edges: realEdges, onOpen });
+      host3d.querySelector('[data-map-action="2d"]').focus();
+    } catch {
+      if (disposed || request !== threeRequest) return;
+      leave3d();
+      notice.textContent = '3D could not start in this browser. Your 2D map and records are still available.';
+      notice.hidden = false;
     }
-  });
-  bind(renderer.domElement, "pointermove", (event) => {
-    if (!pointers.has(event.pointerId)) {
-      const hover = closestNode(event.clientX, event.clientY);
-      renderer.domElement.style.cursor = hover >= 0 ? "pointer" : "grab";
-      return;
-    }
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      const distance = Math.hypot(a.x - b.x, a.y - b.y);
-      const pinchDelta = Math.abs(distance - previousPinch);
-      if (previousPinch) dolly(previousPinch / Math.max(distance, 1));
-      previousPinch = distance;
-      moved += pinchDelta;
-      return;
-    }
-    const dx = event.clientX - previousX;
-    const dy = event.clientY - previousY;
-    moved += Math.abs(dx) + Math.abs(dy);
-    previousX = event.clientX;
-    previousY = event.clientY;
-    cameraState.targetTheta -= dx * 0.005;
-    cameraState.targetPhi = Math.max(0.12, Math.min(Math.PI - 0.12, cameraState.targetPhi - dy * 0.005));
-    spin = false;
-    syncButtons();
-  });
-  const endPointer = (event) => {
-    pointers.delete(event.pointerId);
-    previousPinch = 0;
-    if (moved <= 6) {
-      const index = closestNode(event.clientX, event.clientY);
-      if (index >= 0) selectNode(index, { open: true });
-    }
-    dragging = pointers.size > 0;
-  };
-  bind(renderer.domElement, "pointerup", endPointer);
-  bind(renderer.domElement, "pointercancel", endPointer);
-  bind(renderer.domElement, "wheel", (event) => {
-    event.preventDefault();
-    dolly(event.deltaY > 0 ? 1.11 : 1 / 1.11);
-  }, { passive: false });
-
-  bind(queryInput, "input", () => {
-    query = queryInput.value;
-    renderResults();
-    resultsHost.hidden = false;
-  });
-  bind(queryInput, "focus", () => {
-    renderResults();
-    resultsHost.hidden = false;
-  });
-  bind(resultsHost, "click", (event) => {
-    const button = event.target.closest("[data-constellation-result]");
-    if (!button) return;
-    selectNode(Number(button.dataset.constellationResult));
-    resultsHost.hidden = true;
-    queryInput.blur();
-  });
-  bind(document, "pointerdown", (event) => {
-    if (!event.target.closest(".constellation-search")) resultsHost.hidden = true;
-  });
-  bind(container, "click", (event) => {
-    const action = event.target.closest("[data-constellation-action]")?.dataset.constellationAction;
+  }
+  bind(container, 'click', (event) => {
+    const filter = event.target.closest('[data-map-filter]');
+    if (filter) { kind = filter.dataset.mapFilter; resetSelection(); syncFilters(); draw(); return; }
+    const record = event.target.closest('[data-star], [data-select]');
+    if (record && (!record.hasAttribute("data-star") || !dragged)) { select(Number(record.dataset.star ?? record.dataset.select)); return; }
+    const action = event.target.closest('[data-map-action]')?.dataset.mapAction;
     if (!action) return;
-    if (action === "labels") showLabels = !showLabels;
-    if (action === "signals") signals = !signals;
-    if (action === "rotate") spin = !spin;
-    if (action === "zoom-out") dolly(1.18);
-    if (action === "zoom-in") dolly(1 / 1.18);
-    if (action === "reset") resetCamera();
-    syncButtons();
+    if (action === 'dashboard') onNavigate?.('control');
+    if (action === 'create') onCreate?.('projects');
+    if (action === 'demo') setDemo(true);
+    if (action === 'exit-demo') setDemo(false);
+    if (action === 'browse') { browse = !browse; draw(); }
+    if (action === 'close') { const previous = selected; resetSelection(); draw(); container.querySelector(`[data-star="${previous}"]`)?.focus(); }
+    if (action === 'open' && selected >= 0 && !demo) onOpen(nodes[selected]);
+    if (action === 'in' || action === 'out') { zoom = Math.max(0.5, Math.min(3, zoom * (action === 'in' ? 1.2 : 1 / 1.2))); transform(); }
+    if (action === 'reset') { zoom = 1; pan = { x: 0, y: 0 }; transform(); }
+    if (action === 'labels' || action === 'connections') { if (action === 'labels') labels = !labels; else connections = !connections; event.target.closest('button').setAttribute('aria-pressed', String(action === 'labels' ? labels : connections)); draw(); }
+    if (action === '3d') enter3d();
+    if (action === '2d') leave3d();
   });
-  bind(zoomText, "click", () => {
-    cameraState.targetDistance = baseDistance;
-    updateZoom();
-  });
-  bind(window, "resize", resize);
-  bind(window, "keydown", (event) => {
-    if (!document.body.classList.contains("constellation-home")) return;
-    if (event.key === "Escape") {
-      resultsHost.hidden = true;
-      detail.hidden = true;
-      selectedIndex = -1;
-      selectionText.textContent = "No selection";
-    }
-    if (event.key === "/" && !event.target.closest("input, textarea, select, dialog")) {
+  bind(input, 'input', () => { query = input.value; resetSelection(); draw(); });
+  bind(stage, 'keydown', (event) => {
+    const star = event.target.closest('[data-star]');
+    if (star && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); select(Number(star.dataset.star)); }
+    if (star && ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
       event.preventDefault();
-      queryInput.focus();
+      const matches = matchingNodeIndexes(nodes, query, kind);
+      const current = matches.indexOf(Number(star.dataset.star));
+      const next = (current + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + matches.length) % matches.length;
+      container.querySelector(`[data-star="${matches[next]}"]`)?.focus();
     }
   });
-
-  renderResults();
-  syncButtons();
-  resize();
-  animationFrame = requestAnimationFrame(frame);
-
-  return {
-    dispose() {
-      abortController.abort();
-      cancelAnimationFrame(animationFrame);
-      scene.traverse((object) => {
-        object.geometry?.dispose();
-        if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
-        else object.material?.dispose();
-      });
-      guideGeometries.forEach((geometry) => geometry.dispose());
-      guideMaterial.dispose();
-      orbitMaterial.dispose();
-      starTexture.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
-      labelPool.forEach((label) => label.remove());
-      container.replaceChildren();
-    },
-  };
+  bind(window, 'keydown', (event) => {
+    if (!document.body.classList.contains('constellation-home') || stage.hidden || event.target.closest('dialog')) return;
+    if (event.key === '/' && !event.target.closest('input,textarea,select')) { event.preventDefault(); input.focus(); }
+    if (event.key === 'Escape') { resetSelection(); query = ''; input.value = ''; browse = false; draw(); input.focus(); }
+  });
+  const pointers = new Map();
+  let dragged = false;
+  let moved = 0;
+  let lastPinch = 0;
+  bind(svg, 'pointerdown', (event) => {
+    if (event.button !== 0) return;
+    if (!pointers.size) { dragged = false; moved = 0; }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); }
+    // Capture on the star itself so a tap retains its accessible click target.
+    event.target.setPointerCapture?.(event.pointerId);
+  });
+  bind(svg, 'pointermove', (event) => {
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
+    const dx = event.clientX - previous.x; const dy = event.clientY - previous.y;
+    moved += Math.abs(dx) + Math.abs(dy); dragged = moved > 7;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()]; const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (lastPinch) zoom = Math.max(0.5, Math.min(3, zoom * distance / lastPinch));
+      lastPinch = distance; dragged = true;
+    } else {
+      const bounds = svg.getBoundingClientRect(); const box = svg.viewBox.baseVal;
+      const scale = Math.min(bounds.width / box.width, bounds.height / box.height);
+      pan.x += dx / Math.max(scale, 0.01); pan.y += dy / Math.max(scale, 0.01);
+    }
+    transform();
+  });
+  const end = (event) => { pointers.delete(event.pointerId); lastPinch = 0; };
+  bind(svg, 'pointerup', end); bind(svg, 'pointercancel', (event) => { dragged = true; end(event); });
+  bind(svg, 'wheel', (event) => { event.preventDefault(); zoom = Math.max(0.5, Math.min(3, zoom * (event.deltaY > 0 ? 0.94 : 1.06))); transform(); }, { passive: false });
+  draw();
+  return { dispose() { disposed = true; leave3d(); controller.abort(); container.replaceChildren(); } };
 }
