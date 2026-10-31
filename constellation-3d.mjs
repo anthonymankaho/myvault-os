@@ -116,6 +116,7 @@ function markup(projectCount, skillCount) {
         <button type="button" data-constellation-action="reset">Reset</button>
       </div>
       <p class="constellation-hint">Drag to orbit · Scroll or pinch to zoom · Select a star to open its MyVault record</p>
+      ${projectCount + skillCount === 0 ? `<div class="constellation-empty"><span aria-hidden="true">✧</span><h2>Your 3D constellation is ready.</h2><p>Add projects and skills to place your first stars.</p><button type="button" data-map-action="create">Create a project</button><button type="button" data-map-action="create-skill">Add a skill</button></div>` : ''}
       <aside class="constellation-detail" data-constellation-detail hidden aria-live="polite"></aside>
       <div class="constellation-unavailable" data-constellation-unavailable hidden>
         The interactive constellation is unavailable in this browser. Use the Projects and Skills pages from the side control.
@@ -576,6 +577,8 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     updateZoom();
   });
   bind(window, "resize", resize);
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(stage);
   bind(window, "keydown", (event) => {
     if (!document.body.classList.contains("constellation-home")) return;
     if (event.key === "Escape") {
@@ -598,6 +601,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
   return {
     dispose() {
       abortController.abort();
+      resizeObserver.disconnect();
       cancelAnimationFrame(animationFrame);
       scene.traverse((object) => {
         object.geometry?.dispose();

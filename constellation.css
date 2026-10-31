@@ -69,6 +69,11 @@ body:not(.constellation-home) .orbit-3d { display: none !important; }
 .orbit-demo-exit { position: absolute; z-index: 4; right: 32px; top: 200px; color: #ffe3b3 !important; font-size: 11px !important; }
 .orbit-3d { position: absolute; inset: 0; }
 .orbit-return { position: absolute; z-index: 8; top: 190px; right: 24px; font-size: 12px; }
+.constellation-empty { position: absolute; z-index: 4; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(410px, calc(100% - 40px)); padding: 24px; border: 1px solid #45606a; border-radius: 16px; text-align: center; background: #10212be8; color: #e7f2ee; }
+.constellation-empty > span { color: #ffe3b3; font-size: 36px; }
+.constellation-empty h2 { font: 400 28px/1.2 Georgia, serif; }
+.constellation-empty p { color: #b8cdd3; }
+.constellation-empty button { min-height: 44px; margin: 6px; padding: 10px 14px; background: #28493f; color: #d3f6e4; border: 1px solid #648d7d; border-radius: 8px; cursor: pointer; }
 .constellation-label[data-kind="skills"] { width: max-content; max-width: 240px; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; text-align: center; color: #c7ecdc; font: 12px/1.4 ui-sans-serif, system-ui, sans-serif; }
 @media (max-width: 1150px) {
   .orbit-discovery { gap: 6px; }
