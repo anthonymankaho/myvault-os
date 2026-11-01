@@ -214,6 +214,7 @@ test("validateReply accepts tool steps and rejects malformed ones", () => {
   const vault = initial();
   const base = { message: "Done.", operations: [] };
   assert.deepEqual(validateReply(base, vault).steps, []);
+  assert.equal(validateReply(base, vault).quota, undefined);
   const withSteps = {
     ...base,
     steps: [{ tool: "vault_search", query: "original", matches: 1 }],
@@ -228,6 +229,21 @@ test("validateReply accepts tool steps and rejects malformed ones", () => {
     "not-an-array",
   ])
     assert.throws(() => validateReply({ ...base, steps }, vault));
+});
+
+test("validateReply accepts a monthly quota and rejects malformed ones", () => {
+  const vault = initial();
+  const base = { message: "Done.", operations: [] };
+  const withQuota = { ...base, quota: { used: 150, limit: 5000000 } };
+  assert.deepEqual(validateReply(withQuota, vault).quota, withQuota.quota);
+  for (const quota of [
+    { used: -1, limit: 5000000 },
+    { used: 1.5, limit: 5000000 },
+    { used: 0, limit: 0 },
+    { used: 0, limit: 5000000, extra: true },
+    "not-an-object",
+  ])
+    assert.throws(() => validateReply({ ...base, quota }, vault));
 });
 
 function appFixture() {
@@ -274,6 +290,7 @@ test("agent steps are kept for display and never mutate the vault", async () => 
     message: "Found it.",
     operations: [update({ name: "Suggested" })],
     steps: [{ tool: "vault_search", query: "original", matches: 1 }],
+    quota: { used: 150, limit: 5000000 },
   });
   const before = structuredClone(app.getVault());
   const controller = createQwenController(app);
@@ -281,6 +298,8 @@ test("agent steps are kept for display and never mutate the vault", async () => 
   assert.deepEqual(result.steps, [
     { tool: "vault_search", query: "original", matches: 1 },
   ]);
+  assert.deepEqual(result.quota, { used: 150, limit: 5000000 });
+  assert.deepEqual(controller.memory.quota, result.quota);
   assert.deepEqual(app.getVault(), before);
   assert.deepEqual(controller.memory.steps, result.steps);
 });

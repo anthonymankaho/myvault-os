@@ -232,8 +232,18 @@ export function validateSteps(steps) {
   });
 }
 
+export function validateQuota(quota) {
+  if (quota === undefined || quota === null) return undefined;
+  exactKeys(quota, ["used", "limit"], "Quota");
+  if (!Number.isInteger(quota.used) || quota.used < 0)
+    fail("Invalid quota usage.");
+  if (!Number.isInteger(quota.limit) || quota.limit < 1)
+    fail("Invalid quota limit.");
+  return { used: quota.used, limit: quota.limit };
+}
+
 export function validateReply(reply, vault) {
-  exactKeys(reply, ["message", "operations", "steps"], "Reply");
+  exactKeys(reply, ["message", "operations", "steps", "quota"], "Reply");
   if (
     typeof reply.message !== "string" ||
     !reply.message.trim() ||
@@ -244,6 +254,7 @@ export function validateReply(reply, vault) {
     message: reply.message,
     operations: validateOperations(reply.operations, vault),
     steps: reply.steps === undefined ? [] : validateSteps(reply.steps),
+    quota: validateQuota(reply.quota),
   };
 }
 
