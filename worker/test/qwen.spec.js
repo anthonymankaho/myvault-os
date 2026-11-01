@@ -17,15 +17,26 @@ function request(data = payload(), auth = TOKEN, origin = 'https://anthonymankah
 	});
 }
 const reply = (operations = []) => ({ message: 'Review this proposal.', operations });
-function mockUpstream(body = reply(), status = 200) {
+function mockUpstream(body = reply(), status = 200, usage = null) {
+	const completion = { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(body) } }] };
+	if (usage) completion.usage = usage;
 	return vi
 		.fn()
 		.mockResolvedValueOnce(Response.json({ login: 'anthonymankaho' }))
 		.mockResolvedValueOnce(
 			status === 200
-				? Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(body) } }] })
+				? Response.json(completion)
 				: new Response('sensitive upstream error', { status, headers: { 'Retry-After': '7' } }),
 		);
+}
+const monthKey = () => `qwen-usage:anthonymankaho:${new Date().toISOString().slice(0, 7)}`;
+function memoryKV(initial = {}) {
+	const store = new Map(Object.entries(initial));
+	return {
+		store,
+		get: async (key) => store.get(key) ?? null,
+		put: async (key, value) => void store.set(key, String(value)),
+	};
 }
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -83,6 +94,68 @@ describe('Qwen API', () => {
 		response = await worker.fetch(request(), ENV);
 		expect(response.status).toBe(502);
 		expect((await response.json()).code).toBe('AI_INVALID_RESPONSE');
+	});
+	it('records prompt and completion tokens per account and reports the quota', async () => {
+		const kv = memoryKV();
+		const env = { ...ENV, QWEN_USAGE: kv };
+		vi.stubGlobal('fetch', mockUpstream(reply(), 200, { prompt_tokens: 100, completion_tokens: 50 }));
+		const response = await worker.fetch(request(), env);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ ...reply(), steps: [], quota: { used: 150, limit: 5000000 } });
+		expect(kv.store.get(monthKey())).toBe('150');
+	});
+	it('accumulates token usage across the agent loop and across requests', async () => {
+		const kv = memoryKV();
+		const env = { ...ENV, QWEN_USAGE: kv };
+		const toolThenFinal = vi
+			.fn()
+			.mockResolvedValueOnce(Response.json({ login: 'anthonymankaho' }))
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ tool: 'vault_search', query: 'Original' }) } }],
+					usage: { prompt_tokens: 2000, completion_tokens: 100 },
+				}),
+			)
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(reply()) } }],
+					usage: { prompt_tokens: 3000, completion_tokens: 200 },
+				}),
+			);
+		vi.stubGlobal('fetch', toolThenFinal);
+		let response = await worker.fetch(request(), env);
+		expect((await response.json()).quota).toEqual({ used: 5300, limit: 5000000 });
+		vi.stubGlobal('fetch', mockUpstream(reply(), 200, { prompt_tokens: 700, completion_tokens: 0 }));
+		response = await worker.fetch(request(), env);
+		expect((await response.json()).quota).toEqual({ used: 6000, limit: 5000000 });
+		expect(kv.store.get(monthKey())).toBe('6000');
+	});
+	it('fails closed with a safe message when the monthly quota is spent', async () => {
+		const kv = memoryKV({ [monthKey()]: '5000000' });
+		const mock = vi.fn().mockResolvedValueOnce(Response.json({ login: 'anthonymankaho' }));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request(), { ...ENV, QWEN_USAGE: kv });
+		expect(response.status).toBe(429);
+		expect(response.headers.get('Retry-After')).toBe('3600');
+		const body = await response.json();
+		expect(body.code).toBe('AI_QUOTA');
+		expect(body.error).toContain('resets');
+		expect(mock).toHaveBeenCalledTimes(1); // only the GitHub check; Qwen is never called
+	});
+	it('honors a configured monthly quota and keys usage per account and month', async () => {
+		const kv = memoryKV({ [monthKey()]: '100', 'qwen-usage:other:2026-01': '9999999' });
+		vi.stubGlobal('fetch', mockUpstream(reply()));
+		const response = await worker.fetch(request(), { ...ENV, QWEN_USAGE: kv, QWEN_MONTHLY_TOKEN_QUOTA: '100' });
+		expect(response.status).toBe(429);
+		expect(kv.store.get(monthKey())).toBe('100');
+	});
+	it('skips accounting and enforcement when no KV binding is present', async () => {
+		vi.stubGlobal('fetch', mockUpstream(reply()));
+		const response = await worker.fetch(request(), ENV);
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		expect(body).toEqual({ ...reply(), steps: [] });
+		expect(body.quota).toBeUndefined();
 	});
 	it('requires and verifies GitHub authentication before calling Qwen', async () => {
 		const fetchMock = vi.fn();
