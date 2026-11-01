@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import {
   validateOperations,
+  validateReply,
   validateRequest,
   compactVault,
   applySelectedOperations,
+  searchVault,
 } from "../qwen-contract.mjs";
 import { createQwenController } from "../qwen.mjs";
 
@@ -180,6 +182,54 @@ test("compact context contains current editable fields only and no metadata/card
   );
 });
 
+test("searchVault matches names, notes, tags, and ids case-insensitively", () => {
+  const vault = initial();
+  vault.projects[0].status = "Active";
+  vault.docs.push({ id: "d1", title: "Guide", tags: ["Urgent"] });
+  vault.skills.push({ id: "s1", name: "TypeScript", level: "Advanced" });
+  const compact = compactVault(vault);
+  assert.equal(searchVault(compact, "original").length, 1);
+  assert.equal(searchVault(compact, "full original")[0].id, "p1");
+  assert.equal(searchVault(compact, "ACTIVE")[0].id, "p1");
+  assert.equal(searchVault(compact, "urgent")[0].id, "d1");
+  assert.equal(searchVault(compact, "s1")[0].collection, "skills");
+  assert.equal(searchVault(compact, "typescript advanced")[0].id, "s1");
+  assert.equal(searchVault(compact, "typescript beginner").length, 0);
+  assert.equal(searchVault(compact, "nothing-matches").length, 0);
+  assert.throws(() => searchVault(compact, ""));
+  assert.throws(() => searchVault(compact, "x".repeat(201)));
+});
+
+test("searchVault caps results and truncates notes for tool feedback", () => {
+  const vault = initial();
+  for (let index = 0; index < 15; index++)
+    vault.projects.push({ id: `p${index + 2}`, name: "Common", notes: "n".repeat(1200) });
+  const found = searchVault(compactVault(vault), "common");
+  assert.equal(found.length, 10);
+  assert.ok(found.every((item) => item.notes.length <= 300));
+  assert.ok(found.every((item) => !item.created));
+});
+
+test("validateReply accepts tool steps and rejects malformed ones", () => {
+  const vault = initial();
+  const base = { message: "Done.", operations: [] };
+  assert.deepEqual(validateReply(base, vault).steps, []);
+  const withSteps = {
+    ...base,
+    steps: [{ tool: "vault_search", query: "original", matches: 1 }],
+  };
+  assert.deepEqual(validateReply(withSteps, vault).steps, withSteps.steps);
+  for (const steps of [
+    [{ tool: "vault_delete", query: "x", matches: 0 }],
+    [{ tool: "vault_search", query: "", matches: 0 }],
+    [{ tool: "vault_search", query: "x", matches: -1 }],
+    [{ tool: "vault_search", query: "x", matches: 11 }],
+    [{ tool: "vault_search", query: "x", matches: 0, extra: true }],
+    "not-an-array",
+  ])
+    assert.throws(() => validateReply({ ...base, steps }, vault));
+});
+
 function appFixture() {
   let vault = initial(),
     revision = 0,
@@ -216,6 +266,23 @@ test("receiving and discarding proposals never mutate the vault", async () => {
   controller.discard();
   assert.deepEqual(app.getVault(), before);
   assert.equal(app.counters.dirtyCalls, 0);
+});
+
+test("agent steps are kept for display and never mutate the vault", async () => {
+  const app = appFixture();
+  app.call = async () => ({
+    message: "Found it.",
+    operations: [update({ name: "Suggested" })],
+    steps: [{ tool: "vault_search", query: "original", matches: 1 }],
+  });
+  const before = structuredClone(app.getVault());
+  const controller = createQwenController(app);
+  const result = await controller.send("Rename the original project");
+  assert.deepEqual(result.steps, [
+    { tool: "vault_search", query: "original", matches: 1 },
+  ]);
+  assert.deepEqual(app.getVault(), before);
+  assert.deepEqual(controller.memory.steps, result.steps);
 });
 
 test("Apply requires confirmation, marks dirty once, supports undo and guards newer changes", async () => {
