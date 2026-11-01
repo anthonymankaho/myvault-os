@@ -68,6 +68,18 @@ Use **Ask Qwen** in the utility bar after signing in with GitHub. The assistant 
 
 Conversation history is held in memory only and disappears on page reload. Context excludes vault metadata, cards, imported source paths, and unknown fields; note context is capped at 1,200 characters per item. Replies and operations are validated on the server and again before Apply. Updates use IDs and preserve creation times and fields outside the proposal. The assistant cannot delete records.
 
+### Monthly token quota
+
+Every provider call's `usage` (prompt + completion tokens) is counted against a per-account quota of **5,000,000 tokens per calendar month (UTC)** — configurable with the `QWEN_MONTHLY_TOKEN_QUOTA` var. Counts persist in the `QWEN_USAGE` KV binding per GitHub login and month, the panel shows "Tokens this month: used / limit" (amber once usage passes 80%), and once the quota is spent the Worker fails closed with a safe message until the first day of the next month without calling Qwen. Enabling it is one step after creating the namespace:
+
+```
+cd worker
+npx wrangler kv namespace create QWEN_USAGE     # paste the production ID
+npx wrangler kv namespace create QWEN_USAGE --preview   # optional, for wrangler dev
+```
+
+Paste both IDs into the commented `kv_namespaces` block in `wrangler.jsonc` and redeploy. Without the binding the Worker skips accounting and enforcement, so the assistant keeps working (and tests need no KV).
+
 ## Monthly Task
 
 The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.
@@ -83,6 +95,8 @@ The checked-in `worker/wrangler.jsonc` uses the Token Plan endpoint and model re
 | `QWEN_BASE_URL` | `https://token-plan.maas.qwencloudapi.com/compatible-mode/v1` |
 | `QWEN_MODEL` | `qwen3.8-flash`; the code falls back to `qwen-plus` when unset |
 | `QWEN_ALLOWED_GITHUB_USER` | `anthonymankaho`; Qwen requests verify this identity with GitHub |
+| `QWEN_MONTHLY_TOKEN_QUOTA` | `5000000`; per-account monthly token budget counted from provider `usage` (prompt + completion tokens) |
+| `QWEN_USAGE` | Optional KV namespace binding that persists per-account monthly token counts; enforced only when bound |
 | `DASHSCOPE_API_KEY` | Worker **secret**, configured using `wrangler secret put DASHSCOPE_API_KEY` from the `worker` directory; never put its value in source, `.env`, logs, or frontend assets |
 
 The original Singapore workspace endpoint format, `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`, is also supported. Only the configured approved hosts are accepted. Credentials and endpoints must belong to the same provider plan. The existing `GITHUB_CLIENT_SECRET` remains required for GitHub sign-in; GitHub tokens are used only for GitHub and are never sent to Qwen. Provider requests use manual redirect handling to avoid forwarding credentials. Qwen3 models use direct-answer mode, and the Worker includes exact collection counts alongside the compact records.
@@ -93,4 +107,4 @@ After changing Worker bindings, run `npx wrangler types --include-runtime=false`
 
 ### Qwen validation
 
-Run `node --test test/*.test.*` in the root and `npm test -- --run` in `worker`. Tests cover all four create types, ID-based updates, invalid operations, stale previews, selection/confirmation, Discard, Undo, local cache persistence, unchanged manual GitHub saving, authentication, bounded inputs, quota handling, timeout, and credential isolation. Agent-loop tests cover tool execution and result feedback, the tool step budget with forced final answers, and rejection of unknown tools or oversized queries. The dock is a native keyboard-accessible dialog; at phone widths it fills the screen. Escape closes it and restores focus to **Ask Qwen**.
+Run `node --test test/*.test.*` in the root and `npm test -- --run` in `worker`. Tests cover all four create types, ID-based updates, invalid operations, stale previews, selection/confirmation, Discard, Undo, local cache persistence, unchanged manual GitHub saving, authentication, bounded inputs, quota handling, timeout, and credential isolation. Agent-loop tests cover tool execution and result feedback, the tool step budget with forced final answers, and rejection of unknown tools or oversized queries. Quota tests cover per-call token accounting, accumulation across the loop and across requests, fail-closed behavior when the monthly quota is spent (Qwen is never called), per-account/per-month keying, and the no-KV degradation path. The dock is a native keyboard-accessible dialog; at phone widths it fills the screen. Escape closes it and restores focus to **Ask Qwen**.
