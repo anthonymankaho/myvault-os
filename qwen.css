@@ -94,6 +94,17 @@ body:has(.qwen-panel[open]) {
 #qwen-feedback[data-kind="error"] {
   color: var(--danger);
 }
+#qwen-quota {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+#qwen-quota p {
+  margin: 0;
+}
+#qwen-quota [data-warn] {
+  color: #d8b26a;
+}
 #qwen-proposals h3 {
   font-size: 15px;
   font-weight: 550;
