@@ -17,6 +17,7 @@ export function createQwenController(app) {
     error: null,
     notice: "",
     lastPrompt: "",
+    steps: [],
     undo: null,
   };
   return {
@@ -47,6 +48,7 @@ export function createQwenController(app) {
       memory.pending = null;
       memory.confirmed = false;
       memory.lastPrompt = message;
+      memory.steps = [];
       const request = new AbortController();
       const timeout = setTimeout(() => request.abort(), 35000);
       try {
@@ -59,6 +61,7 @@ export function createQwenController(app) {
           baseline,
         );
         memory.history.push({ role: "assistant", content: result.message });
+        memory.steps = result.steps;
         memory.pending = result.operations.length ? result.operations : null;
         memory.baseline = baseline;
         memory.selected = new Set(result.operations.map((_, index) => index));
@@ -135,7 +138,7 @@ export function mountQwenPanel(app, document) {
   panel.className = "qwen-panel";
   panel.setAttribute("aria-labelledby", "qwen-title");
   panel.setAttribute("aria-modal", "true");
-  panel.innerHTML = `<div class="qwen-shell"><header class="qwen-heading"><div><p class="eyebrow">Your workspace assistant</p><h2 id="qwen-title">Ask Qwen</h2></div><button class="dialog-close" id="qwen-close" type="button" aria-label="Close Qwen">×</button></header><p class="qwen-intro">Uses a compact copy of your current local vault, including unsaved changes. Review suggestions before applying. Changes sync only when you save.</p><div class="qwen-scroll" id="qwen-scroll"><div id="qwen-conversation" role="log" aria-label="Qwen conversation" aria-live="polite" aria-relevant="additions text"></div><div id="qwen-feedback" role="status" aria-live="polite"></div><div id="qwen-proposals"></div></div><form class="qwen-composer" id="qwen-form"><label for="qwen-message">Message Qwen</label><textarea id="qwen-message" rows="3" maxlength="4000" placeholder="Help me plan a project, organize notes, or update a skill…" required></textarea><div class="qwen-composer-actions"><span>Conversation stays in memory.</span><button class="button button-primary" type="submit" id="qwen-send">Send</button></div></form></div>`;
+  panel.innerHTML = `<div class="qwen-shell"><header class="qwen-heading"><div><p class="eyebrow">Your workspace assistant</p><h2 id="qwen-title">Ask Qwen</h2></div><button class="dialog-close" id="qwen-close" type="button" aria-label="Close Qwen">×</button></header><p class="qwen-intro">Uses a compact copy of your current local vault, including unsaved changes. Qwen may search it while working, then propose changes for your review — nothing applies until you confirm. Changes sync only when you save.</p><div class="qwen-scroll" id="qwen-scroll"><div id="qwen-conversation" role="log" aria-label="Qwen conversation" aria-live="polite" aria-relevant="additions text"></div><div id="qwen-feedback" role="status" aria-live="polite"></div><div id="qwen-proposals"></div></div><form class="qwen-composer" id="qwen-form"><label for="qwen-message">Message Qwen</label><textarea id="qwen-message" rows="3" maxlength="4000" placeholder="Help me plan a project, organize notes, or update a skill…" required></textarea><div class="qwen-composer-actions"><span>Conversation stays in memory.</span><button class="button button-primary" type="submit" id="qwen-send">Send</button></div></form></div>`;
   document.body.append(panel);
   const controller = createQwenController(app),
     memory = controller.memory;
@@ -157,14 +160,21 @@ export function mountQwenPanel(app, document) {
 
   function renderPanel() {
     const available = app.isSignedIn() && Boolean(app.getVault());
-    history.innerHTML = memory.history.length
-      ? memory.history
-          .map(
-            (turn) =>
-              `<article class="qwen-turn" data-role="${turn.role}"><h3>${turn.role === "user" ? "You" : "Qwen"}</h3><p>${escape(turn.content)}</p></article>`,
-          )
-          .join("")
-      : `<div class="empty-state"><strong>A second pair of eyes for your vault</strong><p>Ask a question or describe a change. Qwen will propose it for your review.</p></div>`;
+    history.innerHTML =
+      (memory.history.length
+        ? memory.history
+            .map(
+              (turn) =>
+                `<article class="qwen-turn" data-role="${turn.role}"><h3>${turn.role === "user" ? "You" : "Qwen"}</h3><p>${escape(turn.content)}</p></article>`,
+            )
+            .join("")
+        : `<div class="empty-state"><strong>A second pair of eyes for your vault</strong><p>Ask a question or describe a change. Qwen can search your vault first, then propose changes for your review.</p></div>`) +
+      memory.steps
+        .map(
+          (step) =>
+            `<article class="qwen-turn" data-role="tool"><h3>Qwen searched the vault</h3><p>“${escape(step.query)}” — ${step.matches} match${step.matches === 1 ? "" : "es"}</p></article>`,
+        )
+        .join("");
     history.setAttribute("aria-busy", String(memory.busy));
     send.disabled = memory.busy || !available || Date.now() < retryReadyAt;
     input.disabled = memory.busy || !available;
