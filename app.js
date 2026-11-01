@@ -149,6 +149,7 @@ function normalizeTask(raw) {
       ? String(task.scheduledDate)
       : hkDateKey(),
     status: task.status === "Completed" ? "Completed" : "Not Started",
+    recurring: task.recurring === true,
     docResult: String(task.docResult || ""),
     completedAt: task.status === "Completed" ? task.completedAt || new Date().toISOString() : null,
     createdAt: task.createdAt || task.created || new Date().toISOString(),
@@ -900,7 +901,7 @@ function renderSearch() {
       .map((item, index) => ({ key, config, item, index }))
       .filter(({ item }) => itemMatches(item, query)),
   );
-  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`)).join("") : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
+  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`).join("") : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
   bindWorkspaceActions();
 }
 
@@ -974,6 +975,7 @@ function refreshDailyReminder() {
   if (counts.today || counts.overdue) {
     setStatus(`Daily reminder / 每日提醒: ${counts.today} due today, ${counts.overdue} overdue.`, "warning");
   }
+  autoGenerateRecurringTasks();
 }
 
 function renderTaskHomeWidget() {
@@ -1031,7 +1033,7 @@ function taskRowHtml(task, today) {
   const action = task.status === "Completed"
     ? `<button class="button button-quiet" type="button" data-task-reopen="${escapeHtml(task.id)}">Reopen / 重開</button>`
     : `<button class="button button-primary" type="button" data-task-complete="${escapeHtml(task.id)}">Complete / 完成</button>`;
-  return `<article class="item task-row ${overdue ? "is-overdue" : ""} ${task.status === "Completed" ? "is-completed" : ""}"><div class="item-top"><div><p class="task-company">${escapeHtml(task.company)} · ${escapeHtml(task.planningMonth)}</p><h2 class="item-name">${escapeHtml(task.description)}</h2></div><div class="item-actions"><span class="badge task-date-badge">${overdue ? "Overdue / 逾期 · " : ""}${escapeHtml(task.scheduledDate)}</span><button class="button button-quiet" type="button" data-task-edit="${escapeHtml(task.id)}">Edit / 編輯</button></div></div><p class="task-status-text"><span class="task-status-dot ${overdue ? "is-overdue" : ""}"></span>${escapeHtml(task.status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始")}${task.completedAt ? ` · ${escapeHtml(hkDateKey(task.completedAt))}` : ""}</p>${task.docResult ? `<p class="item-notes"><strong>Doc / Result:</strong><br>${escapeHtml(task.docResult).replaceAll("\n", "<br>")}</p>` : ""}<div class="task-row-actions">${action}<button class="button button-danger" type="button" data-task-delete="${escapeHtml(task.id)}">Delete / 刪除</button></div></article>`;
+  return `<article class="item task-row ${overdue ? "is-overdue" : ""} ${task.status === "Completed" ? "is-completed" : ""}"><div class="item-top"><div><p class="task-company">${escapeHtml(task.company)} · ${escapeHtml(task.planningMonth)}${task.recurring ? ' <span class="badge task-recurring-badge" title="Monthly recurring / 每月重複">↻ monthly</span>' : ""}</p><h2 class="item-name">${escapeHtml(task.description)}</h2></div><div class="item-actions"><span class="badge task-date-badge">${overdue ? "Overdue / 逾期 · " : ""}${escapeHtml(task.scheduledDate)}</span><button class="button button-quiet" type="button" data-task-edit="${escapeHtml(task.id)}">Edit / 編輯</button></div></div><p class="task-status-text"><span class="task-status-dot ${overdue ? "is-overdue" : ""}"></span>${escapeHtml(task.status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始")}${task.completedAt ? ` · ${escapeHtml(hkDateKey(task.completedAt))}` : ""}</p>${task.docResult ? `<p class="item-notes"><strong>Doc / Result:</strong><br>${escapeHtml(task.docResult).replaceAll("\n", "<br>")}</p>` : ""}<div class="task-row-actions">${action}<button class="button button-danger" type="button" data-task-delete="${escapeHtml(task.id)}">Delete / 刪除</button></div></article>`;
 }
 
 function renderTasks() {
@@ -1064,10 +1066,10 @@ function bindTaskActions() {
 
 function openTaskDialog(index = null, defaults = {}) {
   const editing = index !== null && index >= 0 ? state.vault.tasks[index] : null;
-  const task = editing || { planningMonth: ui.taskMonth, scheduledDate: hkDateKey(), company: "OTHER", status: "Not Started", ...defaults };
+  const task = editing || { planningMonth: ui.taskMonth, scheduledDate: hkDateKey(), company: "OTHER", status: "Not Started", recurring: false, ...defaults };
   const dialog = document.querySelector("#item-dialog");
   const content = document.querySelector("#dialog-content");
-  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY TASK / 工作任務</p><h2 id="dialog-title">${editing ? "Edit task / 編輯任務" : "Add task / 新增任務"}</h2><p>Dates are date-only and calculated in Asia/Hong_Kong.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form task-form"><div class="form-row"><div class="field"><label for="task-planning-month">Planning month / 計劃月份 *</label><input id="task-planning-month" name="planningMonth" type="month" value="${escapeHtml(task.planningMonth)}" required></div><div class="field"><label for="task-company-field">Company / 公司 *</label><input id="task-company-field" name="company" value="${escapeHtml(task.company)}" required></div><div class="field"><label for="task-date-field">Scheduled date / 排程日期 *</label><input id="task-date-field" name="scheduledDate" type="date" value="${escapeHtml(task.scheduledDate)}" required></div><div class="field"><label for="task-status-field">Status / 狀態</label><select id="task-status-field" name="status">${TASK_STATUS.map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></div><div class="field field-wide"><label for="task-description-field">Description / 任務描述 *</label><textarea id="task-description-field" name="description" required>${escapeHtml(task.description)}</textarea></div><div class="field field-wide"><label for="task-result-field">Doc / Result / 文件或結果</label><textarea id="task-result-field" name="docResult" placeholder="Files, references, amounts, notes, or results…">${escapeHtml(task.docResult)}</textarea></div></div><p class="form-help" id="task-form-feedback">Completion does not require an attachment.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="submit">${editing ? "Save changes / 儲存" : "Create task / 建立"}</button></div></form>`;
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY TASK / 工作任務</p><h2 id="dialog-title">${editing ? "Edit task / 編輯任務" : "Add task / 新增任務"}</h2><p>Dates are date-only and calculated in Asia/Hong_Kong.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form task-form"><div class="form-row"><div class="field"><label for="task-planning-month">Planning month / 計劃月份 *</label><input id="task-planning-month" name="planningMonth" type="month" value="${escapeHtml(task.planningMonth)}" required></div><div class="field"><label for="task-company-field">Company / 公司 *</label><input id="task-company-field" name="company" value="${escapeHtml(task.company)}" required></div><div class="field"><label for="task-date-field">Scheduled date / 排程日期 *</label><input id="task-date-field" name="scheduledDate" type="date" value="${escapeHtml(task.scheduledDate)}" required></div><div class="field"><label for="task-status-field">Status / 狀態</label><select id="task-status-field" name="status">${TASK_STATUS.map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></div><div class="field field-wide"><label for="task-description-field">Description / 任務描述 *</label><textarea id="task-description-field" name="description" required>${escapeHtml(task.description)}</textarea></div><div class="field field-wide"><label for="task-result-field">Doc / Result / 文件或結果</label><textarea id="task-result-field" name="docResult" placeholder="Files, references, amounts, notes, or results…">${escapeHtml(task.docResult)}</textarea></div><div class="field field-wide"><label class="task-recurring-label" for="task-recurring-field"><input id="task-recurring-field" name="recurring" type="checkbox" value="yes" ${task.recurring ? "checked" : ""}> Monthly recurring / 每月重複 — auto-create next month at month-end (title month and date update automatically)</label></div></div><p class="form-help" id="task-form-feedback">Completion does not require an attachment.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="submit">${editing ? "Save changes / 儲存" : "Create task / 建立"}</button></div></form>`;
   const form = content.querySelector("form");
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1075,6 +1077,7 @@ function openTaskDialog(index = null, defaults = {}) {
     const feedback = content.querySelector("#task-form-feedback");
     data.company = String(data.company || "").trim();
     data.description = String(data.description || "").trim();
+    data.recurring = data.recurring === "yes";
     if (!data.company || !data.description || !/^\d{4}-\d{2}$/.test(data.planningMonth) || !/^\d{4}-\d{2}-\d{2}$/.test(data.scheduledDate)) {
       feedback.textContent = "Company, description, planning month, and date are required.";
       feedback.dataset.kind = "error";
@@ -1214,7 +1217,7 @@ function openTaskRolloverPreview() {
   const candidates = state.vault.tasks.filter((task) => task.planningMonth === sourceMonth && task.status !== "Completed");
   const dialog = document.querySelector("#item-dialog");
   const content = document.querySelector("#dialog-content");
-  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY ROLLOVER / 每月延續</p><h2 id="dialog-title">${escapeHtml(sourceMonth)} → ${escapeHtml(targetMonth)}</h2><p>Select recurring unfinished tasks. New tasks reset to Not Started and clear Doc / Result. Weekend dates move forward; Hong Kong holiday coverage is not verified.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><div class="rollover-list">${candidates.length ? candidates.map((task) => `<label><input type="checkbox" name="rollover" value="${escapeHtml(task.id)}" checked><span><strong>${escapeHtml(task.company)}</strong> ${escapeHtml(task.description)}<small>${escapeHtml(task.scheduledDate)} → ${escapeHtml(rolloverDate(task.scheduledDate, targetMonth))}</small></span></label>`).join("") : '<p class="voice-empty">No unfinished tasks are available for rollover.</p>'}</div><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="button" id="confirm-rollover" ${candidates.length ? "" : "disabled"}>Create selected tasks</button></div>`;
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY ROLLOVER / 每月延續</p><h2 id="dialog-title">${escapeHtml(sourceMonth)} → ${escapeHtml(targetMonth)}</h2><p>Select recurring unfinished tasks. New tasks reset to Not Started and clear Doc / Result. Dates move forward to the next Hong Kong workday (Mon–Fri, skipping public holidays).</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><div class="rollover-list">${candidates.length ? candidates.map((task) => `<label><input type="checkbox" name="rollover" value="${escapeHtml(task.id)}" checked><span><strong>${escapeHtml(task.company)}</strong> ${escapeHtml(task.description)}<small>${escapeHtml(task.scheduledDate)} → ${escapeHtml(rolloverDate(task.scheduledDate, targetMonth))}</small></span></label>`).join("") : '<p class="voice-empty">No unfinished tasks are available for rollover.</p>'}</div><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="button" id="confirm-rollover" ${candidates.length ? "" : "disabled"}>Create selected tasks</button></div>`;
   content.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
   content.querySelector("#cancel-edit").addEventListener("click", () => dialog.close());
   content.querySelector("#confirm-rollover").addEventListener("click", () => {
@@ -1235,9 +1238,136 @@ function rolloverDate(dateKey, targetMonth) {
   const [, month, day] = String(dateKey).split("-").map(Number);
   const [year, target] = targetMonth.split("-").map(Number);
   const lastDay = new Date(Date.UTC(year, target, 0)).getUTCDate();
-  const date = new Date(Date.UTC(year, target - 1, Math.min(day || 1, lastDay)));
-  while ([0, 6].includes(date.getUTCDay())) date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
+  const raw = new Date(Date.UTC(year, target - 1, Math.min(day || 1, lastDay))).toISOString().slice(0, 10);
+  return nextHkWorkday(raw);
+}
+
+// Hong Kong general holidays (Mon–Fri only affect workday math; weekend dates kept for completeness).
+// 2026 and 2027 are gazetted (gov.hk). 2028 entries are estimates — verify against the gazette when published.
+const HK_HOLIDAYS = new Set([
+  // 2026
+  "2026-01-01", "2026-02-17", "2026-02-18", "2026-02-19",
+  "2026-04-03", "2026-04-04", "2026-04-06", "2026-04-07",
+  "2026-05-01", "2026-05-25", "2026-06-19", "2026-07-01",
+  "2026-09-26", "2026-10-01", "2026-10-19", "2026-12-25", "2026-12-26",
+  // 2027
+  "2027-01-01", "2027-02-06", "2027-02-07", "2027-02-08", "2027-02-09",
+  "2027-03-26", "2027-03-27", "2027-03-29", "2027-04-05", "2027-05-01",
+  "2027-05-13", "2027-06-09", "2027-07-01", "2027-09-16", "2027-10-01",
+  "2027-10-08", "2027-12-25", "2027-12-27",
+  // 2028 (estimate until gazetted)
+  "2028-01-01", "2028-01-26", "2028-01-27", "2028-01-28", "2028-04-04",
+  "2028-04-14", "2028-04-15", "2028-04-17", "2028-05-01", "2028-05-02",
+  "2028-05-29", "2028-07-01", "2028-10-01", "2028-10-04", "2028-10-26",
+  "2028-12-25", "2028-12-26",
+]);
+
+function isHkWorkday(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  const weekday = date.getUTCDay();
+  return weekday !== 0 && weekday !== 6 && !HK_HOLIDAYS.has(dateKey);
+}
+
+function nextHkWorkday(dateKey) {
+  let current = String(dateKey);
+  for (let guard = 0; guard < 15 && !isHkWorkday(current); guard += 1) {
+    current = addDateDays(current, 1);
+  }
+  return current;
+}
+
+function shiftRecurringText(text, sourceMonth, targetMonth) {
+  let output = String(text ?? "");
+  if (!/^\d{4}-\d{2}$/.test(sourceMonth) || !/^\d{4}-\d{2}$/.test(targetMonth) || sourceMonth === targetMonth) return output;
+  const [sourceYear, source] = sourceMonth.split("-");
+  const [targetYear, target] = targetMonth.split("-");
+  const names = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const sourceName = names[Number(source) - 1];
+  const targetName = names[Number(target) - 1];
+  const patterns = [
+    [new RegExp(`${source}/${sourceYear}`, "g"), `${target}/${targetYear}`],
+    [new RegExp(`${sourceYear}-${source}(?!-?\\d)`, "g"), `${targetYear}-${target}`],
+    [new RegExp(`${sourceYear}/${source}(?!/?\\d)`, "g"), `${targetYear}/${target}`],
+    [new RegExp(`\\b${sourceName}\\s*${sourceYear}\\b`, "gi"), `${targetName} ${targetYear}`],
+  ];
+  for (const [pattern, replacement] of patterns) {
+    output = output.replace(pattern, replacement);
+  }
+  return output;
+}
+
+// Generation window: the last 2 days of a month plus the first 3 days of the next
+// (month-end day plus a small grace period in case the app is not opened exactly then).
+function recurringTargetMonth(todayKey) {
+  const [year, month, day] = String(todayKey).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day >= lastDay - 1) return shiftMonth(`${year}-${String(month).padStart(2, "0")}`, 1);
+  if (day <= 3) return `${year}-${String(month).padStart(2, "0")}`;
+  return "";
+}
+
+function taskLineageRoot(task, byId) {
+  let root = task;
+  const seen = new Set([task.id]);
+  while (root.carriedFromTaskId && byId.has(root.carriedFromTaskId) && !seen.has(root.carriedFromTaskId)) {
+    seen.add(root.carriedFromTaskId);
+    root = byId.get(root.carriedFromTaskId);
+  }
+  return root.id;
+}
+
+function autoGenerateRecurringTasks(todayKey = hkDateKey()) {
+  if (!state.vault || !Array.isArray(state.vault.tasks)) return [];
+  const targetMonth = recurringTargetMonth(todayKey);
+  if (!targetMonth) return [];
+  const byId = new Map(state.vault.tasks.map((task) => [task.id, task]));
+  const rootsInTarget = new Set(
+    state.vault.tasks
+      .filter((task) => task.planningMonth === targetMonth)
+      .map((task) => taskLineageRoot(task, byId)),
+  );
+  const latestByRoot = new Map();
+  for (const task of state.vault.tasks) {
+    if (!task.recurring) continue;
+    const rootId = taskLineageRoot(task, byId);
+    const current = latestByRoot.get(rootId);
+    if (!current || String(task.planningMonth).localeCompare(String(current.planningMonth)) > 0 ||
+        (task.planningMonth === current.planningMonth && String(task.createdAt) > String(current.createdAt))) {
+      latestByRoot.set(rootId, task);
+    }
+  }
+  const now = new Date().toISOString();
+  const additions = [];
+  for (const [rootId, task] of latestByRoot) {
+    if (rootsInTarget.has(rootId)) continue;
+    if (String(task.planningMonth) >= targetMonth) continue;
+    const [targetYear, target] = targetMonth.split("-").map(Number);
+    const anchorDay = Number(String(task.scheduledDate).slice(8, 10)) || 1;
+    const lastDay = new Date(Date.UTC(targetYear, target, 0)).getUTCDate();
+    const raw = new Date(Date.UTC(targetYear, target - 1, Math.min(anchorDay, lastDay))).toISOString().slice(0, 10);
+    additions.push(normalizeTask({
+      id: uid(),
+      planningMonth: targetMonth,
+      company: task.company,
+      description: shiftRecurringText(task.description, task.planningMonth, targetMonth),
+      scheduledDate: nextHkWorkday(raw),
+      status: "Not Started",
+      docResult: "",
+      recurring: true,
+      createdAt: now,
+      updatedAt: now,
+      carriedFromTaskId: task.id,
+      source: { autoRecurring: true, generatedFrom: task.id, generatedOn: todayKey },
+    }));
+  }
+  if (additions.length) {
+    state.vault.tasks.push(...additions);
+    markDirty();
+    render();
+    setStatus(`Monthly recurring / 每月重複: ${additions.length} task(s) created for ${targetMonth}. Saved on this device.`, "success");
+  }
+  return additions;
 }
 
 function downloadText(filename, text, type = "text/plain") {
