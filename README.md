@@ -70,15 +70,14 @@ Conversation history is held in memory only and disappears on page reload. Conte
 
 ### Monthly token quota
 
-Every provider call's `usage` (prompt + completion tokens) is counted against a per-account quota of **5,000,000 tokens per calendar month (UTC)** — configurable with the `QWEN_MONTHLY_TOKEN_QUOTA` var. Counts persist in the `QWEN_USAGE` KV binding per GitHub login and month, the panel shows "Tokens this month: used / limit" (amber once usage passes 80%), and once the quota is spent the Worker fails closed with a safe message until the first day of the next month without calling Qwen. Enabling it is one step after creating the namespace:
+Every provider call's `usage` (prompt + completion tokens) is counted against a per-account quota of **5,000,000 tokens per calendar month (UTC)** — configurable with the `QWEN_MONTHLY_TOKEN_QUOTA` var. Counts persist in the `QWEN_USAGE` KV binding per GitHub login and month, the panel shows "Tokens this month: used / limit" (amber once usage passes 80%), and once the quota is spent the Worker fails closed with a safe message until the first day of the next month without calling Qwen. The production `QWEN_USAGE` namespace is already wired in `worker/wrangler.jsonc`, so accounting and enforcement start on the next deploy. A separate preview namespace for `wrangler dev` is optional:
 
 ```
 cd worker
-npx wrangler kv namespace create QWEN_USAGE     # paste the production ID
-npx wrangler kv namespace create QWEN_USAGE --preview   # optional, for wrangler dev
+npx wrangler kv namespace create QWEN_USAGE --preview   # optional
 ```
 
-Paste both IDs into the commented `kv_namespaces` block in `wrangler.jsonc` and redeploy. Without the binding the Worker skips accounting and enforcement, so the assistant keeps working (and tests need no KV).
+Paste the preview ID as `preview_id` next to the production `id` if you create one. Without any binding the Worker skips accounting and enforcement, so the assistant keeps working (and tests need no KV).
 
 ## Monthly Task
 
@@ -96,7 +95,7 @@ The checked-in `worker/wrangler.jsonc` uses the Token Plan endpoint and model re
 | `QWEN_MODEL` | `qwen3.8-flash`; the code falls back to `qwen-plus` when unset |
 | `QWEN_ALLOWED_GITHUB_USER` | `anthonymankaho`; Qwen requests verify this identity with GitHub |
 | `QWEN_MONTHLY_TOKEN_QUOTA` | `5000000`; per-account monthly token budget counted from provider `usage` (prompt + completion tokens) |
-| `QWEN_USAGE` | Optional KV namespace binding that persists per-account monthly token counts; enforced only when bound |
+| `QWEN_USAGE` | KV namespace binding that persists per-account monthly token counts (production ID wired in `wrangler.jsonc`) |
 | `DASHSCOPE_API_KEY` | Worker **secret**, configured using `wrangler secret put DASHSCOPE_API_KEY` from the `worker` directory; never put its value in source, `.env`, logs, or frontend assets |
 
 The original Singapore workspace endpoint format, `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`, is also supported. Only the configured approved hosts are accepted. Credentials and endpoints must belong to the same provider plan. The existing `GITHUB_CLIENT_SECRET` remains required for GitHub sign-in; GitHub tokens are used only for GitHub and are never sent to Qwen. Provider requests use manual redirect handling to avoid forwarding credentials. Qwen3 models use direct-answer mode, and the Worker includes exact collection counts alongside the compact records.
