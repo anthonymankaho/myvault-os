@@ -4,6 +4,8 @@ interface __BaseEnv_Env {
 	QWEN_BASE_URL: "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1";
 	QWEN_MODEL: "qwen3.8-flash";
 	QWEN_ALLOWED_GITHUB_USER: "anthonymankaho";
+	QWEN_MONTHLY_TOKEN_QUOTA: "5000000";
+	QWEN_USAGE?: KVNamespace;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -16,7 +18,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "QWEN_BASE_URL" | "QWEN_MODEL" | "QWEN_ALLOWED_GITHUB_USER">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "QWEN_BASE_URL" | "QWEN_MODEL" | "QWEN_ALLOWED_GITHUB_USER" | "QWEN_MONTHLY_TOKEN_QUOTA">> {}
 }
 declare module "*.txt" {
 	const value: string;
