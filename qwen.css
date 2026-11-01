@@ -67,6 +67,12 @@ body:has(.qwen-panel[open]) {
   background: var(--accent-bg);
   border-color: #365044;
 }
+.qwen-turn[data-role="tool"] {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+  margin-top: -6px;
+}
 .qwen-turn h3 {
   font-size: 11px;
   color: var(--accent);
