@@ -1453,6 +1453,18 @@ dialog::backdrop {
 .task-date-badge {
   white-space: nowrap;
 }
+.task-recurring-badge {
+  color: var(--accent, #4f7cff);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.task-recurring-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
 .task-status-text {
   display: flex;
   align-items: center;

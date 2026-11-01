@@ -20,7 +20,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 - Voice notes with the browser Web Speech API
 - Installable progressive web app for iPad and other devices
 - Vanilla HTML, CSS, and JavaScript; no build step or framework
-- Monthly Task workspace with date-safe Hong Kong scheduling, Excel preview/import, rollover, completion tracking, and local backup/restore
+- Monthly Task workspace with date-safe Hong Kong scheduling, Excel preview/import, rollover, month-end recurring auto-generation (Hong Kong public-holiday aware), completion tracking, and local backup/restore
 
 ## Vault shape
 
@@ -83,7 +83,17 @@ Paste the preview ID as `preview_id` next to the production `id` if you create o
 
 The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.
 
-The browser parses Excel locally with SheetJS; workbook contents are not sent to the parser service. Reminders are in-app only (there are no closed-tab push notifications), and rollover holiday coverage is explicitly marked for manual verification.
+The browser parses Excel locally with SheetJS; workbook contents are not sent to the parser service. Reminders are in-app only (there are no closed-tab push notifications).
+
+### Monthly recurring auto-generation
+
+Any task can be flagged **Monthly recurring / 每月重複** in the Add/Edit dialog (shown with a `↻ monthly` badge in the list). On app open near a month boundary — the last 2 days of a month plus the first 3 days of the next, Hong Kong time — the app automatically creates the next month's instance for each recurring task lineage:
+
+- The description's month tokens are rewritten from the source month to the target month (`11/2026` → `12/2026`, `2026-11` → `2026-12`, `NOV2026` → `DEC 2026`; embedded full dates like `2026-11-02` are left untouched).
+- The new date keeps the original day-of-month, clamped to the target month's length, then rolls forward to the next Hong Kong workday (Monday–Friday excluding public holidays, e.g. a day-6 anchor targeting February 2027 becomes `2027-02-10` because 6–7 February are the weekend and 8–9 February are Lunar New Year holidays).
+- The new task is `Not Started` with an empty Doc/Result, is itself flagged recurring so the chain continues, and carries `carriedFromTaskId` plus an `autoRecurring` source marker.
+
+Generation is idempotent: an existing instance of the same lineage in the target month prevents duplicates, so opening the app repeatedly in the window never creates copies. New tasks are local until you save, and a status-line notice reports how many tasks were created. The holiday table covers 2026 and 2027 (gazetted, gov.hk) and 2028 (estimate until gazetted — verify when published). The manual **Create Next Month / 建立下月** rollover uses the same workday logic.
 
 ### Worker configuration
 
