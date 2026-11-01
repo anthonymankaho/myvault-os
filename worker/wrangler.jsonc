@@ -13,11 +13,10 @@
     "QWEN_ALLOWED_GITHUB_USER": "anthonymankaho",
     "QWEN_MONTHLY_TOKEN_QUOTA": "5000000"
   },
-  // Monthly token quota accounting is enforced only when the QWEN_USAGE KV
-  // namespace is bound. Create it with:
-  //   npx wrangler kv namespace create QWEN_USAGE
-  // then paste the production (and preview) IDs below and redeploy.
-  // "kv_namespaces": [
-  //   { "binding": "QWEN_USAGE", "id": "<production-namespace-id>", "preview_id": "<preview-namespace-id>" }
-  // ]
+  // Monthly token quota accounting (QWEN_USAGE KV, production ID wired below;
+  // add a preview_id for wrangler dev with:
+  //   npx wrangler kv namespace create QWEN_USAGE --preview
+  "kv_namespaces": [
+    { "binding": "QWEN_USAGE", "id": "a3c1595319134c3c99647ae4591e3170" }
+  ]
 }
