@@ -14,6 +14,9 @@ export const PROJECT_STATUSES = [
 ];
 export const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Expert"];
 export const MAX_OPERATIONS = 12;
+export const MAX_TOOL_STEPS = 6;
+export const MAX_SEARCH_RESULTS = 10;
+const SEARCH_NOTES_PREVIEW = 300;
 const MAX_ITEMS = 200;
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const object = (value) =>
@@ -173,8 +176,64 @@ export function validateRequest(payload) {
   };
 }
 
+export function searchVault(compact, query) {
+  if (typeof query !== "string" || !query.trim() || query.length > 200)
+    fail("Invalid search query.");
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = [];
+  for (const [collection, fields] of Object.entries(COLLECTION_FIELDS)) {
+    for (const item of compact[collection] ?? []) {
+      const haystack = [
+        item.id ?? "",
+        ...fields.map((field) =>
+          Array.isArray(item[field])
+            ? item[field].join(" ")
+            : (item[field] ?? ""),
+        ),
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!terms.every((term) => haystack.includes(term))) continue;
+      const match = { collection };
+      if (validId(item.id)) match.id = item.id;
+      for (const field of fields) {
+        const value = item[field];
+        if (field === "tags" && Array.isArray(value)) match.tags = [...value];
+        else if (typeof value === "string")
+          match[field] =
+            field === "notes" ? value.slice(0, SEARCH_NOTES_PREVIEW) : value;
+      }
+      matches.push(match);
+      if (matches.length >= MAX_SEARCH_RESULTS) return matches;
+    }
+  }
+  return matches;
+}
+
+export function validateSteps(steps) {
+  if (!Array.isArray(steps) || steps.length > MAX_TOOL_STEPS)
+    fail("Invalid assistant steps.");
+  return steps.map((step) => {
+    exactKeys(step, ["tool", "query", "matches"], "Step");
+    if (step.tool !== "vault_search") fail("Unknown assistant tool.");
+    if (
+      typeof step.query !== "string" ||
+      !step.query.trim() ||
+      step.query.length > 200
+    )
+      fail("Invalid step query.");
+    if (
+      !Number.isInteger(step.matches) ||
+      step.matches < 0 ||
+      step.matches > MAX_SEARCH_RESULTS
+    )
+      fail("Invalid step match count.");
+    return { tool: step.tool, query: step.query, matches: step.matches };
+  });
+}
+
 export function validateReply(reply, vault) {
-  exactKeys(reply, ["message", "operations"], "Reply");
+  exactKeys(reply, ["message", "operations", "steps"], "Reply");
   if (
     typeof reply.message !== "string" ||
     !reply.message.trim() ||
@@ -184,6 +243,7 @@ export function validateReply(reply, vault) {
   return {
     message: reply.message,
     operations: validateOperations(reply.operations, vault),
+    steps: reply.steps === undefined ? [] : validateSteps(reply.steps),
   };
 }
 
@@ -214,7 +274,7 @@ export function applySelectedOperations(
   if (
     !Array.isArray(selected) ||
     !selected.length ||
-    new Set(selected).size !== selected.length ||
+    new Set(selected).size !== selected.size ||
     selected.some(
       (index) =>
         !Number.isInteger(index) || index < 0 || index >= validated.length,
