@@ -274,7 +274,7 @@ export function applySelectedOperations(
   if (
     !Array.isArray(selected) ||
     !selected.length ||
-    new Set(selected).size !== selected.size ||
+    new Set(selected).size !== selected.length ||
     selected.some(
       (index) =>
         !Number.isInteger(index) || index < 0 || index >= validated.length,
