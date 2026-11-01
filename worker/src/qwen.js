@@ -73,6 +73,18 @@ The first user message is a JSON envelope with request, vault_summary, and vault
 const AGENT_BUDGET_MS = 28000;
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+// Monthly token quota per authenticated GitHub account. Counts are kept in the
+// optional QWEN_USAGE KV binding; without the binding the mechanism degrades to
+// no accounting so the assistant keeps working (and tests run without KV).
+const DEFAULT_MONTHLY_TOKEN_QUOTA = 5_000_000;
+const monthlyQuota = (env) => {
+	const parsed = Number(env.QWEN_MONTHLY_TOKEN_QUOTA ?? DEFAULT_MONTHLY_TOKEN_QUOTA);
+	if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1_000_000_000) return DEFAULT_MONTHLY_TOKEN_QUOTA;
+	return parsed;
+};
+// Calendar month (UTC), so the counter resets on the first day of each month.
+const usageKey = (login, now = new Date()) => `qwen-usage:${login.toLowerCase()}:${now.toISOString().slice(0, 7)}`;
+
 export async function handleQwen(payload, authorization, env) {
 	if (typeof authorization !== 'string' || !/^Bearer [^\s]{10,512}$/.test(authorization))
 		throw new AIError('Sign in with GitHub to use Qwen.', 401, 'AI_AUTH_REQUIRED');
@@ -102,8 +114,20 @@ export async function handleQwen(payload, authorization, env) {
 		throw new AIError('Could not verify your GitHub session. Please retry.', 503, 'AI_AUTH_UNAVAILABLE');
 	}
 	if (!user.ok) throw new AIError('Your GitHub session could not be verified. Sign in again.', 401, 'AI_AUTH_REQUIRED');
-	if (String(user.data?.login ?? '').toLowerCase() !== String(env.QWEN_ALLOWED_GITHUB_USER || 'anthonymankaho').toLowerCase())
+	const login = String(user.data?.login ?? '');
+	if (login.toLowerCase() !== String(env.QWEN_ALLOWED_GITHUB_USER || 'anthonymankaho').toLowerCase())
 		throw new AIError('This GitHub account cannot use this assistant.', 403, 'AI_FORBIDDEN');
+
+	// Per-account monthly token quota, counted from provider usage (prompt +
+	// completion tokens) into the QWEN_USAGE KV binding when it is bound.
+	const kv = env.QWEN_USAGE;
+	const quotaLimit = monthlyQuota(env);
+	let used = 0;
+	if (kv) {
+		used = Math.max(0, Number(await kv.get(usageKey(login))) || 0);
+		if (used >= quotaLimit)
+			throw new AIError('The monthly Qwen token quota is spent. It resets on the first day of next month.', 429, 'AI_QUOTA', 3600);
+	}
 
 	let base;
 	try {
@@ -177,6 +201,11 @@ export async function handleQwen(payload, authorization, env) {
 					throw new AIError('Qwen is unavailable. Check the Worker key, workspace, model, and model access.', 503, 'AI_UNAVAILABLE');
 				throw new AIError('Qwen is temporarily unavailable. Please retry.', 502, 'AI_UPSTREAM');
 			}
+			const usage = result.data?.usage;
+			if (kv && isObject(usage) && Number.isInteger(usage.prompt_tokens) && Number.isInteger(usage.completion_tokens)) {
+				used += usage.prompt_tokens + usage.completion_tokens;
+				await kv.put(usageKey(login), String(used));
+			}
 			const choice = result.data?.choices?.[0];
 			if (choice?.finish_reason === 'length' || typeof choice?.message?.content !== 'string') throw new Error('Invalid completion.');
 			let parsed;
@@ -214,7 +243,7 @@ export async function handleQwen(payload, authorization, env) {
 			const serialized = JSON.stringify({ ...reply, steps });
 			if ([env.DASHSCOPE_API_KEY, authorization, authorization.slice(7)].some((secret) => secret && serialized.includes(secret)))
 				throw new Error('Credential echo rejected.');
-			return { ...reply, steps };
+			return { ...reply, steps, ...(kv ? { quota: { used, limit: quotaLimit } } : {}) };
 		}
 	} catch (error) {
 		if (error instanceof AIError && error.code !== 'AI_TOO_LARGE') throw error;

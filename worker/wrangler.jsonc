@@ -10,6 +10,13 @@
   "vars": {
     "QWEN_BASE_URL": "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1",
     "QWEN_MODEL": "qwen3.8-flash",
-    "QWEN_ALLOWED_GITHUB_USER": "anthonymankaho"
-  }
+    "QWEN_ALLOWED_GITHUB_USER": "anthonymankaho",
+    "QWEN_MONTHLY_TOKEN_QUOTA": "5000000"
+  },
+  // Monthly token quota accounting (QWEN_USAGE KV, production ID wired below;
+  // add a preview_id for wrangler dev with:
+  //   npx wrangler kv namespace create QWEN_USAGE --preview
+  "kv_namespaces": [
+    { "binding": "QWEN_USAGE", "id": "a3c1595319134c3c99647ae4591e3170" }
+  ]
 }
