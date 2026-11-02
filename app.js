@@ -901,7 +901,7 @@ function renderSearch() {
       .map((item, index) => ({ key, config, item, index }))
       .filter(({ item }) => itemMatches(item, query)),
   );
-  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`).join("") : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
+  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`).join("")) : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
   bindWorkspaceActions();
 }
 
