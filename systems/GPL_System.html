@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>GPL System · MyVault OS</title>
+  <style>
+    :root { color-scheme: light; font: 15px/1.5 "Segoe UI", Arial, sans-serif; color: #1e293b; background: #f3f5f8; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+    header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #dce2ea; }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand a { color: #465569; text-decoration: none; font-size: 14px; }
+    .brand strong { color: #15243a; font-size: 16px; }
+    button, .button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 14px; border: 0; border-radius: 8px; background: #315de8; color: #fff; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
+    button.secondary, .button.secondary { color: #26364e; background: #edf1f6; }
+    button:hover, .button:hover { filter: brightness(.96); }
+    #lock[hidden], #gate[hidden], #system[hidden], #clear[hidden] { display: none; }
+    #gate { width: min(640px, calc(100% - 32px)); margin: 9vh auto; padding: 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; }
+    #gate h1 { margin: 0 0 8px; font-size: 23px; }
+    #gate p { color: #59677a; margin: 8px 0 18px; }
+    #message { min-height: 24px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+    .note { margin-top: 18px !important; font-size: 13px; }
+    #system { flex: 1; min-height: 0; }
+    #system iframe { display: block; width: 100%; height: calc(100vh - 58px); border: 0; background: #fff; }
+    @media (max-width: 520px) { header { padding: 9px 12px; } .brand { gap: 8px; } .brand strong { font-size: 14px; } #gate { padding: 22px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <a href="../index.html">← MyVault OS</a>
+      <strong>GPL System</strong>
+    </div>
+    <button id="lock" class="secondary" type="button" hidden>Sign out &amp; lock</button>
+  </header>
+  <main id="gate">
+    <h1>Sign in required</h1>
+    <p id="message">Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.</p>
+    <div class="actions">
+      <a class="button" href="../index.html" target="_blank" rel="noopener noreferrer">Open MyVault OS sign-in</a>
+      <button id="retry" class="secondary" type="button">Check sign-in</button>
+      <button id="clear" class="secondary" type="button" hidden>Clear sign-in</button>
+    </div>
+    <p class="note">After signing in, return to this page. The GPL system will load automatically when access is confirmed.</p>
+  </main>
+  <section id="system" hidden aria-label="GPL accounting system"></section>
+  <script>
+    const API = "https://myvault-api.anthonym-354.workers.dev";
+    const TOKEN_KEY = "myvault_token";
+    const gate = document.querySelector("#gate");
+    const message = document.querySelector("#message");
+    const system = document.querySelector("#system");
+    const lockButton = document.querySelector("#lock");
+    const retryButton = document.querySelector("#retry");
+    const clearButton = document.querySelector("#clear");
+    let loading = false;
+
+    function showGate(text, denied = false) {
+      system.replaceChildren();
+      system.hidden = true;
+      gate.hidden = false;
+      lockButton.hidden = true;
+      message.textContent = text;
+      clearButton.hidden = !denied;
+    }
+
+    async function loadSystem() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.");
+        return;
+      }
+      if (loading) return;
+      loading = true;
+      message.textContent = "Checking your GitHub access and loading GPL…";
+      gate.hidden = false;
+      clearButton.hidden = true;
+      try {
+        const response = await fetch(API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          cache: "no-store",
+          body: JSON.stringify({ action: "gpl-system" })
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          if (response.status === 401 || response.status === 403) {
+            showGate(result.error || "This GitHub account cannot access the private GPL repository.", true);
+          } else {
+            showGate(result.error || "GPL could not be loaded. Please try again.", false);
+          }
+          return;
+        }
+        if (localStorage.getItem(TOKEN_KEY) !== token) {
+          showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+          return;
+        }
+        const html = await response.text();
+        if (!html.trim()) {
+          showGate("The private GPL system returned an empty file. Please contact the administrator.", false);
+          return;
+        }
+        const frame = document.createElement("iframe");
+        frame.title = "GPL System";
+        frame.referrerPolicy = "no-referrer";
+        frame.srcdoc = html;
+        system.replaceChildren(frame);
+        gate.hidden = true;
+        system.hidden = false;
+        lockButton.hidden = false;
+      } catch {
+        showGate("Could not reach the GPL access service. Check your connection and try again.", false);
+      } finally {
+        loading = false;
+      }
+    }
+
+    retryButton.addEventListener("click", () => {
+      if (localStorage.getItem(TOKEN_KEY)) loadSystem();
+      else message.textContent = "No MyVault sign-in was found in this browser. Open MyVault OS and sign in first.";
+    });
+    clearButton.addEventListener("click", () => {
+      localStorage.removeItem(TOKEN_KEY);
+      showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.");
+    });
+    lockButton.addEventListener("click", () => {
+      localStorage.removeItem(TOKEN_KEY);
+      showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+    });
+    window.addEventListener("storage", (event) => {
+      if (event.key !== TOKEN_KEY) return;
+      if (!event.newValue) showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+      else loadSystem();
+    });
+    window.addEventListener("focus", () => {
+      if (!localStorage.getItem(TOKEN_KEY)) showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+      else if (!gate.hidden) loadSystem();
+    });
+    loadSystem();
+  </script>
+</body>
+</html>
