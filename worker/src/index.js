@@ -2,6 +2,8 @@ import { handleQwen, AIError, readBoundedJSON } from "./qwen.js";
 
 const GITHUB_CONTENTS_URL =
   "https://api.github.com/repos/anthonymankaho/myvault-data/contents/vault.json";
+const GPL_SYSTEM_CONTENTS_URL =
+  "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main";
 const GITHUB_OAUTH_URL = "https://github.com/login/oauth/access_token";
 const DEFAULT_ORIGIN = "https://myvault-os.pages.dev";
 
@@ -183,6 +185,50 @@ async function handleSave(payload, authorization, origin) {
   }
 }
 
+async function handleGplSystem(authorization, origin) {
+  if (origin !== "https://anthonymankaho.github.io") {
+    return errorResponse("Origin is not allowed.", 403, origin);
+  }
+  if (!/^Bearer\s+\S+$/i.test(authorization ?? "")) {
+    return errorResponse("A signed-in GitHub account is required.", 401, origin);
+  }
+
+  try {
+    const response = await fetch(GPL_SYSTEM_CONTENTS_URL, {
+      headers: {
+        ...githubHeaders(authorization),
+        Accept: "application/vnd.github.raw+json"
+      }
+    });
+
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      return errorResponse(
+        "This GitHub account cannot access the private GPL system.",
+        403,
+        origin
+      );
+    }
+    if (!response.ok || !response.body) {
+      return errorResponse("The private GPL system could not be loaded.", 502, origin);
+    }
+
+    return new Response(response.body, {
+      status: 200,
+      headers: {
+        ...corsHeaders(origin),
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store, max-age=0",
+        Pragma: "no-cache",
+        Vary: "Origin",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      }
+    });
+  } catch {
+    return errorResponse("The private GPL system could not be loaded.", 502, origin);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin");
@@ -240,6 +286,8 @@ export default {
       }
       case "auth":
         return handleAuth(payload, env, origin);
+      case "gpl-system":
+        return handleGplSystem(request.headers.get("Authorization"), origin);
       case "load":
       case "save": {
         const authorization = request.headers.get("Authorization");
