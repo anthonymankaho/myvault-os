@@ -10,16 +10,25 @@
       * { box-sizing: border-box; }
       html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
       body { position: relative; background: radial-gradient(ellipse at 50% 38%, #1c3140, #071018 72%); }
+      #game { position: absolute; inset: 0; }
       #scene { position: absolute; inset: 0; }
       #scene canvas { display: block; width: 100%; height: 100%; }
-      .topline, .hud, .overlay, .touch-controls, .toast { position: absolute; z-index: 2; }
-      .topline { top: max(16px, env(safe-area-inset-top)); right: 18px; left: 18px; display: flex; align-items: flex-start; justify-content: space-between; pointer-events: none; }
+      .topline, .hud, .overlay, .touch-controls, .toast { position: absolute; }
+      .hud, .toast { z-index: 2; }
+      .touch-controls { z-index: 3; }
+      .overlay { z-index: 5; }
+      .topline { z-index: 6; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); left: max(12px, env(safe-area-inset-left)); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; pointer-events: none; }
+      .topline-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 100%; pointer-events: auto; }
       .brand { display: grid; gap: 3px; text-shadow: 0 2px 16px #071018; }
       .brand small, .stat small, .speed-label, .control-hint { color: #a5b5c1; font: 600 9px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .17em; text-transform: uppercase; }
       .brand strong { color: #fff0d3; font: 400 23px/1.1 Georgia, serif; letter-spacing: -.03em; }
       .icon-button { min-width: 40px; height: 38px; border: 1px solid #91b2ba55; border-radius: 10px; color: #dce8e4; background: #0b1824aa; font: 600 11px ui-monospace, monospace; cursor: pointer; backdrop-filter: blur(12px); }
       .icon-button:hover { border-color: #a1f4d2; color: #a1f4d2; }
-      .hud { top: 72px; right: 18px; left: 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
+      .fullscreen-button, .pause-button { padding: 0 12px; white-space: nowrap; }
+      .mode-switch { display: flex; overflow: hidden; border: 1px solid #91b2ba55; border-radius: 10px; background: #0b1824aa; backdrop-filter: blur(12px); }
+      .mode-switch button { min-height: 38px; padding: 0 10px; border: 0; color: #dce8e4; background: transparent; font: 600 10px ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; }
+      .mode-switch button[aria-pressed="true"] { color: #072019; background: #7ce4c8; }
+      .hud { top: calc(max(12px, env(safe-area-inset-top)) + 52px); right: max(12px, env(safe-area-inset-right)); left: max(12px, env(safe-area-inset-left)); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
       .stats { display: flex; gap: 8px; }
       .stat { min-width: 78px; padding: 10px 12px; border: 1px solid #6c87904a; border-radius: 10px; background: #08141ca8; backdrop-filter: blur(12px); }
       .stat small { display: block; font-size: 8px; }
@@ -28,13 +37,13 @@
       .speed-box { min-width: 104px; padding: 7px 13px 9px; border: 1px solid #6c87904a; border-radius: 10px; text-align: right; background: #08141ca8; backdrop-filter: blur(12px); }
       .speed-box strong { display: inline-block; color: #e5f8ee; font: 500 34px/.95 ui-monospace, monospace; letter-spacing: -.08em; }
       .speed-label { display: block; margin-top: 4px; }
-      .nitro { position: absolute; top: 143px; right: 18px; width: 180px; }
+      .nitro { position: absolute; top: calc(max(12px, env(safe-area-inset-top)) + 124px); right: max(12px, env(safe-area-inset-right)); width: 180px; }
       .nitro-label { display: flex; justify-content: space-between; margin-bottom: 5px; color: #bed0d3; font: 600 8px ui-monospace, monospace; letter-spacing: .15em; }
       .nitro-track { height: 5px; overflow: hidden; border-radius: 99px; background: #7f929744; }
       .nitro-fill { width: 100%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6cf4d5, #ffb46d); box-shadow: 0 0 12px #62e8cf; transition: width .12s linear; }
-      .lap-progress { position: absolute; right: 18px; bottom: 22px; left: 18px; height: 3px; overflow: hidden; background: #dcece52a; }
+      .lap-progress { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); height: 3px; overflow: hidden; background: #dcece52a; }
       .lap-progress span { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #69e7d2, #ffb078); box-shadow: 0 0 12px #76eedb; }
-      .overlay { inset: 0; display: grid; place-items: center; padding: 24px; background: linear-gradient(90deg, #06101899, #07101833 55%, #07101888); backdrop-filter: blur(2px); transition: opacity .2s ease; }
+      .overlay { inset: 0; display: grid; place-items: center; padding: calc(max(12px, env(safe-area-inset-top)) + 58px) 24px 24px; background: linear-gradient(90deg, #06101899, #07101833 55%, #07101888); backdrop-filter: blur(2px); transition: opacity .2s ease; }
       .overlay[hidden] { display: none; }
       .overlay-card { width: min(440px, 100%); padding: clamp(24px, 5vw, 42px); border: 1px solid #95b7b946; border-radius: 18px; background: linear-gradient(145deg, #13232be8, #0b131beF); box-shadow: 0 28px 90px #02070bc9; }
       .eyebrow { margin: 0 0 10px; color: #75dfcc; font: 700 9px ui-monospace, monospace; letter-spacing: .2em; }
@@ -48,26 +57,42 @@
       .best { margin: 13px 0 0; color: #99aeb4; font: 600 9px ui-monospace, monospace; letter-spacing: .12em; text-align: center; text-transform: uppercase; }
       .overlay-actions { display: flex; gap: 8px; margin-top: 9px; }
       .overlay-actions .icon-button { flex: 1; }
-      .touch-controls { right: 14px; bottom: 30px; left: 14px; display: none; justify-content: space-between; align-items: end; pointer-events: none; }
-      .touch-group { display: flex; gap: 8px; pointer-events: auto; }
-      .touch-btn { width: 54px; height: 50px; border: 1px solid #c0eee35c; border-radius: 14px; color: #e5f6ee; background: #0b1b24ad; font: 700 10px ui-monospace, monospace; backdrop-filter: blur(12px); touch-action: none; user-select: none; }
-      .touch-btn:active, .touch-btn.active { color: #072019; background: #7ce4c8; }
+      .touch-controls { right: max(8px, env(safe-area-inset-right)); bottom: max(28px, env(safe-area-inset-bottom)); left: max(8px, env(safe-area-inset-left)); display: none; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; }
+      .touch-controls:not([hidden]) { display: flex; }
+      .touch-group { display: flex; flex: 0 0 auto; gap: 8px; align-items: end; pointer-events: auto; touch-action: none; overscroll-behavior: contain; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      .touch-btn { width: clamp(64px, 12vw, 104px); height: clamp(64px, 12vw, 96px); border: 1px solid #c0eee366; border-radius: 18px; color: #e5f6ee; background: #0b1b2478; font: 700 12px ui-monospace, monospace; letter-spacing: .04em; backdrop-filter: blur(12px); touch-action: none; user-select: none; -webkit-user-select: none; }
+      .touch-steer .touch-btn { width: clamp(72px, 14vw, 112px); height: clamp(72px, 14vw, 112px); font-size: 22px; }
+      .touch-btn:active, .touch-btn.active { color: #072019; background: #7ce4c8cc; }
+      body.show-touch .lap-progress { bottom: calc(max(28px, env(safe-area-inset-bottom)) + clamp(88px, 16vh, 128px)); }
+      html.viewport-fill, html.viewport-fill body, html.viewport-fill #game { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; }
       .toast { top: 50%; left: 50%; padding: 12px 18px; border: 1px solid #ffffff38; border-radius: 999px; color: #fff0db; background: #0b1922d9; font: 700 12px ui-monospace, monospace; letter-spacing: .08em; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; transition: opacity .16s ease; }
       .toast.show { opacity: 1; }
       @media (max-width: 650px) {
-        .topline { top: max(10px, env(safe-area-inset-top)); right: 10px; left: 10px; }
+        .topline { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); left: max(10px, env(safe-area-inset-left)); }
         .brand strong { font-size: 19px; }
-        .hud { top: 61px; right: 10px; left: 10px; gap: 5px; }
+        .hud { right: 10px; left: 10px; gap: 5px; }
         .stats { gap: 5px; }
         .stat { min-width: 62px; padding: 8px 8px; }
         .stat strong { font-size: 16px; }
         .stat small { font-size: 7px; letter-spacing: .1em; }
         .speed-box { min-width: 82px; padding: 6px 8px; }
         .speed-box strong { font-size: 29px; }
-        .nitro { top: 124px; right: 10px; width: 132px; }
-        .touch-controls { display: flex; }
-        .lap-progress { right: 10px; bottom: 12px; left: 10px; }
+        .nitro { top: calc(max(8px, env(safe-area-inset-top)) + 112px); right: 10px; width: 132px; }
+        .hud { top: calc(max(8px, env(safe-area-inset-top)) + 86px); }
+        .lap-progress { right: 10px; left: 10px; }
         .control-hint { display: none; }
+        .mode-switch button { padding: 0 7px; }
+      }
+      @media (max-width: 560px) {
+        .touch-group { gap: 6px; }
+        .touch-btn { width: clamp(52px, 15vw, 68px); height: 68px; font-size: 11px; }
+        .touch-steer .touch-btn { width: clamp(60px, 17vw, 74px); height: 68px; font-size: 20px; }
+      }
+      @media (max-height: 500px) {
+        .touch-btn { width: 64px; height: 56px; font-size: 11px; }
+        .touch-steer .touch-btn { width: 60px; height: 60px; font-size: 18px; }
+        .touch-controls { bottom: max(8px, env(safe-area-inset-bottom)); }
+        body.show-touch .lap-progress { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 72px); }
       }
       @media (max-height: 500px) and (orientation: landscape) {
         .overlay-card { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; width: min(700px, 100%); padding: 18px 24px; }
@@ -80,8 +105,20 @@
     </style>
   </head>
   <body>
+    <div id="game">
     <div id="scene" aria-hidden="true"></div>
-    <div class="topline"><div class="brand"><small>MYVAULT ARCADE / GAME 01</small><strong>Neon Apex</strong></div><button class="icon-button" id="fullscreen" type="button" aria-label="Enter full screen">FULL</button></div>
+    <div class="topline">
+      <div class="brand"><small>MYVAULT ARCADE / GAME 01</small><strong>Neon Apex</strong></div>
+      <div class="topline-actions">
+        <div class="mode-switch" role="group" aria-label="Control mode">
+          <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-mode="touch" aria-pressed="false">Touch</button>
+          <button type="button" data-mode="keyboard" aria-pressed="false">Keyboard</button>
+        </div>
+        <button class="icon-button pause-button" id="pause-race" type="button" hidden>Pause</button>
+        <button class="icon-button fullscreen-button" id="fullscreen" type="button" aria-pressed="false" aria-label="Enter fullscreen">Fullscreen</button>
+      </div>
+    </div>
     <section class="hud" id="hud" aria-label="Race status" hidden>
       <div class="stats"><div class="stat"><small>Lap</small><strong id="lap">1 / 3</strong></div><div class="stat"><small>Position</small><strong id="position" class="position">4 / 4</strong></div><div class="stat"><small>Time</small><strong id="time">00:00</strong></div></div>
       <div class="speed-box"><strong id="speed">000</strong><span class="speed-label">KM / H</span></div>
@@ -91,10 +128,30 @@
     <section class="overlay" id="start-screen">
       <div class="overlay-card"><p class="eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps. Three rivals. One clean line through the city lights. Keep your speed up and save boost for the long straight.</p><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div></div><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
     </section>
-    <div class="touch-controls" aria-label="Touch race controls"><div class="touch-group"><button class="touch-btn" type="button" data-control="left">◀</button><button class="touch-btn" type="button" data-control="right">▶</button></div><div class="touch-group"><button class="touch-btn" type="button" data-control="brake">BRAKE</button><button class="touch-btn" type="button" data-control="boost">BOOST</button><button class="touch-btn" type="button" data-control="gas">GAS</button></div></div>
+    <div class="touch-controls" id="touch-controls" hidden aria-label="Touch race controls">
+      <div class="touch-group touch-steer">
+        <button class="touch-btn" type="button" data-control="left" aria-label="Steer left">◀</button>
+        <button class="touch-btn" type="button" data-control="right" aria-label="Steer right">▶</button>
+      </div>
+      <div class="touch-group touch-actions">
+        <button class="touch-btn" type="button" data-control="gas" aria-label="Accelerate">GAS</button>
+        <button class="touch-btn" type="button" data-control="brake" aria-label="Brake">BRAKE</button>
+        <button class="touch-btn" type="button" data-control="boost" aria-label="Nitro">NITRO</button>
+      </div>
+    </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+      import {
+        CONTROL_MODE_KEY,
+        chooseFullscreenAction,
+        createPointerTracker,
+        detectTouchCapable,
+        normalizeControlMode,
+        shouldClearTouches,
+        touchControlsVisible,
+      } from "./neon-apex-input.mjs";
 
       const $ = (id) => document.getElementById(id);
       const sceneHost = $("scene");
@@ -231,7 +288,13 @@
       const player = racers[0];
       const state = { phase: "ready", speed: 0, lane: 0, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: Number(localStorage.getItem("myvault_neon_apex_best") || 0), collision: 0, lastStamp: 0, lastHud: 0, toastTimer: 0 };
       const keys = new Set();
-      const held = { left: false, right: false, gas: false, brake: false, boost: false };
+      const touchInput = createPointerTracker();
+      const held = touchInput.held;
+      const controlButtons = [...document.querySelectorAll("[data-control]")];
+      const touchCapable = detectTouchCapable(navigator, window);
+      let controlMode = "auto";
+      try { controlMode = normalizeControlMode(localStorage.getItem(CONTROL_MODE_KEY)); } catch { controlMode = "auto"; }
+      let viewportFill = false;
       const totalLaps = 3;
       const lapEl = $("lap"), positionEl = $("position"), timeEl = $("time"), speedEl = $("speed"), boostEl = $("boost"), boostPctEl = $("boost-pct"), progressEl = $("progress-fill");
       const overlay = $("start-screen"), overlayTitle = $("overlay-title"), overlayCopy = $("overlay-copy"), startButton = $("start-race"), hud = $("hud");
@@ -246,14 +309,14 @@
       }
       function showToast(text) { const toast = $("toast"); toast.textContent = text; toast.classList.add("show"); clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => toast.classList.remove("show"), 900); }
       function startRace() {
-        if (state.phase === "paused") { state.phase = "racing"; overlay.hidden = true; return; }
+        if (state.phase === "paused") { state.phase = "racing"; overlay.hidden = true; syncPauseButton(); return; }
         state.phase = "racing"; state.speed = 80; state.lane = 0; state.progress = .015; state.lap = 0; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0;
         player.progress = state.progress; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
         racers.forEach((racer) => { if (!racer.player) { racer.speed = racer.target; racer.laps = 0; } });
-        overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; updateHud();
+        overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; updateHud(); syncPauseButton();
       }
-      function pauseRace() { if (state.phase !== "racing") return; state.phase = "paused"; setOverlay("paused"); }
-      function finishRace() { state.phase = "finished"; state.finishPosition = currentPosition(); state.speed = 0; setOverlay("finished"); }
+      function pauseRace() { if (state.phase !== "racing") return; clearAllTouches("pause"); state.phase = "paused"; setOverlay("paused"); syncPauseButton(); }
+      function finishRace() { state.phase = "finished"; state.finishPosition = currentPosition(); state.speed = 0; setOverlay("finished"); syncPauseButton(); }
       function currentPosition() {
         const ordered = racers.map((racer, index) => ({ racer, index, score: (racer.player ? state.lap : racer.laps || 0) + racer.progress } )).sort((a, b) => b.score - a.score);
         return ordered.findIndex((entry) => entry.index === 0) + 1;
@@ -327,31 +390,147 @@
         camera.lookAt(carPos.clone().add(forward.clone().multiplyScalar(10)).add(new THREE.Vector3(0, 1.0, 0)));
         renderer.render(scene, camera);
       }
-      function resize() { const width = sceneHost.clientWidth, height = sceneHost.clientHeight; if (!width || !height) return; camera.aspect = width / height; camera.fov = width < 650 ? 67 : 58; camera.updateProjectionMatrix(); renderer.setSize(width, height, false); }
-      window.addEventListener("resize", resize); resize();
+      function syncTouchButtons() {
+        for (const button of controlButtons) button.classList.toggle("active", Boolean(held[button.dataset.control]));
+      }
+      function clearPointer(pointerId, reason) {
+        if (!shouldClearTouches(reason)) return;
+        touchInput.release(pointerId);
+        syncTouchButtons();
+      }
+      function clearAllTouches(reason) {
+        if (!shouldClearTouches(reason)) return;
+        const ids = touchInput.releaseAll();
+        for (const button of controlButtons) {
+          for (const id of ids) {
+            if (button.hasPointerCapture?.(id)) {
+              try { button.releasePointerCapture(id); } catch { /* capture already ended */ }
+            }
+          }
+        }
+        syncTouchButtons();
+      }
+      function syncPauseButton() { $("pause-race").hidden = state.phase !== "racing"; }
+      function applyControlMode(mode) {
+        controlMode = normalizeControlMode(mode);
+        const show = touchControlsVisible(controlMode, touchCapable);
+        $("touch-controls").hidden = !show;
+        document.body.classList.toggle("show-touch", show);
+        for (const button of document.querySelectorAll("[data-mode]")) {
+          button.setAttribute("aria-pressed", String(button.dataset.mode === controlMode));
+        }
+        try { localStorage.setItem(CONTROL_MODE_KEY, controlMode); } catch { /* private browsing */ }
+        if (!show) { touchInput.releaseAll(); syncTouchButtons(); }
+      }
+      function isNativeFullscreen() { return Boolean(document.fullscreenElement || document.webkitFullscreenElement); }
+      function updateFullscreenButton() {
+        const active = isNativeFullscreen() || viewportFill;
+        const button = $("fullscreen");
+        button.textContent = active ? "Exit fullscreen" : "Fullscreen";
+        button.setAttribute("aria-pressed", String(active));
+        button.setAttribute("aria-label", active ? "Exit fullscreen" : "Enter fullscreen");
+      }
+      function setViewportFill(active) {
+        viewportFill = active;
+        document.documentElement.classList.toggle("viewport-fill", active);
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: "myvault-neon-apex", action: "fullscreen", active }, window.location.origin);
+        }
+        updateFullscreenButton();
+        requestAnimationFrame(resize);
+      }
+      async function toggleFullscreen() {
+        const root = $("game");
+        const action = chooseFullscreenAction({
+          nativeActive: isNativeFullscreen(),
+          fallbackActive: viewportFill,
+          nativeSupported: Boolean(root.requestFullscreen || root.webkitRequestFullscreen),
+        });
+        if (action === "exit") {
+          if (isNativeFullscreen()) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) { try { await exit.call(document); } catch { /* fall through */ } }
+          }
+          if (viewportFill) setViewportFill(false);
+          updateFullscreenButton();
+          resize();
+          return;
+        }
+        if (action === "request-native") {
+          const request = root.requestFullscreen || root.webkitRequestFullscreen;
+          try {
+            await request.call(root);
+            updateFullscreenButton();
+            resize();
+            return;
+          } catch { /* iOS and blocked embeds use the viewport fallback */ }
+        }
+        setViewportFill(true);
+      }
+      function resize() {
+        const width = sceneHost.clientWidth, height = sceneHost.clientHeight;
+        if (!width || !height) return;
+        camera.aspect = width / height;
+        camera.fov = width < 650 ? 67 : 58;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height, false);
+      }
+      window.addEventListener("resize", resize);
+      window.addEventListener("orientationchange", () => requestAnimationFrame(resize));
+      window.visualViewport?.addEventListener("resize", resize);
+      document.addEventListener("fullscreenchange", () => { updateFullscreenButton(); resize(); });
+      document.addEventListener("webkitfullscreenchange", () => { updateFullscreenButton(); resize(); });
+      new ResizeObserver(() => resize()).observe(sceneHost);
+      resize();
       tick();
       $("start-race").addEventListener("click", startRace);
       $("pause-from-overlay").addEventListener("click", startRace);
-      $("help-button").addEventListener("click", () => showToast("ARROWS STEER · UP GAS · DOWN BRAKE · SHIFT BOOST"));
+      $("pause-race").addEventListener("click", pauseRace);
+      $("help-button").addEventListener("click", () => showToast("ARROWS OR TOUCH · UP GAS · DOWN BRAKE · SHIFT NITRO"));
       window.addEventListener("keydown", (event) => {
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
         keys.add(event.code);
+        if (event.code === "Escape" && viewportFill) setViewportFill(false);
         if ((event.code === "Escape" || event.code === "KeyP") && state.phase === "racing") pauseRace();
         else if (event.code === "Enter" && state.phase !== "racing") startRace();
       });
       window.addEventListener("keyup", (event) => keys.delete(event.code));
-      window.addEventListener("blur", () => { keys.clear(); Object.keys(held).forEach((key) => held[key] = false); if (state.phase === "racing") pauseRace(); });
-      document.querySelectorAll("[data-control]").forEach((button) => {
-        const key = button.dataset.control;
-        const down = (event) => { event.preventDefault(); held[key] = true; button.classList.add("active"); };
-        const up = () => { held[key] = false; button.classList.remove("active"); };
-        button.addEventListener("pointerdown", down); button.addEventListener("pointerup", up); button.addEventListener("pointercancel", up); button.addEventListener("pointerleave", up);
+      window.addEventListener("blur", () => { keys.clear(); clearAllTouches("blur"); if (state.phase === "racing") pauseRace(); });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") { clearAllTouches("visibilityhidden"); if (state.phase === "racing") pauseRace(); }
       });
-      $("fullscreen").addEventListener("click", async () => {
-        try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); }
-        catch { showToast("FULL SCREEN IS NOT AVAILABLE HERE"); }
-      });
+      window.addEventListener("pagehide", () => clearAllTouches("pagehide"));
+      for (const button of controlButtons) {
+        button.addEventListener("pointerdown", (event) => {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          event.preventDefault();
+          try { button.setPointerCapture(event.pointerId); } catch { /* capture is optional if the pointer already ended */ }
+          touchInput.press(event.pointerId, button.dataset.control);
+          syncTouchButtons();
+        });
+        const endPointer = (event) => {
+          const reason = event.type === "pointercancel" ? "pointercancel" : "pointerup";
+          if (button.hasPointerCapture?.(event.pointerId)) {
+            try { button.releasePointerCapture(event.pointerId); } catch { /* already released */ }
+          }
+          clearPointer(event.pointerId, reason);
+        };
+        button.addEventListener("pointerup", endPointer);
+        button.addEventListener("pointercancel", endPointer);
+        button.addEventListener("lostpointercapture", (event) => clearPointer(event.pointerId, "lostpointercapture"));
+        button.addEventListener("contextmenu", (event) => event.preventDefault());
+      }
+      window.addEventListener("pointerup", (event) => clearPointer(event.pointerId, "pointerup"));
+      window.addEventListener("pointercancel", (event) => clearPointer(event.pointerId, "pointercancel"));
+      for (const button of document.querySelectorAll("[data-mode]")) {
+        button.addEventListener("click", () => applyControlMode(button.dataset.mode));
+      }
+      $("fullscreen").addEventListener("click", () => { toggleFullscreen(); });
+      applyControlMode(controlMode);
+      updateFullscreenButton();
+      syncPauseButton();
       setOverlay("ready");
+      document.documentElement.dataset.neonApex = "ready";
     </script>
   </body>
 </html>
