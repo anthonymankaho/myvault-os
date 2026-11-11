@@ -723,7 +723,7 @@ function renderGames() {
   neonApexArea = area;
   neonApexFrame = frame;
   viewContainer.querySelector("#launch-neon-apex").addEventListener("click", () => {
-    frame.src = "games/neon-apex.html?v=touch-1";
+    frame.src = "games/neon-apex.html?v=maps-1";
     area.hidden = false;
     area.scrollIntoView({ behavior: "smooth", block: "start" });
   });

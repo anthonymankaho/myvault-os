@@ -45,7 +45,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 
 ## Games
 
-The **Games** view is a first-class workspace section alongside Projects, Skills, Documents, and Chats. Its built-in **Neon Apex** arcade racer runs in an isolated page, so game controls and saved lap times do not modify or sync with the personal vault. Use the arrow keys to steer and accelerate or brake, hold Shift for boost, and press Escape or P to pause. Touch steering, gas, brake, and nitro appear when the device can touch, and the Auto / Touch / Keyboard control can force them on. Fullscreen expands the whole game, with a viewport-filling fallback where the Fullscreen API is unavailable. The best lap is stored in the current browser only.
+The **Games** view is a first-class workspace section alongside Projects, Skills, Documents, and Chats. Its built-in **Neon Apex** arcade racer runs in an isolated page, so game controls and saved lap times do not modify or sync with the personal vault. Use the arrow keys to steer and accelerate or brake, hold Shift for boost, and press Escape or P to pause. Touch steering, gas, brake, and nitro appear when the device can touch, and the Auto / Touch / Keyboard control can force them on. Fullscreen expands the whole game, with a viewport-filling fallback where the Fullscreen API is unavailable. Pick one of three maps before a race: Night Circuit (the original oval), Harbour Lights (long waterfront straights and tight hairpins), or Dusk Ridge (uneven canyon sweepers). Each map keeps its own best lap, stored in the current browser only.
 
 The game source is `games/neon-apex.html`; it is served as a separate iframe page from the Games library.
 
