@@ -468,7 +468,16 @@ function startVoiceInput() {
   recognition.start();
 }
 
+let neonApexFrame = null;
+let neonApexArea = null;
+
+function setNeonApexFullscreen(active) {
+  neonApexArea?.classList.toggle("game-play-fill", active);
+  document.body.classList.toggle("game-viewport-lock", active);
+}
+
 function render() {
+  if (state.view !== "games") setNeonApexFullscreen(false);
   document.body.classList.toggle("constellation-home", state.view === "home");
   document.querySelector(".skip-link")?.setAttribute("href", state.view === "home" ? "#orbit-main" : "#main");
   const mapContainer = document.querySelector("#constellation-background");
@@ -705,18 +714,21 @@ function renderGames() {
       </div>
       <div class="game-play-area" id="game-play-area" hidden>
         <div class="game-play-heading"><div><p class="eyebrow">NOW PLAYING</p><h2>Neon Apex</h2></div><button class="button button-quiet" id="close-neon-apex" type="button">Back to Games</button></div>
-        <iframe class="game-frame" id="neon-apex-frame" title="Neon Apex 3D racing game" loading="lazy" allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
+        <iframe class="game-frame" id="neon-apex-frame" title="Neon Apex 3D racing game" loading="lazy" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="no-referrer"></iframe>
       </div>
       <p class="game-library-note">Games are separate from your synced vault records. Your best lap is saved only in this browser.</p>
     </section>`;
   const area = viewContainer.querySelector("#game-play-area");
   const frame = viewContainer.querySelector("#neon-apex-frame");
+  neonApexArea = area;
+  neonApexFrame = frame;
   viewContainer.querySelector("#launch-neon-apex").addEventListener("click", () => {
     frame.src = "games/neon-apex.html";
     area.hidden = false;
     area.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   viewContainer.querySelector("#close-neon-apex").addEventListener("click", () => {
+    setNeonApexFullscreen(false);
     frame.src = "about:blank";
     area.hidden = true;
   });
@@ -2107,12 +2119,18 @@ loginButton.addEventListener("click", () => {
 });
 
 window.addEventListener("message", (event) => {
-  if (
-    event.origin !== window.location.origin ||
-    event.data?.type !== "myvault-oauth"
-  ) {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.type === "myvault-neon-apex") {
+    if (
+      neonApexFrame &&
+      event.source === neonApexFrame.contentWindow &&
+      event.data.action === "fullscreen"
+    ) {
+      setNeonApexFullscreen(Boolean(event.data.active));
+    }
     return;
   }
+  if (event.data?.type !== "myvault-oauth") return;
   if (event.data.error) {
     setStatus(event.data.error, "error");
     return;
