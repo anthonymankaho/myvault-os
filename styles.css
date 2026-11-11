@@ -39,6 +39,46 @@ body {
   background: radial-gradient(ellipse at 61% 42%, #162536 0, #101827 42%, #080e12 100%);
   transition: opacity 220ms ease;
 }
+
+/* Games library */
+.games-library { display: grid; gap: 24px; }
+.game-cover { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr); min-height: 360px; overflow: hidden; border: 1px solid #273c42; border-radius: 18px; background: linear-gradient(130deg, #132126, #17201f 62%, #1e2922); box-shadow: 0 24px 70px #05090a55; }
+.game-cover-art { position: relative; min-height: 360px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #f4a56c 0, #d66c56 14%, #4c3652 39%, #1a2635 67%, #10181e 100%); }
+.game-cover-art::before { position: absolute; inset: 0; content: ""; background: linear-gradient(180deg, transparent 45%, #111719 100%); }
+.game-sun { position: absolute; top: 16%; left: 50%; width: 112px; aspect-ratio: 1; border-radius: 50%; transform: translateX(-50%); background: linear-gradient(#ffd0a0, #f29173); box-shadow: 0 0 75px #f38c6880; }
+.game-horizon { position: absolute; right: -20%; bottom: 22%; left: -20%; height: 38%; border-radius: 50% 50% 0 0; background: linear-gradient(180deg, #243b46, #111719); }
+.game-track { position: absolute; bottom: -42%; left: 50%; width: 92%; height: 85%; border: 38px solid #252b32; border-radius: 50%; transform: translateX(-50%) perspective(150px) rotateX(55deg); box-shadow: 0 0 0 3px #df806e, 0 0 40px #f2876a45; }
+.game-track::before { position: absolute; inset: 0; border: 2px dashed #f7d7a2; border-radius: 50%; content: ""; }
+.game-track span { position: absolute; top: 50%; left: 50%; width: 5px; height: 76px; background: #fff4d6; transform: translate(-50%, -50%); }
+.game-track span:nth-child(2) { transform: translate(-50%, -50%) rotate(90deg); }
+.game-track span:nth-child(3) { transform: translate(-50%, -50%) rotate(45deg); }
+.game-car { position: absolute; z-index: 1; bottom: 22%; left: 49%; width: 68px; height: 104px; border: 1px solid #ffffff40; border-radius: 22px 22px 12px 12px; background: linear-gradient(90deg, #8a284f, #f55668 48%, #a52c52); box-shadow: 0 12px 20px #06090e90, 0 0 30px #f34f68aa; transform: translateX(-50%) perspective(200px) rotateX(18deg); }
+.game-car::before { position: absolute; top: 22px; right: 12px; left: 12px; height: 35px; border: 1px solid #ffffff38; border-radius: 12px 12px 5px 5px; background: linear-gradient(135deg, #b2e4e8, #324958 72%); content: ""; }
+.game-car i { position: absolute; right: -6px; bottom: 15px; left: -6px; height: 8px; border-radius: 50%; background: #ffe0b2; box-shadow: 0 0 12px #ffb06a; }
+.game-car-rival { z-index: 0; bottom: 32%; left: 69%; width: 48px; height: 74px; background: linear-gradient(90deg, #177a81, #45c4b8 48%, #1b777c); transform: translateX(-50%) perspective(200px) rotateX(18deg) rotateZ(12deg); }
+.game-car-rival::before { top: 16px; right: 9px; left: 9px; height: 25px; }
+.game-cover-tag { position: absolute; z-index: 2; top: 20px; left: 22px; color: #f9cfaa; font: 600 10px/1.4 ui-monospace, monospace; letter-spacing: .2em; }
+.game-cover-tag b { margin-left: 8px; color: #fff; }
+.game-cover-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: clamp(28px, 5vw, 58px); }
+.game-cover-copy .eyebrow, .game-play-heading .eyebrow { color: #f2a47e; }
+.game-cover-copy h2 { margin: 0; color: #fff2df; font: 400 clamp(34px, 5vw, 52px)/1.1 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
+.game-cover-copy > p:not(.eyebrow) { max-width: 430px; margin: 16px 0; color: #aebbbb; line-height: 1.75; }
+.game-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
+.game-facts span { padding: 6px 10px; border: 1px solid #425253; border-radius: 99px; color: #c5d0ca; font-size: 11px; }
+.game-cover-copy .button { gap: 12px; }
+.game-play-area { display: grid; gap: 12px; scroll-margin-top: 24px; }
+.game-play-area[hidden] { display: none; }
+.game-play-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.game-play-heading .eyebrow { margin: 0 0 4px; }
+.game-play-heading h2 { margin: 0; font: 400 26px/1.2 Georgia, "Times New Roman", serif; }
+.game-frame { display: block; width: 100%; height: min(72vh, 760px); min-height: 520px; border: 1px solid #2a3c40; border-radius: 14px; background: #081016; box-shadow: 0 22px 60px #0005; }
+.game-library-note { margin: 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 760px) {
+  .game-cover { grid-template-columns: 1fr; }
+  .game-cover-art { min-height: 250px; }
+  .game-cover-copy { padding: 28px; }
+  .game-frame { height: 72vh; min-height: 480px; }
+}
 .constellation-stage {
   position: absolute;
   inset: 0 0 0 232px;

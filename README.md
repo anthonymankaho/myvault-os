@@ -8,6 +8,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Features
 
 - Personal dashboard for skills, projects, documents, and chats
+- Games library with an isolated, playable Three.js arcade racer
 - Responsive overview with active projects, recent items, and quick capture
 - Search across the vault (`/` shortcut), filter projects and skills, and sort records
 - Keyboard-accessible add/edit dialogs that preserve imported metadata and links
@@ -41,6 +42,12 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 - `styles.css` — responsive workspace styling and reduced-motion support
 - `test/app.test.cjs` — frontend data and synchronization checks (`node --test test/app.test.cjs`)
 - `worker/` — Cloudflare Worker that proxies GitHub OAuth, vault storage, and authenticated private GPL file access (`npm test` runs the vitest suite)
+
+## Games
+
+The **Games** view is a first-class workspace section alongside Projects, Skills, Documents, and Chats. Its built-in **Neon Apex** arcade racer runs in an isolated page, so game controls and saved lap times do not modify or sync with the personal vault. Use the arrow keys to steer and accelerate or brake, hold Shift for boost, and press Escape or P to pause. Touch controls are available on mobile. The best lap is stored in the current browser only.
+
+The game source is `games/neon-apex.html`; it is served as a separate iframe page from the Games library.
 
 ## Live app
 

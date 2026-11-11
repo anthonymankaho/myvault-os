@@ -81,6 +81,7 @@ const VIEWS = {
     ]),
   ),
   tasks: { title: "Monthly Task" },
+  games: { title: "Games" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
 };
@@ -501,6 +502,9 @@ function render() {
     case "tasks":
       renderTasks();
       break;
+    case "games":
+      renderGames();
+      break;
     default:
       renderCollection(state.view);
   }
@@ -548,6 +552,8 @@ const ICON_PATHS = {
   docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
   chats:
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
+  games:
+    '<path d="M6 8h12a4 4 0 0 1 3.8 5.2l-1.3 4.1a2 2 0 0 1-3.2 1l-3.1-2.4h-4.4l-3.1 2.4a2 2 0 0 1-3.2-1l-1.3-4.1A4 4 0 0 1 6 8Z"/><path d="M8 11v4m-2-2h4m6-1h.01M18 14h.01"/>',
   tasks:
     '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m5.5 8 .8.8L7.8 7"/>',
   build:
@@ -675,6 +681,45 @@ function renderHome() {
       setStatus("Voice note deleted. Changes saved on this device.", "success");
     }),
   );
+}
+
+function renderGames() {
+  viewContainer.innerHTML = `
+    ${pageHeading("Games", "A small corner of your workspace for taking a break.")}
+    <section class="games-library" aria-labelledby="games-library-heading">
+      <div class="game-cover">
+        <div class="game-cover-art" aria-hidden="true">
+          <div class="game-sun"></div><div class="game-horizon"></div>
+          <div class="game-track"><span></span><span></span><span></span></div>
+          <div class="game-car game-car-player"><i></i></div>
+          <div class="game-car game-car-rival"><i></i></div>
+          <div class="game-cover-tag">MYVAULT ARCADE <b>01</b></div>
+        </div>
+        <div class="game-cover-copy">
+          <p class="eyebrow">ARCADE / 3D RACING</p>
+          <h2 id="games-library-heading">Neon Apex</h2>
+          <p>Take the inside line, pass the field, and finish three laps under the lights. A quick race with no downloads or account setup.</p>
+          <div class="game-facts"><span>3 laps</span><span>4 drivers</span><span>Keyboard + touch</span></div>
+          <button class="button button-primary" id="launch-neon-apex" type="button">Start a race <span aria-hidden="true">↗</span></button>
+        </div>
+      </div>
+      <div class="game-play-area" id="game-play-area" hidden>
+        <div class="game-play-heading"><div><p class="eyebrow">NOW PLAYING</p><h2>Neon Apex</h2></div><button class="button button-quiet" id="close-neon-apex" type="button">Back to Games</button></div>
+        <iframe class="game-frame" id="neon-apex-frame" title="Neon Apex 3D racing game" loading="lazy" allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <p class="game-library-note">Games are separate from your synced vault records. Your best lap is saved only in this browser.</p>
+    </section>`;
+  const area = viewContainer.querySelector("#game-play-area");
+  const frame = viewContainer.querySelector("#neon-apex-frame");
+  viewContainer.querySelector("#launch-neon-apex").addEventListener("click", () => {
+    frame.src = "games/neon-apex.html";
+    area.hidden = false;
+    area.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  viewContainer.querySelector("#close-neon-apex").addEventListener("click", () => {
+    frame.src = "about:blank";
+    area.hidden = true;
+  });
 }
 
 function fieldHtml(field, item = {}) {
