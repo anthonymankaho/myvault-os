@@ -3,6 +3,8 @@
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-brightgreen)](https://anthonymankaho.github.io/myvault-os)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+> **Office Qwen (myoffice):** start with [`HANDOFF.md`](HANDOFF.md) — consolidated handoff (auditor portal, Owner Console codes, galaxy constellation, environment gotchas, standing conventions), then the dated `Processing status · 處理狀態` entries below.
+
 MyVault OS is a multi-platform AI personal operating system, with a lightweight web dashboard and a GitHub-backed personal vault.
 
 ## Features
