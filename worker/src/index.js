@@ -2,8 +2,23 @@ import { handleQwen, AIError, readBoundedJSON } from "./qwen.js";
 
 const GITHUB_CONTENTS_URL =
   "https://api.github.com/repos/anthonymankaho/myvault-data/contents/vault.json";
-const GPL_SYSTEM_CONTENTS_URL =
-  "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main";
+const ACCOUNTING_SYSTEMS = {
+  gpl: {
+    label: "GPL",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main"
+  },
+  eic: {
+    label: "EIC",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/EIC/contents/EIC-System/EIC_System.html?ref=main"
+  },
+  mpl: {
+    label: "MPL",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main"
+  }
+};
 const GITHUB_OAUTH_URL = "https://github.com/login/oauth/access_token";
 const DEFAULT_ORIGIN = "https://myvault-os.pages.dev";
 
@@ -185,16 +200,20 @@ async function handleSave(payload, authorization, origin) {
   }
 }
 
-async function handleGplSystem(authorization, origin) {
+async function handleAccountingSystem(authorization, origin, systemKey) {
   if (origin !== "https://anthonymankaho.github.io") {
     return errorResponse("Origin is not allowed.", 403, origin);
   }
   if (!/^Bearer\s+\S+$/i.test(authorization ?? "")) {
     return errorResponse("A signed-in GitHub account is required.", 401, origin);
   }
+  const system = ACCOUNTING_SYSTEMS[systemKey];
+  if (!system) {
+    return errorResponse("Unknown accounting system.", 400, origin);
+  }
 
   try {
-    const response = await fetch(GPL_SYSTEM_CONTENTS_URL, {
+    const response = await fetch(system.contentsUrl, {
       headers: {
         ...githubHeaders(authorization),
         Accept: "application/vnd.github.raw+json"
@@ -203,13 +222,13 @@ async function handleGplSystem(authorization, origin) {
 
     if (response.status === 401 || response.status === 403 || response.status === 404) {
       return errorResponse(
-        "This GitHub account cannot access the private GPL system.",
+        `This GitHub account cannot access the private ${system.label} system.`,
         403,
         origin
       );
     }
     if (!response.ok || !response.body) {
-      return errorResponse("The private GPL system could not be loaded.", 502, origin);
+      return errorResponse(`The private ${system.label} system could not be loaded.`, 502, origin);
     }
 
     return new Response(response.body, {
@@ -225,7 +244,7 @@ async function handleGplSystem(authorization, origin) {
       }
     });
   } catch {
-    return errorResponse("The private GPL system could not be loaded.", 502, origin);
+    return errorResponse(`The private ${system.label} system could not be loaded.`, 502, origin);
   }
 }
 
@@ -287,7 +306,13 @@ export default {
       case "auth":
         return handleAuth(payload, env, origin);
       case "gpl-system":
-        return handleGplSystem(request.headers.get("Authorization"), origin);
+        return handleAccountingSystem(request.headers.get("Authorization"), origin, "gpl");
+      case "accounting-system":
+        return handleAccountingSystem(
+          request.headers.get("Authorization"),
+          origin,
+          typeof payload.system === "string" ? payload.system.toLowerCase() : ""
+        );
       case "load":
       case "save": {
         const authorization = request.headers.get("Authorization");

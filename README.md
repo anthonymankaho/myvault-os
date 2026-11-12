@@ -8,6 +8,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Features
 
 - Personal dashboard for skills, projects, documents, and chats
+- Accounting System section launching the GPL, EIC, and MPL company systems from private repos via GitHub access
 - Games library with an isolated, playable Three.js arcade racer
 - Responsive overview with active projects, recent items, and quick capture
 - Search across the vault (`/` shortcut), filter projects and skills, and sort records
@@ -41,7 +42,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 - `index.html`, `app.js`, `manifest.json` — the PWA frontend (GitHub Pages)
 - `styles.css` — responsive workspace styling and reduced-motion support
 - `test/app.test.cjs` — frontend data and synchronization checks (`node --test test/app.test.cjs`)
-- `worker/` — Cloudflare Worker that proxies GitHub OAuth, vault storage, and authenticated private GPL file access (`npm test` runs the vitest suite)
+- `worker/` — Cloudflare Worker that proxies GitHub OAuth, vault storage, and authenticated private accounting-system file access (`npm test` runs the vitest suite)
 
 ## Games
 
@@ -53,9 +54,19 @@ The game source is `games/neon-apex.html`; it is served as a separate iframe pag
 
 https://anthonymankaho.github.io/myvault-os
 
-## Protected GPL system
+## Accounting System
 
-The public `systems/GPL_System.html` URL is a sign-in page, not the GPL application source. It reads the existing MyVault GitHub OAuth session and asks the Cloudflare Worker to load the system from the private `anthonymankaho/GPL` repository. Access is granted only when GitHub authorizes that signed-in account to read the private file. The Worker returns the HTML with caching disabled; the full GPL system and its embedded workbook data are not stored in this public repository's current files.
+The **Accounting System** view is a first-class workspace section alongside Documents and Chats. It launches the three company accounting systems — **GPL** (Gold Plume Limited), **EIC**, and **MPL** (Meyer Properties Limited) — online, either embedded in the workspace (with a full-screen mode) or standalone in a new tab.
+
+Each public `systems/<Company>_System.html` URL is a sign-in page, not the application source. It reads the existing MyVault GitHub OAuth session and asks the Cloudflare Worker (`accounting-system` action with `payload.system` = `gpl` / `eic` / `mpl`; the legacy `gpl-system` action still works) to load the system from its private repository:
+
+| System | Private source |
+| --- | --- |
+| GPL | `anthonymankaho/GPL` → `GPL-System/GPL_System.html` |
+| EIC | `anthonymankaho/EIC` → `EIC-System/EIC_System.html` |
+| MPL | `anthonymankaho/MPL` → `MPL_System.html` |
+
+Access is granted only when GitHub authorizes that signed-in account to read the private file. The Worker returns the HTML with caching disabled; the full systems and their embedded workbook data are not stored in this public repository's current files. When a shell is embedded in the Accounting view it hides its standalone back link — the workspace provides **Back to Accounting**, **Full screen**, and Escape-to-exit.
 
 ## Screenshot
 

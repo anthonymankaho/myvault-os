@@ -240,3 +240,125 @@ describe("MyVault API Worker", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
   });
 });
+
+const PAGES_ORIGIN = "https://anthonymankaho.github.io";
+const SYSTEM_URLS = {
+  gpl: "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main",
+  eic: "https://api.github.com/repos/anthonymankaho/EIC/contents/EIC-System/EIC_System.html?ref=main",
+  mpl: "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main"
+};
+
+function makePagesRequest(action, payload = {}, authorization) {
+  const headers = { "Content-Type": "application/json", Origin: PAGES_ORIGIN };
+  if (authorization) {
+    headers.Authorization = authorization;
+  }
+  return new Request("https://myvault-api.example/", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ action, payload })
+  });
+}
+
+describe("accounting-system action", () => {
+  it("rejects origins other than the GitHub Pages site", async () => {
+    const response = await worker.fetch(
+      makeRequest("accounting-system", { system: "gpl" }, "Bearer token"),
+      {}
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Origin is not allowed." });
+  });
+
+  it("requires a signed-in GitHub account", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "eic" }),
+      {}
+    );
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "A signed-in GitHub account is required." });
+  });
+
+  it("rejects unknown system keys", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "unknown" }, "Bearer token"),
+      {}
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Unknown accounting system." });
+  });
+
+  it.each(Object.entries(SYSTEM_URLS))(
+    "streams the private %s system with no-store and the caller's GitHub authorization",
+    async (key, url) => {
+      const html = `<!doctype html><title>${key.toUpperCase()} system</title>`;
+      const fetchMock = vi.fn().mockResolvedValue(new Response(html, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const response = await worker.fetch(
+        makePagesRequest("accounting-system", { system: key }, "Bearer user-token"),
+        {}
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(html);
+      expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe(PAGES_ORIGIN);
+      expect(fetchMock).toHaveBeenCalledWith(
+        url,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer user-token",
+            Accept: "application/vnd.github.raw+json"
+          })
+        })
+      );
+    }
+  );
+
+  it.each([401, 403, 404])(
+    "returns a friendly 403 when GitHub denies access (status %i)",
+    async (status) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status })));
+      const response = await worker.fetch(
+        makePagesRequest("accounting-system", { system: "mpl" }, "Bearer user-token"),
+        {}
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: "This GitHub account cannot access the private MPL system."
+      });
+    }
+  );
+
+  it("returns 502 when the private file cannot be loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "eic" }, "Bearer user-token"),
+      {}
+    );
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "The private EIC system could not be loaded." });
+  });
+
+  it("keeps the legacy gpl-system action working", async () => {
+    const html = "<!doctype html><title>GPL</title>";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(html, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(
+      makePagesRequest("gpl-system", {}, "Bearer user-token"),
+      {}
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(html);
+    expect(fetchMock).toHaveBeenCalledWith(
+      SYSTEM_URLS.gpl,
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer user-token" })
+      })
+    );
+  });
+});

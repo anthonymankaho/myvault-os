@@ -59,6 +59,13 @@
     const clearButton = document.querySelector("#clear");
     let loading = false;
 
+    // When opened inside the MyVault OS Accounting view, the parent chrome
+    // provides the back navigation - hide the standalone back link.
+    if (window.self !== window.top) {
+      const backLink = document.querySelector(".brand a");
+      if (backLink) backLink.hidden = true;
+    }
+
     function showGate(text, denied = false) {
       system.replaceChildren();
       system.hidden = true;

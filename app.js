@@ -81,6 +81,7 @@ const VIEWS = {
     ]),
   ),
   tasks: { title: "Monthly Task" },
+  accounting: { title: "Accounting System" },
   games: { title: "Games" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
@@ -476,8 +477,16 @@ function setNeonApexFullscreen(active) {
   document.body.classList.toggle("game-viewport-lock", active);
 }
 
+let accountingArea = null;
+
+function setAccountingFullscreen(active) {
+  accountingArea?.classList.toggle("accounting-fill", active);
+  document.body.classList.toggle("game-viewport-lock", active);
+}
+
 function render() {
   if (state.view !== "games") setNeonApexFullscreen(false);
+  if (state.view !== "accounting") setAccountingFullscreen(false);
   document.body.classList.toggle("constellation-home", state.view === "home");
   document.querySelector(".skip-link")?.setAttribute("href", state.view === "home" ? "#orbit-main" : "#main");
   const mapContainer = document.querySelector("#constellation-background");
@@ -513,6 +522,9 @@ function render() {
       break;
     case "games":
       renderGames();
+      break;
+    case "accounting":
+      renderAccounting();
       break;
     default:
       renderCollection(state.view);
@@ -561,6 +573,8 @@ const ICON_PATHS = {
   docs: '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6"/>',
   chats:
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
+  accounting:
+    '<path d="M5 3h14v18H5z"/><path d="M9 3v18"/><path d="M12 7h4M12 10h4M12 13h4M12 16h2"/>',
   games:
     '<path d="M6 8h12a4 4 0 0 1 3.8 5.2l-1.3 4.1a2 2 0 0 1-3.2 1l-3.1-2.4h-4.4l-3.1 2.4a2 2 0 0 1-3.2-1l-1.3-4.1A4 4 0 0 1 6 8Z"/><path d="M8 11v4m-2-2h4m6-1h.01M18 14h.01"/>',
   tasks:
@@ -730,6 +744,107 @@ function renderGames() {
   });
   viewContainer.querySelector("#close-neon-apex").addEventListener("click", () => {
     setNeonApexFullscreen(false);
+    frame.src = "about:blank";
+    area.hidden = true;
+  });
+}
+
+const ACCOUNTING_COMPANIES = [
+  {
+    key: "gpl",
+    code: "GPL",
+    name: "Gold Plume Limited",
+    file: "GPL_System.html",
+    description:
+      "The GPL accounting and investment workspace — close, journals, trial balance and performance, with the Qwen assistant on call.",
+    chips: ["Accounting & investments", "Qwen assistant", "Performance"],
+  },
+  {
+    key: "eic",
+    code: "EIC",
+    name: "EIC Company",
+    file: "EIC_System.html",
+    description:
+      "Month-end close, journals, investments and the group suite — the same books, protected by the same GitHub access.",
+    chips: ["Close & journals", "Investments", "Qwen assistant"],
+  },
+  {
+    key: "mpl",
+    code: "MPL",
+    name: "Meyer Properties Limited",
+    file: "MPL_System.html",
+    description:
+      "Property accounting — receipts, deposits, impairment and the monthly performance pack, all in one launcher.",
+    chips: ["Property accounting", "Qwen assistant", "Performance"],
+  },
+];
+
+function renderAccounting() {
+  const cards = ACCOUNTING_COMPANIES.map(
+    (company) => `
+    <article class="accounting-card accounting-tone-${company.key}">
+      <div class="accounting-card-art" aria-hidden="true">
+        <span class="accounting-ledger-lines"></span>
+        <span class="accounting-code">${company.code}</span>
+        <span class="accounting-card-tag">PRIVATE REPO · GITHUB ACCESS</span>
+      </div>
+      <div class="accounting-card-copy">
+        <h2>${escapeHtml(company.name)}</h2>
+        <p>${escapeHtml(company.description)}</p>
+        <div class="accounting-chips">${company.chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>
+        <div class="accounting-actions">
+          <button class="button button-primary" type="button" data-open-system="${company.key}">Open system <span aria-hidden="true">↗</span></button>
+          <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">Standalone ↗</a>
+        </div>
+      </div>
+    </article>`,
+  ).join("");
+  viewContainer.innerHTML = `
+    ${pageHeading("Accounting System", "The three company books, online under one roof — each system loads live from its private GitHub repository.")}
+    <section class="accounting-library" aria-label="Company accounting systems">
+      <div class="accounting-grid">${cards}</div>
+      <div class="accounting-play-area" id="accounting-play-area" hidden>
+        <div class="game-play-heading">
+          <div><p class="eyebrow">NOW OPEN</p><h2 id="accounting-play-title">Accounting system</h2></div>
+          <div class="accounting-play-actions">
+            <button class="button button-quiet" id="accounting-fill" type="button" aria-pressed="false">Full screen</button>
+            <button class="button button-quiet" id="close-accounting" type="button">Back to Accounting</button>
+          </div>
+        </div>
+        <iframe class="accounting-frame" id="accounting-frame" title="Company accounting system" loading="lazy" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <p class="game-library-note">Sign in with GitHub first — each system checks that your account can read its private repository before it loads. Company data never sits in this public site, and nothing here changes your synced vault records.</p>
+    </section>`;
+  const area = viewContainer.querySelector("#accounting-play-area");
+  const frame = viewContainer.querySelector("#accounting-frame");
+  const title = viewContainer.querySelector("#accounting-play-title");
+  const fillButton = viewContainer.querySelector("#accounting-fill");
+  accountingArea = area;
+  const syncFillButton = () => {
+    const active = area.classList.contains("accounting-fill");
+    fillButton.textContent = active ? "Exit full screen" : "Full screen";
+    fillButton.setAttribute("aria-pressed", String(active));
+  };
+  viewContainer.querySelectorAll("[data-open-system]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const company = ACCOUNTING_COMPANIES.find(
+        (entry) => entry.key === button.dataset.openSystem,
+      );
+      if (!company) return;
+      title.textContent = company.name;
+      frame.title = `${company.name} accounting system`;
+      frame.src = `systems/${company.file}?v=accounting-1`;
+      area.hidden = false;
+      syncFillButton();
+      area.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  fillButton.addEventListener("click", () => {
+    setAccountingFullscreen(!area.classList.contains("accounting-fill"));
+    syncFillButton();
+  });
+  viewContainer.querySelector("#close-accounting").addEventListener("click", () => {
+    setAccountingFullscreen(false);
     frame.src = "about:blank";
     area.hidden = true;
   });
@@ -2108,6 +2223,18 @@ async function updateLegacyConstellationBackground() {
 
 document.querySelectorAll(".nav-link").forEach((link) => {
   link.addEventListener("click", () => navigate(link.dataset.view));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || state.view !== "accounting") return;
+  if (accountingArea && !accountingArea.hidden && accountingArea.classList.contains("accounting-fill")) {
+    setAccountingFullscreen(false);
+    const fillButton = document.querySelector("#accounting-fill");
+    if (fillButton) {
+      fillButton.textContent = "Full screen";
+      fillButton.setAttribute("aria-pressed", "false");
+    }
+  }
 });
 
 saveButton.addEventListener("click", saveVault);

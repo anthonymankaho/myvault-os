@@ -85,6 +85,59 @@ body.game-viewport-lock { overflow: hidden; }
   .game-cover-copy { padding: 28px; }
   .game-frame { height: 72vh; min-height: 480px; }
 }
+
+/* Accounting System library */
+html { scrollbar-color: #33454a #111719; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #111719; }
+::-webkit-scrollbar-thumb { background: #2c3c41; border-radius: 6px; border: 2px solid #111719; }
+::-webkit-scrollbar-thumb:hover { background: #3d5259; }
+.accounting-library { display: grid; gap: 24px; }
+.accounting-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.accounting-card { position: relative; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 18px 50px #05090a45; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.accounting-card:hover { transform: translateY(-3px); }
+.accounting-card:focus-within { border-color: #4a6a72; }
+.accounting-card-art { position: relative; display: flex; align-items: flex-end; min-height: 150px; padding: 18px; overflow: hidden; }
+.accounting-ledger-lines { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, .05) 34px 35px), repeating-linear-gradient(0deg, transparent 0 26px, rgba(255, 255, 255, .04) 26px 27px); -webkit-mask-image: linear-gradient(180deg, transparent, #000 35%); mask-image: linear-gradient(180deg, transparent, #000 35%); }
+.accounting-code { position: relative; font: 400 54px/1 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
+.accounting-card-tag { position: absolute; top: 14px; left: 18px; font: 600 9.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .18em; opacity: .85; }
+.accounting-card-copy { display: flex; flex-direction: column; flex: 1; gap: 10px; padding: 18px 20px 20px; }
+.accounting-card-copy h2 { margin: 0; font: 400 21px/1.25 Georgia, "Times New Roman", serif; letter-spacing: -.01em; }
+.accounting-card-copy > p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.65; }
+.accounting-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
+.accounting-chips span { padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; color: #b6c4c3; font-size: 10.5px; letter-spacing: .02em; background: #ffffff08; }
+.accounting-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.accounting-tone-gpl .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #1d4a2e 0, #14301f 45%, #101d16 100%); }
+.accounting-tone-gpl .accounting-code { color: #8fe6b0; text-shadow: 0 0 26px #22c55e55; }
+.accounting-tone-gpl .accounting-card-tag { color: #a7d9b8; }
+.accounting-tone-gpl:hover { border-color: #2f6b45; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #2f6b4533, 0 0 34px #22c55e1f; }
+.accounting-tone-eic .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #1e3a66 0, #16294a 45%, #101a2c 100%); }
+.accounting-tone-eic .accounting-code { color: #9cc3ff; text-shadow: 0 0 26px #3b82f655; }
+.accounting-tone-eic .accounting-card-tag { color: #aecbf2; }
+.accounting-tone-eic:hover { border-color: #33549c; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #33549c33, 0 0 34px #3b82f61f; }
+.accounting-tone-mpl .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #46256e 0, #301b4d 45%, #1b1230 100%); }
+.accounting-tone-mpl .accounting-code { color: #d3b8ff; text-shadow: 0 0 26px #a78bfa55; }
+.accounting-tone-mpl .accounting-card-tag { color: #cdb6ec; }
+.accounting-tone-mpl:hover { border-color: #5d3a96; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #5d3a9633, 0 0 34px #a78bfa1f; }
+.accounting-play-area { display: grid; gap: 12px; scroll-margin-top: 24px; }
+.accounting-play-area[hidden] { display: none; }
+.accounting-play-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.accounting-frame { display: block; width: 100%; height: min(78vh, 860px); min-height: 540px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 22px 60px #0005; }
+.accounting-play-area.accounting-fill { position: fixed; z-index: 60; inset: 0; display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; background: #071018; }
+.accounting-play-area.accounting-fill .game-play-heading { flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid #1c2a30; }
+.accounting-play-area.accounting-fill .game-play-heading h2 { font-size: 18px; }
+.accounting-play-area.accounting-fill .accounting-frame { flex: 1; width: 100%; height: auto; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+@media (max-width: 1100px) {
+  .accounting-grid { grid-template-columns: 1fr; }
+  .accounting-card { display: grid; grid-template-columns: minmax(150px, 240px) 1fr; }
+  .accounting-card-art { min-height: 100%; }
+}
+@media (max-width: 640px) {
+  .accounting-card { display: flex; }
+  .accounting-card-art { min-height: 130px; }
+  .accounting-frame { height: 74vh; min-height: 460px; }
+  .accounting-play-area .game-play-heading { flex-wrap: wrap; }
+}
 .constellation-stage {
   position: absolute;
   inset: 0 0 0 232px;
