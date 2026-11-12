@@ -54,6 +54,7 @@
       .lede { margin: 16px 0 23px; color: #b4c2c5; font-size: 13px; line-height: 1.7; }
       .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
       .key { padding: 10px 11px; border: 1px solid #6d828c44; border-radius: 9px; background: #17252ccc; color: #c6d2d3; font-size: 10px; }
+      .touch-hint { display: none; margin: -10px 0 18px; color: #a5b5c1; font-size: 11px; line-height: 1.5; }
       kbd { display: inline-block; min-width: 22px; margin-right: 5px; padding: 2px 5px; border: 1px solid #84989a66; border-radius: 4px; color: #f4e6cf; font: 600 9px ui-monospace, monospace; text-align: center; }
       .primary { width: 100%; min-height: 46px; border: 0; border-radius: 9px; color: #061510; background: linear-gradient(100deg, #6fe4ca, #b4f1cf); font: 800 11px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 8px 28px #53cdbd33; }
       .primary:hover { filter: brightness(1.08); }
@@ -70,6 +71,7 @@
       .track-option[aria-checked="true"] { border-color: #7ce4c8; color: #eafff7; background: #7ce4c81f; box-shadow: inset 0 0 0 1px #7ce4c855; }
       .track-option[aria-checked="true"] path { stroke: #7ce4c8; opacity: 1; }
       body.show-touch .keys { display: none; }
+      body.show-touch .touch-hint { display: block; }
       .touch-controls { right: max(8px, env(safe-area-inset-right)); bottom: max(28px, env(safe-area-inset-bottom)); left: max(8px, env(safe-area-inset-left)); display: none; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; }
       .touch-controls:not([hidden]) { display: flex; }
       .touch-group { display: flex; flex: 0 0 auto; gap: 8px; align-items: end; pointer-events: auto; touch-action: none; overscroll-behavior: contain; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -144,7 +146,7 @@
     </section>
     <div class="lap-progress" id="progress" hidden><span id="progress-fill"></span></div>
     <section class="overlay" id="start-screen">
-      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps. Three rivals. One clean line through the city lights. Keep your speed up and save boost for the long straight.</p><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div></div><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
+      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps. Three rivals. One clean line through the city lights. Keep your speed up and save boost for the long straight.</p><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div><div class="key"><kbd>SPACE</kbd> Drift while steering</div></div><p class="touch-hint">Hold BRAKE and steer above 95 km/h to drift.</p><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
     </section>
     <div class="touch-controls" id="touch-controls" hidden aria-label="Touch race controls">
       <div class="touch-group touch-steer">
@@ -360,40 +362,110 @@
 
       function makeCar(bodyColor, trimColor, isPlayer = false) {
         const car = new THREE.Group();
-        const paint = new THREE.MeshStandardMaterial({ color: bodyColor, metalness: .52, roughness: .28, emissive: bodyColor, emissiveIntensity: isPlayer ? .12 : .035 });
-        const dark = new THREE.MeshStandardMaterial({ color: 0x111820, metalness: .35, roughness: .45 });
-        const glass = new THREE.MeshStandardMaterial({ color: isPlayer ? 0x67b8c4 : 0x7895a0, metalness: .25, roughness: .18, transparent: true, opacity: .88 });
-        const trim = new THREE.MeshStandardMaterial({ color: trimColor, metalness: .36, roughness: .31, emissive: trimColor, emissiveIntensity: .38 });
-        function box(w, h, d, mat, x, y, z, cast = true) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; car.add(m); return m; }
-        box(1.75, .52, 3.55, paint, 0, .75, 0);
-        box(1.43, .55, 1.62, glass, 0, 1.18, -.2);
-        box(1.85, .12, .62, paint, 0, 1.05, -1.56);
-        box(2.08, .14, .48, dark, 0, .62, 1.67);
-        box(2.12, .12, .22, trim, 0, .97, 1.82);
-        box(.16, .12, .16, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe4ba, emissiveIntensity: 3 }), -.57, .75, -1.81);
-        box(.16, .12, .16, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe4ba, emissiveIntensity: 3 }), .57, .75, -1.81);
-        box(.42, .12, .12, new THREE.MeshStandardMaterial({ color: 0xff4e58, emissive: 0xff252f, emissiveIntensity: 2 }), -.55, .78, 1.8);
-        box(.42, .12, .12, new THREE.MeshStandardMaterial({ color: 0xff4e58, emissive: 0xff252f, emissiveIntensity: 2 }), .55, .78, 1.8);
-        for (const x of [-.94, .94]) for (const z of [-1.1, 1.08]) {
-          const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .24, 14), dark); wheel.rotation.z = Math.PI / 2; wheel.position.set(x, .42, z); wheel.castShadow = true; car.add(wheel);
-          const hub = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, .255, 10), new THREE.MeshStandardMaterial({ color: trimColor, metalness: .6, roughness: .24 })); hub.rotation.z = Math.PI / 2; hub.position.set(x * 1.01, .42, z); car.add(hub);
+        const shell = new THREE.Group(); car.add(shell);
+        const paint = new THREE.MeshStandardMaterial({ color: bodyColor, metalness: .28, roughness: .36 });
+        const dark = new THREE.MeshStandardMaterial({ color: 0x151b21, metalness: .18, roughness: .58 });
+        const glass = new THREE.MeshStandardMaterial({ color: isPlayer ? 0x254b58 : 0x344d5d, metalness: .3, roughness: .19, side: THREE.DoubleSide });
+        const trim = new THREE.MeshStandardMaterial({ color: trimColor, metalness: .4, roughness: .32, emissive: trimColor, emissiveIntensity: .22 });
+        const chrome = new THREE.MeshStandardMaterial({ color: 0xbecbd0, metalness: .8, roughness: .24 });
+        const headlight = new THREE.MeshStandardMaterial({ color: 0xfff2d0, emissive: 0xffe8b2, emissiveIntensity: 2.5 });
+        const taillight = new THREE.MeshStandardMaterial({ color: 0xc52032, emissive: 0xff2837, emissiveIntensity: 1.5 });
+        function box(w, h, d, mat, x, y, z, castShadow = false) {
+          const mesh = new THREE.Mesh(unitBox, mat);
+          mesh.scale.set(w, h, d); mesh.position.set(x, y, z); mesh.castShadow = castShadow; shell.add(mesh); return mesh;
         }
-        const lamp = new THREE.PointLight(trimColor, isPlayer ? 13 : 4, 11, 2); lamp.position.set(0, .85, -2.3); car.add(lamp);
+        function panel(points, mat) {
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute("position", new THREE.Float32BufferAttribute(points.flat(), 3));
+          geometry.setIndex([0, 1, 2, 0, 2, 3]); geometry.computeVertexNormals();
+          const mesh = new THREE.Mesh(geometry, mat); shell.add(mesh);
+        }
+        function pillar(a, b) {
+          const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b);
+          const mesh = new THREE.Mesh(new THREE.CylinderGeometry(.033, .033, start.distanceTo(end), 6), dark);
+          mesh.position.copy(start).add(end).multiplyScalar(.5); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.sub(start).normalize()); shell.add(mesh);
+        }
+        // Original compact coupe silhouette: sloped glass, long hood, dark rocker panels.
+        box(1.88, .43, 3.86, paint, 0, .74, 0, true);
+        box(1.84, .16, 1.18, paint, 0, 1.02, -1.31, true);
+        box(1.84, .16, .72, paint, 0, 1.02, 1.51, true);
+        box(1.44, .08, 1.12, paint, 0, 1.59, .32, true);
+        panel([[-.72, 1.06, -.74], [.72, 1.06, -.74], [.64, 1.55, -.2], [-.64, 1.55, -.2]], glass);
+        panel([[.7, 1.06, 1.33], [-.7, 1.06, 1.33], [-.64, 1.55, .87], [.64, 1.55, .87]], glass);
+        for (const side of [-1, 1]) {
+          panel([[side * .75, 1.07, -.7], [side * .66, 1.56, -.18], [side * .66, 1.56, .34], [side * .75, 1.07, .34]], glass);
+          panel([[side * .75, 1.07, .4], [side * .66, 1.56, .4], [side * .66, 1.56, .83], [side * .75, 1.07, 1.28]], glass);
+          pillar([side * .75, 1.04, -.72], [side * .66, 1.58, -.2]);
+          pillar([side * .75, 1.04, .37], [side * .66, 1.58, .37]);
+          pillar([side * .75, 1.04, 1.3], [side * .66, 1.58, .86]);
+          box(.035, .22, 3.28, dark, side * .958, .65, -.13);
+          box(.04, .035, 3.18, trim, side * .98, .81, -.14);
+          box(.15, .13, .25, dark, side * .84, 1.17, -.61);
+          box(.36, .12, .26, paint, side * .94, 1.15, -.72);
+          box(.08, .13, .32, dark, side * .97, .88, .18);
+        }
+        box(1.94, .19, .22, dark, 0, .54, -1.91);
+        box(1.1, .14, .045, dark, 0, .73, -1.96);
+        for (const side of [-1, 1]) {
+          box(.44, .09, .06, headlight, side * .58, 1.03, -1.88);
+          box(.32, .08, .055, headlight, side * .68, .65, -1.98);
+          box(.53, .15, .06, taillight, side * .57, .82, 1.96);
+          box(.09, .18, .07, chrome, side * .95, .56, 1.93);
+        }
+        box(1.98, .2, .22, dark, 0, .54, 1.91);
+        box(1.16, .045, .28, dark, 0, 1.23, 1.8);
+        box(.08, .27, .08, dark, -.52, 1.11, 1.74); box(.08, .27, .08, dark, .52, 1.11, 1.74);
+        box(.16, .09, .22, chrome, -.46, .48, 2.0);
+        const rollingWheels = [], steeringWheels = [];
+        for (const side of [-1, 1]) for (const z of [-1.25, 1.2]) {
+          const steerPivot = new THREE.Group(); steerPivot.position.set(side * .98, .43, z); car.add(steerPivot);
+          const rollPivot = new THREE.Group(); steerPivot.add(rollPivot);
+          const tire = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .28, 16), dark); tire.rotation.z = Math.PI / 2; tire.castShadow = true; rollPivot.add(tire);
+          const hub = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .29, 10), chrome); hub.rotation.z = Math.PI / 2; hub.position.x = side * .01; rollPivot.add(hub);
+          const center = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .3, 8), trim); center.rotation.z = Math.PI / 2; rollPivot.add(center);
+          rollingWheels.push(rollPivot); if (z < 0) steeringWheels.push(steerPivot);
+        }
+        const lamp = new THREE.PointLight(0xffe7bb, isPlayer ? 12 : 3, 10, 2); lamp.position.set(0, .9, -2.15); car.add(lamp);
         if (isPlayer) {
-          const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 4.3), new THREE.MeshBasicMaterial({ color: 0x35dfc4, transparent: true, opacity: .14, side: THREE.DoubleSide })); glow.rotation.x = -Math.PI / 2; glow.position.y = .025; car.add(glow);
+          const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 4.3), new THREE.MeshBasicMaterial({ color: 0x35dfc4, transparent: true, opacity: .11, side: THREE.DoubleSide, depthWrite: false })); glow.rotation.x = -Math.PI / 2; glow.position.y = .025; car.add(glow);
         }
+        car.userData = { shell, rollingWheels, steeringWheels, taillight };
         return car;
       }
 
       const racers = [
-        { name: "YOU", car: makeCar(0xd44461, 0x7dffdc, true), progress: .015, lane: 0, speed: 0, target: 218, player: true },
+        { name: "YOU", car: makeCar(0xe8e9df, 0x9ce6d0, true), progress: .015, lane: 0, speed: 0, target: 218, player: true },
         { name: "KAI", car: makeCar(0x24a59f, 0xffb982), progress: .004, lane: -3.5, speed: 199, target: 204 + Math.random() * 10 },
         { name: "MIRA", car: makeCar(0xd19a43, 0x5ce4da), progress: .992, lane: 3.4, speed: 205, target: 208 + Math.random() * 8 },
         { name: "SOL", car: makeCar(0x4e70c5, 0xff876f), progress: .982, lane: -3.2, speed: 194, target: 200 + Math.random() * 10 },
       ];
       racers.forEach((racer) => { racer.startLane = racer.lane; scene.add(racer.car); });
       const player = racers[0];
-      const state = { phase: "ready", speed: 0, lane: 0, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, lastStamp: 0, lastHud: 0, toastTimer: 0 };
+      const state = { phase: "ready", speed: 0, lane: 0, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, steer: 0, braking: false, drift: 0, driftSide: 0, smokeTimer: 0, lastStamp: 0, lastHud: 0, toastTimer: 0 };
+      const smokeGeometry = new THREE.SphereGeometry(.38, 6, 4);
+      const smokePuffs = Array.from({ length: 24 }, () => {
+        const puff = new THREE.Mesh(smokeGeometry, new THREE.MeshBasicMaterial({ color: 0xc9d7d4, transparent: true, opacity: 0, depthWrite: false }));
+        puff.visible = false; puff.userData.age = 0; scene.add(puff); return puff;
+      });
+      let nextPuff = 0;
+      function updateSmoke(dt) {
+        for (const puff of smokePuffs) {
+          if (!puff.visible) continue;
+          puff.userData.age += dt; puff.position.y += dt * .5;
+          puff.scale.setScalar(1 + puff.userData.age * 1.8);
+          puff.material.opacity = Math.max(0, .3 * (1 - puff.userData.age / .8));
+          if (puff.userData.age >= .8) puff.visible = false;
+        }
+        if (state.phase !== "racing" || state.drift < .35) { state.smokeTimer = 0; return; }
+        state.smokeTimer += dt;
+        if (state.smokeTimer < .09) return;
+        state.smokeTimer = 0; player.car.updateMatrixWorld(true);
+        for (const side of [-1, 1]) {
+          const puff = smokePuffs[nextPuff++ % smokePuffs.length];
+          puff.position.copy(player.car.localToWorld(new THREE.Vector3(side * .98, .26, 1.2)));
+          puff.scale.setScalar(.75); puff.userData.age = 0; puff.material.opacity = .3; puff.visible = true;
+        }
+      }
       const keys = new Set();
       const touchInput = createPointerTracker();
       const held = touchInput.held;
@@ -419,13 +491,14 @@
       function showToast(text) { const toast = $("toast"); toast.textContent = text; toast.classList.add("show"); clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => toast.classList.remove("show"), 900); }
       function startRace() {
         if (state.phase === "paused") { state.phase = "racing"; overlay.hidden = true; syncPauseButton(); return; }
-        state.phase = "racing"; state.speed = 80; state.lane = 0; state.progress = .015; state.lap = 0; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false;
+        state.phase = "racing"; state.speed = 80; state.lane = 0; state.progress = .015; state.lap = 0; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.smokeTimer = 0;
+        smokePuffs.forEach((puff) => puff.visible = false);
         player.progress = state.progress; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
         racers.forEach((racer) => { if (!racer.player) { racer.speed = racer.target; racer.laps = 0; } });
         overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; updateHud(); syncPauseButton();
       }
       function pauseRace() { if (state.phase !== "racing") return; clearAllTouches("pause"); state.phase = "paused"; setOverlay("paused"); syncPauseButton(); }
-      function finishRace() { state.phase = "finished"; state.finishPosition = currentPosition(); state.speed = 0; setOverlay("finished"); syncPauseButton(); }
+      function finishRace() { state.phase = "finished"; state.finishPosition = currentPosition(); state.speed = 0; state.drift = 0; setOverlay("finished"); syncPauseButton(); }
       function currentPosition() {
         const ordered = racers.map((racer, index) => ({ racer, index, score: (racer.player ? state.lap : racer.laps || 0) + racer.progress } )).sort((a, b) => b.score - a.score);
         return ordered.findIndex((entry) => entry.index === 0) + 1;
@@ -443,8 +516,12 @@
         const p = trackPoint(t, racer.lane, .18);
         const tangent = trackPoint(t + .001, racer.lane, .18).sub(trackPoint(t - .001, racer.lane, .18)).normalize();
         racer.car.position.copy(p);
-        racer.car.rotation.y = Math.atan2(-tangent.x, -tangent.z);
-        if (racer.player) racer.car.rotation.z = (held.left ? .035 : 0) + (held.right ? -.035 : 0);
+        racer.car.rotation.y = Math.atan2(-tangent.x, -tangent.z) + (racer.player ? state.driftSide * state.drift * .26 : 0);
+        if (racer.player) {
+          racer.car.rotation.z = -state.steer * .035 - state.driftSide * state.drift * .035;
+          for (const wheel of racer.car.userData.steeringWheels) wheel.rotation.y = -state.steer * .22 + state.driftSide * state.drift * .12;
+          racer.car.userData.taillight.emissiveIntensity = state.braking ? 3 : 1.5;
+        }
       }
       const trackPicker = $("track-picker");
       for (const track of tracks) {
@@ -455,7 +532,7 @@
         trackPicker.append(button);
       }
       function resetGrid() {
-        player.progress = state.progress = .015; state.lane = 0; state.offroadWarned = false; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
+        player.progress = state.progress = .015; state.lane = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
         racers.forEach((racer) => { if (!racer.player) racer.lane = racer.startLane; });
         player.lane = 0;
       }
@@ -482,17 +559,22 @@
         const dt = Math.min(clock.getDelta(), .04);
         if (state.phase === "racing") {
           state.elapsed += dt * 1000; state.lapElapsed += dt * 1000;
+          const steer = (held.right || keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (held.left || keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
           const boostNow = (held.boost || keys.has("ShiftLeft") || keys.has("ShiftRight")) && state.boost > 0 && state.speed > 65;
           const accelerating = held.gas || keys.has("ArrowUp") || keys.has("KeyW");
           const braking = held.brake || keys.has("ArrowDown") || keys.has("KeyS");
+          const drifting = steer !== 0 && state.speed > 95 && (keys.has("Space") || braking) && !state.offroadWarned;
+          state.steer = steer; state.braking = braking;
+          state.drift = THREE.MathUtils.clamp(state.drift + (drifting ? 3.2 : -4.4) * dt, 0, 1);
+          if (drifting) state.driftSide = steer;
           if (accelerating) state.speed += (boostNow ? 112 : 70) * dt;
           else state.speed -= 17 * dt;
-          if (braking) state.speed -= 145 * dt;
+          if (braking) state.speed -= (drifting ? 58 : 145) * dt;
+          if (drifting) state.speed -= 14 * dt;
           if (boostNow) { state.speed = Math.min(state.speed, 292); state.boost = Math.max(0, state.boost - 30 * dt); }
           else state.boost = Math.min(100, state.boost + 5.6 * dt);
           state.speed = THREE.MathUtils.clamp(state.speed, 42, boostNow ? 292 : 238);
-          const steer = (held.right || keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (held.left || keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
-          state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * (state.speed > 200 ? 10.5 : 8.2), -playerLaneLimit, playerLaneLimit);
+          state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * (state.speed > 200 ? 10.5 : 8.2) * (1 + state.drift * .42), -playerLaneLimit, playerLaneLimit);
           if (Math.abs(state.lane) > roadHalf - 1.2) {
             state.speed = Math.max(42, state.speed - 48 * dt);
             if (!state.offroadWarned) { showToast("OFF TRACK · BACK ON THE TARMAC"); state.offroadWarned = true; }
@@ -522,8 +604,10 @@
           }
           state.collision = Math.max(0, state.collision - dt);
           racers.forEach(updateRacer);
+          for (const racer of racers) for (const wheel of racer.car.userData.rollingWheels) wheel.rotation.x += racer.speed * dt * .13;
           if (performance.now() - state.lastHud > 75) { updateHud(); state.lastHud = performance.now(); }
         }
+        updateSmoke(dt);
         aimCamera(1 - Math.exp(-dt * 3.8));
         renderer.render(scene, camera);
       }
@@ -531,9 +615,9 @@
         const angle = state.progress * Math.PI * 2;
         const carPos = trackPoint(angle, state.lane, .4);
         const forward = trackPoint(angle + .04, state.lane).sub(trackPoint(angle - .04, state.lane)).normalize();
-        const cameraTarget = carPos.clone().sub(forward.clone().multiplyScalar(13)).add(new THREE.Vector3(0, 7.4, 0));
+        const cameraTarget = carPos.clone().sub(forward.clone().multiplyScalar(10.5)).add(new THREE.Vector3(0, 5.5, 0));
         camera.position.lerp(cameraTarget, blend);
-        camera.lookAt(carPos.clone().add(forward.clone().multiplyScalar(10)).add(new THREE.Vector3(0, 1.0, 0)));
+        camera.lookAt(carPos.clone().add(forward.clone().multiplyScalar(10)).add(new THREE.Vector3(0, 1.1, 0)));
       }
       function snapCamera() { aimCamera(1); }
       function syncTouchButtons() {
@@ -632,7 +716,7 @@
       $("start-race").addEventListener("click", startRace);
       $("pause-from-overlay").addEventListener("click", startRace);
       $("pause-race").addEventListener("click", pauseRace);
-      $("help-button").addEventListener("click", () => showToast("ARROWS OR TOUCH · UP GAS · DOWN BRAKE · SHIFT NITRO"));
+      $("help-button").addEventListener("click", () => showToast("STEER + SPACE OR BRAKE TO DRIFT · SHIFT NITRO"));
       window.addEventListener("keydown", (event) => {
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
         keys.add(event.code);
