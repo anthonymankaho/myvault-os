@@ -26,6 +26,16 @@ body:not(.constellation-home) .orbit-3d { display: none !important; }
 .orbit-guide { fill: none; stroke: #8bbeb1; stroke-width: 1; opacity: .2; stroke-dasharray: 3 7; vector-effect: non-scaling-stroke; }
 .orbit-guide-inner { stroke: #e8c991; opacity: .18; stroke-dasharray: none; }
 .orbit-center-label { fill: #8da4af; font: 10px ui-monospace, monospace; letter-spacing: 3px; opacity: .6; pointer-events: none; }
+.orbit-sun { pointer-events: none; }
+.orbit-sun .orbit-guide { stroke: var(--sun-color); opacity: .16; }
+.orbit-sun-glow { fill: var(--sun-color); opacity: .14; filter: blur(6px); }
+.orbit-sun-core { fill: var(--sun-color); filter: drop-shadow(0 0 9px var(--sun-color)); }
+.orbit-sun-label { fill: var(--sun-color); font: 600 9.5px ui-monospace, monospace; letter-spacing: 2.2px; opacity: .9; paint-order: stroke; stroke: #0d1822; stroke-width: 3px; stroke-linejoin: round; }
+.orbit-filters { flex-wrap: wrap; max-width: 100%; }
+.orbit-filters button { display: inline-flex; align-items: center; gap: 6px; }
+.orbit-filters button i { width: 6px; height: 6px; border-radius: 50%; background: var(--section-color, #b9e8d1); box-shadow: 0 0 7px var(--section-color, #b9e8d1); }
+.orbit-filters button small { color: #93a7b1; font-size: 10px; }
+.orbit-filters button[aria-pressed="true"] { border-color: var(--section-color, #648d7d); box-shadow: 0 0 12px -5px var(--section-color, #648d7d); }
 .orbit-link { stroke: #9fcbbb; stroke-width: 1; vector-effect: non-scaling-stroke; stroke-opacity: .35; }
 .orbit-link.is-connected { stroke: #e5f6d8; stroke-width: 2; stroke-opacity: .85; }
 .orbit-star { cursor: pointer; }
@@ -107,7 +117,7 @@ body:not(.constellation-home) .orbit-3d { display: none !important; }
   .orbit-demo-exit { top: 222px; right: 18px; min-height: 28px !important; padding: 3px 8px !important; font-size: 10px !important; }
   .orbit-stage.is-demo .orbit-summary { max-width: 58%; }
   .orbit-notice { left: 12px; right: 12px; bottom: 80px; }
-  .orbit-return { top: 275px; right: 12px; }
+  .orbit-return { top: 306px; right: 12px; }
 }
 @media (max-height: 740px) {
   .orbit-welcome { top: 60%; padding: 15px; }

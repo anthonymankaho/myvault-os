@@ -1,6 +1,10 @@
 // The everyday map has no network, canvas, or WebGL dependency.
+import { SECTION_META, sectionMeta, layoutSystemMap, layoutConstellation } from './constellation-systems.mjs?v=5';
+export { layoutConstellation };
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const color = (node) => node.kind === 'projects' ? '#ffe3b3' : '#b9e8d1';
+const color = (node) => sectionMeta(node.kind).star;
+const starRadius = (node) => node.kind === 'projects' ? 6 : node.kind === 'accounting' || node.kind === 'games' ? 5.5 : 4;
+const haloRadius = (node) => node.kind === 'projects' ? 19 : node.kind === 'accounting' || node.kind === 'games' ? 17 : 14;
 
 export function wrapStarName(value, width = 26) {
   const lines = [];
@@ -13,19 +17,6 @@ export function wrapStarName(value, width = 26) {
   }
   if (remaining) lines.push(remaining);
   return lines;
-}
-
-export function layoutConstellation(nodes) {
-  const groups = ['projects', 'skills'].map((kind) => nodes.map((node, index) => ({ node, index })).filter(({ node }) => node.kind === kind));
-  const positions = new Array(nodes.length);
-  groups.forEach((group, kind) => group.forEach(({ index }, slot) => {
-    const ring = Math.floor(slot / 28);
-    const count = Math.min(28, group.length - ring * 28);
-    const angle = (slot % 28) / count * Math.PI * 2 - Math.PI / 2 + ring * 0.23;
-    const radius = kind === 0 ? (group.length === 1 ? 0 : 95 + ring * 36) : 235 + ring * 30;
-    positions[index] = { x: 500 + Math.cos(angle) * radius * 1.32, y: 310 + Math.sin(angle) * radius };
-  }));
-  return positions;
 }
 
 export function layoutStarLabels(nodes, positions) {
@@ -98,14 +89,15 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
   let disposed = false;
   let threeD = null;
   let threeRequest = 0;
-  let positions = layoutConstellation(nodes);
+  let systemMap = layoutSystemMap(nodes);
+  let positions = systemMap.positions;
   let namePositions = layoutStarLabels(nodes, positions);
 
   container.innerHTML = `<section id="orbit-main" tabindex="-1" class="constellation-stage orbit-stage" aria-label="Constellation map">
-    <header class="orbit-header"><div><p class="orbit-eyebrow">YOUR CONNECTED WORKSPACE</p><h1>Everything, connected.</h1><p>Projects at the heart. Skills that help them grow.</p></div><button type="button" class="orbit-dashboard" data-map-action="dashboard">Dashboard ↗</button></header>
-    <div class="orbit-discovery"><label class="visually-hidden" for="orbit-query">Search projects and skills</label><input id="orbit-query" type="search" placeholder="Find a project or skill…" autocomplete="off"><div class="orbit-filters" role="group" aria-label="Filter stars"><button type="button" data-map-filter="all" aria-pressed="true">All stars</button><button type="button" data-map-filter="projects" aria-pressed="false">Projects</button><button type="button" data-map-filter="skills" aria-pressed="false">Skills</button></div><button type="button" data-map-action="browse" aria-expanded="false" aria-controls="orbit-index">Browse records</button></div>
+    <header class="orbit-header"><div><p class="orbit-eyebrow">YOUR CONNECTED WORKSPACE · 你的星系</p><h1>Everything, connected.</h1><p>Every item a star — each section its own solar system.</p></div><button type="button" class="orbit-dashboard" data-map-action="dashboard">Dashboard ↗</button></header>
+    <div class="orbit-discovery"><label class="visually-hidden" for="orbit-query">Search every item in MyVault</label><input id="orbit-query" type="search" placeholder="Find any star…" autocomplete="off"><div class="orbit-filters" role="group" aria-label="Filter stars by section"></div><button type="button" data-map-action="browse" aria-expanded="false" aria-controls="orbit-index">Browse records</button></div>
     <div class="orbit-summary" role="status" aria-live="polite"></div>
-    <div class="orbit-viewport"><svg class="orbit-map" viewBox="0 0 1000 620" role="group" aria-label="Project and skill stars. Tab to a star; Enter to inspect it. Drag to pan; pinch or use controls to zoom."><g class="orbit-camera"></g></svg></div>
+    <div class="orbit-viewport"><svg class="orbit-map" viewBox="0 0 1000 620" role="group" aria-label="Workspace stars grouped in section solar systems. Tab to a star; Enter to inspect it. Drag to pan; pinch or use controls to zoom."><g class="orbit-camera"></g></svg></div>
     <div class="orbit-welcome" hidden></div>
     <aside class="orbit-index" id="orbit-index" aria-label="Matching records" hidden></aside>
     <aside class="orbit-detail" aria-label="Selected record" hidden></aside>
@@ -134,11 +126,13 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
   function draw() {
     const matches = new Set(matchingNodeIndexes(nodes, query, kind));
     const nearby = new Set(selected >= 0 ? [selected, ...neighbors(selected)] : []);
-    const projectCount = nodes.filter((node) => node.kind === 'projects').length;
-    summary.textContent = `${demo ? 'SAMPLE PREVIEW · ' : ''}${projectCount} projects · ${nodes.length - projectCount} skills · ${edges.length} links${query || kind !== 'all' ? ` · ${matches.size} matches` : ''}`;
+    const counts = systemMap.centers.map((center) => `${center.count} ${sectionMeta(center.kind).label.toLowerCase()}`).join(' · ');
+    summary.textContent = `${demo ? 'SAMPLE PREVIEW · ' : ''}${counts} · ${edges.length} links${query || kind !== 'all' ? ` · ${matches.size} matches` : ''}`;
     const extent = Math.max(340, ...positions.map(({ x, y }) => Math.max(Math.abs(x - 500), Math.abs(y - 310))), ...namePositions.map(({ box }) => Math.max(Math.abs(box.top - 310), Math.abs(box.top + box.height - 310), Math.abs(box.left - 500) / 1.55, Math.abs(box.left + box.width - 500) / 1.55))) + 12;
     svg.setAttribute('viewBox', `${500 - extent * 1.55} ${310 - extent} ${extent * 3.1} ${extent * 2}`);
-    camera.innerHTML = `<ellipse class="orbit-guide" cx="500" cy="310" rx="310" ry="235"/><ellipse class="orbit-guide orbit-guide-inner" cx="500" cy="310" rx="126" ry="95"/><text class="orbit-center-label" x="500" y="310" text-anchor="middle">${projectCount === 1 ? '' : 'YOUR PROJECTS'}</text>` +
+    const filters = container.querySelector('.orbit-filters');
+    filters.innerHTML = `<button type="button" data-map-filter="all" aria-pressed="${kind === 'all'}">All stars</button>` + systemMap.centers.map((center) => `<button type="button" data-map-filter="${center.kind}" aria-pressed="${kind === center.kind}" style="--section-color:${SECTION_META[center.kind].sun}"><i></i>${SECTION_META[center.kind].label} <small>${center.count}</small></button>`).join('');
+    camera.innerHTML = systemMap.centers.map((center) => `<g class="orbit-sun" style="--sun-color:${SECTION_META[center.kind].sun}" transform="translate(${center.x} ${center.y})"><circle class="orbit-guide" r="${center.radius}"/><circle class="orbit-sun-glow" r="20"/><circle class="orbit-sun-core" r="7"/><text class="orbit-sun-label" y="-30" text-anchor="middle">${SECTION_META[center.kind].label.toUpperCase()} · ${SECTION_META[center.kind].zh}</text></g>`).join('') +
       (connections ? edges.map(({ source, target }) => {
         const a = positions[source]; const b = positions[target];
         const active = selected >= 0 && (source === selected || target === selected);
@@ -153,7 +147,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
         const label = namePositions[index];
         const labelX = label.x - x; const labelY = label.y - y;
         const lines = label.lines;
-        return `<g class="orbit-star${strong ? ' is-selected' : ''}" data-star="${index}" role="button" tabindex="${visible ? 0 : -1}" aria-label="${name}, ${node.kind === 'projects' ? 'project' : 'skill'}, ${neighbors(index).length} connections" aria-pressed="${strong}"${visible ? '' : ' aria-hidden="true"'} transform="translate(${x} ${y})" style="--star-color:${color(node)};opacity:${opacity}"><title>${name}</title><circle class="orbit-hit" r="24"/><circle class="orbit-halo" r="${node.kind === 'projects' ? 19 : 14}"/><circle class="orbit-dot" r="${node.kind === 'projects' ? 6 : 4}"/>${labels ? `${Math.abs(labelX) > 20 || Math.abs(labelY) > 45 ? `<line class="orbit-label-leader" x2="${labelX}" y2="${labelY}"/>` : ''}<text x="${labelX}" y="${labelY - (lines.length - 1) * 7.5}" text-anchor="middle">${lines.map((line, lineIndex) => `<tspan x="${labelX}" dy="${lineIndex ? 15 : 0}">${escape(line)}</tspan>`).join('')}</text>` : ''}</g>`;
+        return `<g class="orbit-star${strong ? ' is-selected' : ''}" data-star="${index}" role="button" tabindex="${visible ? 0 : -1}" aria-label="${name}, ${sectionMeta(node.kind).label}, ${neighbors(index).length} connections" aria-pressed="${strong}"${visible ? '' : ' aria-hidden="true"'} transform="translate(${x} ${y})" style="--star-color:${color(node)};opacity:${opacity}"><title>${name}</title><circle class="orbit-hit" r="24"/><circle class="orbit-halo" r="${haloRadius(node)}"/><circle class="orbit-dot" r="${starRadius(node)}"/>${labels ? `${Math.abs(labelX) > 20 || Math.abs(labelY) > 45 ? `<line class="orbit-label-leader" x2="${labelX}" y2="${labelY}"/>` : ''}<text x="${labelX}" y="${labelY - (lines.length - 1) * 7.5}" text-anchor="middle">${lines.map((line, lineIndex) => `<tspan x="${labelX}" dy="${lineIndex ? 15 : 0}">${escape(line)}</tspan>`).join('')}</text>` : ''}</g>`;
       }).join('');
     transform();
     welcome.hidden = nodes.length > 0;
@@ -161,7 +155,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     container.querySelector('[data-map-action="3d"]').hidden = !realNodes.length || demo;
     indexHost.hidden = !(browse || query);
     container.querySelector('[data-map-action="browse"]').setAttribute('aria-expanded', String(!indexHost.hidden));
-    indexHost.innerHTML = `<h2>${demo ? 'Sample records' : 'Your records'} <span>${matches.size}</span></h2>${[...matches].map((index) => `<button type="button" data-select="${index}"><i style="background:${color(nodes[index])}"></i><span>${escape(nodes[index].name)}<small>${escape(nodes[index].meta || (nodes[index].kind === 'projects' ? 'Project' : 'Skill'))}</small></span><span aria-hidden="true">↗</span></button>`).join('') || '<p>No matches. Try a different name or filter.</p>'}${demo ? '<button type="button" data-map-action="exit-demo">Exit sample preview</button>' : ''}`;
+    indexHost.innerHTML = `<h2>${demo ? 'Sample records' : 'Your records'} <span>${matches.size}</span></h2>${[...matches].map((index) => `<button type="button" data-select="${index}"><i style="background:${color(nodes[index])}"></i><span>${escape(nodes[index].name)}<small>${escape(nodes[index].meta || sectionMeta(nodes[index].kind).label)} · ${sectionMeta(nodes[index].kind).label}</small></span><span aria-hidden="true">↗</span></button>`).join('') || '<p>No matches. Try a different name or filter.</p>'}${demo ? '<button type="button" data-map-action="exit-demo">Exit sample preview</button>' : ''}`;
     stage.classList.toggle('is-demo', demo);
     let demoExit = container.querySelector('.orbit-demo-exit');
     if (demo && !demoExit) {
@@ -176,7 +170,9 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     const node = nodes[index];
     const linked = neighbors(index);
     detail.hidden = false;
-    detail.innerHTML = `<button type="button" class="orbit-close" data-map-action="close" aria-label="Close star details">×</button><p class="orbit-eyebrow">${demo ? 'SAMPLE ' : ''}${node.kind === 'projects' ? 'PROJECT' : 'SKILL'}</p><h2>${escape(node.name)}</h2><span class="orbit-meta">${escape(node.meta)}</span><p>${escape(node.description || 'No notes yet. Open the record to add a little context.')}</p><h3>${linked.length} connected ${linked.length === 1 ? 'record' : 'records'}</h3><div class="orbit-related">${linked.map((target) => `<button type="button" data-select="${target}">${escape(nodes[target].name)} ↗</button>`).join('') || '<p>Add links to this record to connect it with your other projects and skills.</p>'}</div>${demo ? '<p class="orbit-sample-note">Sample preview · Nothing is saved to your vault.</p>' : '<button type="button" class="button button-primary" data-map-action="open">Open record ↗</button>'}`;
+    const meta = sectionMeta(node.kind);
+    const virtual = node.kind === 'accounting' || node.kind === 'games';
+    detail.innerHTML = `<button type="button" class="orbit-close" data-map-action="close" aria-label="Close star details">×</button><p class="orbit-eyebrow" style="color:${meta.sun}">${demo ? 'SAMPLE ' : ''}${meta.kindLabel} · <span lang="zh-Hant">${meta.zh}</span></p><h2>${escape(node.name)}</h2><span class="orbit-meta" style="color:${meta.star}">${escape(node.meta)}</span><p>${escape(node.description || 'No notes yet. Open the record to add a little context.')}</p><h3>${linked.length} connected ${linked.length === 1 ? 'record' : 'records'}</h3><div class="orbit-related">${linked.map((target) => `<button type="button" data-select="${target}">${escape(nodes[target].name)} ↗</button>`).join('') || '<p>Add links to this record to connect it with your other projects and skills.</p>'}</div>${demo ? '<p class="orbit-sample-note">Sample preview · Nothing is saved to your vault.</p>' : `<button type="button" class="button button-primary" data-map-action="open">${virtual ? `Open ${meta.label} ↗` : 'Open record ↗'}</button>`}`;
     draw();
     if (focus) detail.querySelector('.orbit-close').focus();
   }
@@ -187,7 +183,8 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     demo = enabled;
     nodes = demo ? DEMO_NODES : realNodes;
     edges = demo ? DEMO_EDGES : realEdges;
-    positions = layoutConstellation(nodes);
+    systemMap = layoutSystemMap(nodes);
+    positions = systemMap.positions;
     namePositions = layoutStarLabels(nodes, positions);
     query = ''; input.value = ''; kind = 'all'; browse = false;
     zoom = 1; pan = { x: 0, y: 0 }; resetSelection(); syncFilters(); draw();
@@ -205,7 +202,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     const request = ++threeRequest;
     threeButton.disabled = true; threeButton.textContent = 'Loading 3D…'; notice.hidden = true;
     try {
-      const module = await Promise.race([import('./constellation-3d.mjs?v=4'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
+      const module = await Promise.race([import('./constellation-3d.mjs?v=5'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
       if (disposed || request !== threeRequest) return;
       host3d.hidden = false; stage.hidden = true;
       threeD = module.createMyVaultConstellation({ container: host3d.querySelector('[data-three-host]'), nodes: realNodes, edges: realEdges, onOpen });

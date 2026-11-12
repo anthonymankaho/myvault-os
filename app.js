@@ -1798,7 +1798,7 @@ function renderBuild() {
 let constellationCleanup = null;
 let constellationDataKey = "";
 let constellationRequest = 0;
-const CONSTELLATION_COLLECTIONS = ["projects", "skills"];
+const CONSTELLATION_COLLECTIONS = ["projects", "skills", "docs", "chats", "tasks"];
 
 function normalizeTags(value) {
   const list = Array.isArray(value)
@@ -1826,14 +1826,22 @@ function constellationAlias(value) {
 function buildConstellationModel() {
   const nodes = CONSTELLATION_COLLECTIONS.flatMap((kind) =>
     state.vault[kind].map((item, index) => {
-      const name = itemTitle(item);
+      const name = kind === "tasks"
+        ? String(item.description || "").trim() || "Untitled task"
+        : itemTitle(item);
       const id = String(item.id || `missing-${index}`);
-      const description = String(item.notes ?? "").replace(/^#+\s*/gm, "").trim();
+      const description = String(item.notes ?? item.docResult ?? "").replace(/^#+\s*/gm, "").trim();
       const meta = kind === "projects"
         ? String(item.status || "Project")
-        : String(item.level || "Skill");
+        : kind === "skills"
+          ? String(item.level || "Skill")
+          : kind === "docs"
+            ? normalizeTags(item.tags).join(", ") || "Document"
+            : kind === "chats"
+              ? "Chat"
+              : `${item.company || "OTHER"} · ${item.status || "Not Started"}`;
       return {
-        key: `${kind === "projects" ? "project" : "skill"}:${id}`,
+        key: `${kind}:${id}`,
         id,
         kind,
         name,
@@ -1846,6 +1854,32 @@ function buildConstellationModel() {
       };
     }),
   );
+  ACCOUNTING_COMPANIES.forEach((company) => {
+    nodes.push({
+      key: `accounting:${company.key}`,
+      id: company.key,
+      kind: "accounting",
+      name: company.name,
+      meta: company.code,
+      description: company.description,
+      links: [],
+      safeName: escapeHtml(company.name),
+      safeMeta: escapeHtml(company.code),
+      safeDescription: escapeHtml(company.description),
+    });
+  });
+  nodes.push({
+    key: "games:neon-apex",
+    id: "neon-apex",
+    kind: "games",
+    name: "Neon Apex",
+    meta: "Arcade racer",
+    description: "The built-in arcade racer — three maps, drift, boost and local best laps.",
+    links: [],
+    safeName: "Neon Apex",
+    safeMeta: "Arcade racer",
+    safeDescription: "The built-in arcade racer — three maps, drift, boost and local best laps.",
+  });
   const aliases = new Map();
   nodes.forEach((node, index) => {
     const values = [node.name, constellationAlias(node.name)];
@@ -1877,10 +1911,11 @@ async function updateConstellationBackground() {
       state.vault[kind].map((item) => [
         kind,
         item.id ?? "",
-        itemTitle(item),
-        item.status ?? item.level ?? "",
-        item.notes ?? "",
+        kind === "tasks" ? item.description ?? "" : itemTitle(item),
+        item.status ?? item.level ?? item.company ?? "",
+        item.notes ?? item.docResult ?? "",
         item.links ?? [],
+        item.tags ?? "",
       ]),
     ),
   );
@@ -1891,7 +1926,7 @@ async function updateConstellationBackground() {
   const request = ++constellationRequest;
   const model = buildConstellationModel();
   try {
-    const { createMyVaultConstellation } = await import("./constellation.mjs?v=4");
+    const { createMyVaultConstellation } = await import("./constellation.mjs?v=5");
     if (request !== constellationRequest) return;
     const constellation = createMyVaultConstellation({
       container,
@@ -1902,6 +1937,10 @@ async function updateConstellationBackground() {
         openItemDialog(kind);
       },
       onOpen(node) {
+        if (node.kind === "accounting" || node.kind === "games") {
+          navigate(node.kind);
+          return;
+        }
         const index = state.vault[node.kind].findIndex(
           (item) => String(item.id || "") === node.id,
         );
@@ -1910,7 +1949,8 @@ async function updateConstellationBackground() {
           return;
         }
         navigate(node.kind);
-        openItemDialog(node.kind, index);
+        if (node.kind === "tasks") openTaskDialog(index);
+        else openItemDialog(node.kind, index);
       },
     });
     constellationCleanup = () => constellation.dispose();
