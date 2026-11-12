@@ -707,9 +707,10 @@ function renderGames() {
         <div class="game-cover-copy">
           <p class="eyebrow">ARCADE / 3D RACING</p>
           <h2 id="games-library-heading">Neon Apex</h2>
-          <p>Take the inside line, pass the field, and finish three laps under the lights. A quick race with no downloads or account setup.</p>
+          <p>Take the inside line, pass the field, and finish three laps under the lights. Play here or install the standalone game on your iPad.</p>
           <div class="game-facts"><span>3 laps</span><span>4 drivers</span><span>Keyboard + touch</span></div>
-          <button class="button button-primary" id="launch-neon-apex" type="button">Start a race <span aria-hidden="true">↗</span></button>
+          <div class="game-actions"><button class="button button-primary" id="launch-neon-apex" type="button">Start a race <span aria-hidden="true">↗</span></button><a class="button button-quiet" href="games/neon-apex.html" target="_blank" rel="noopener">Open standalone / Install on iPad ↗</a></div>
+          <p class="game-install-hint">On iPad, open the standalone game in Safari, then tap Share → Add to Home Screen → Open as Web App.</p>
         </div>
       </div>
       <div class="game-play-area" id="game-play-area" hidden>
@@ -723,7 +724,7 @@ function renderGames() {
   neonApexArea = area;
   neonApexFrame = frame;
   viewContainer.querySelector("#launch-neon-apex").addEventListener("click", () => {
-    frame.src = "games/neon-apex.html?v=touge-1";
+    frame.src = "games/neon-apex.html?v=ipad-1";
     area.hidden = false;
     area.scrollIntoView({ behavior: "smooth", block: "start" });
   });

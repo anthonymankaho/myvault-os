@@ -66,6 +66,8 @@ body {
 .game-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
 .game-facts span { padding: 6px 10px; border: 1px solid #425253; border-radius: 99px; color: #c5d0ca; font-size: 11px; }
 .game-cover-copy .button { gap: 12px; }
+.game-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.game-cover-copy .game-install-hint { margin: 12px 0 0; color: #94aaaa; font-size: 12px; line-height: 1.5; }
 .game-play-area { display: grid; gap: 12px; scroll-margin-top: 24px; }
 .game-play-area[hidden] { display: none; }
 .game-play-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }

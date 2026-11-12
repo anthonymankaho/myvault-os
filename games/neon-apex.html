@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#071018" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Neon Apex" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/neon-apex-180.png" />
     <title>Neon Apex — MyVault Arcade</title>
     <style>
       :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #eef4f0; background: #071018; font-synthesis: none; }
@@ -162,7 +167,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
     <script type="module">
-      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+      import * as THREE from "./vendor/three.module.js";
       import {
         CONTROL_MODE_KEY,
         chooseFullscreenAction,
@@ -171,8 +176,8 @@
         normalizeControlMode,
         shouldClearTouches,
         touchControlsVisible,
-      } from "./neon-apex-input.mjs?v=touch-1";
-      import { ROAD_HALF, TAU, TRACK_KEY, createTracks, normalizeTrackId, outlinePath } from "./neon-apex-tracks.mjs?v=maps-1";
+      } from "./neon-apex-input.mjs";
+      import { ROAD_HALF, TAU, TRACK_KEY, createTracks, normalizeTrackId, outlinePath } from "./neon-apex-tracks.mjs";
 
       const $ = (id) => document.getElementById(id);
       const sceneHost = $("scene");
@@ -761,6 +766,7 @@
       syncPauseButton();
       setOverlay("ready");
       document.documentElement.dataset.neonApex = "ready";
+      if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
     </script>
   </body>
 </html>
