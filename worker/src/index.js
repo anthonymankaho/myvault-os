@@ -6,19 +6,33 @@ const ACCOUNTING_SYSTEMS = {
   gpl: {
     label: "GPL",
     contentsUrl:
-      "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main"
+      "https://api.github.com/repos/anthonymankaho/GPL/contents/GPL-System/GPL_System.html?ref=main",
+    standaloneSecret: "GPL_STANDALONE_CODE"
   },
   eic: {
     label: "EIC",
     contentsUrl:
-      "https://api.github.com/repos/anthonymankaho/EIC/contents/EIC-System/EIC_System.html?ref=main"
+      "https://api.github.com/repos/anthonymankaho/EIC/contents/EIC-System/EIC_System.html?ref=main",
+    standaloneSecret: "EIC_STANDALONE_CODE"
   },
   mpl: {
     label: "MPL",
     contentsUrl:
-      "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main"
+      "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main",
+    standaloneSecret: "MPL_STANDALONE_CODE"
   }
 };
+
+// Constant-time-ish string compare for access codes (length is not secret).
+function constantTimeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
 const GITHUB_OAUTH_URL = "https://github.com/login/oauth/access_token";
 const DEFAULT_ORIGIN = "https://myvault-os.pages.dev";
 
@@ -200,32 +214,60 @@ async function handleSave(payload, authorization, origin) {
   }
 }
 
-async function handleAccountingSystem(authorization, origin, systemKey) {
+async function handleAccountingSystem(authorization, env, origin, systemKey, payload) {
   if (origin !== "https://anthonymankaho.github.io") {
     return errorResponse("Origin is not allowed.", 403, origin);
-  }
-  if (!/^Bearer\s+\S+$/i.test(authorization ?? "")) {
-    return errorResponse("A signed-in GitHub account is required.", 401, origin);
   }
   const system = ACCOUNTING_SYSTEMS[systemKey];
   if (!system) {
     return errorResponse("Unknown accounting system.", 400, origin);
   }
 
+  // Two ways in: the visitor's own GitHub token, or a standalone access code
+  // that unlocks a server-side read of the private repo (no GitHub needed).
+  const hasGitHub = /^Bearer\s+\S+$/i.test(authorization ?? "");
+  const standaloneCode = typeof payload?.code === "string" ? payload.code.trim() : "";
+  let repoAuthorization;
+  let standalone = false;
+
+  if (hasGitHub) {
+    repoAuthorization = authorization;
+  } else if (standaloneCode) {
+    const expected = env[system.standaloneSecret];
+    if (!expected || !env.GH_REPO_READ_TOKEN) {
+      return errorResponse(
+        `Standalone access is not configured for the ${system.label} system.`,
+        503,
+        origin
+      );
+    }
+    if (!constantTimeEqual(standaloneCode, expected)) {
+      return errorResponse("Incorrect access code.", 403, origin);
+    }
+    repoAuthorization = `Bearer ${env.GH_REPO_READ_TOKEN}`;
+    standalone = true;
+  } else {
+    return errorResponse(
+      "A signed-in GitHub account or a standalone access code is required.",
+      401,
+      origin
+    );
+  }
+
   try {
     const response = await fetch(system.contentsUrl, {
       headers: {
-        ...githubHeaders(authorization),
+        ...githubHeaders(repoAuthorization),
         Accept: "application/vnd.github.raw+json"
       }
     });
 
     if (response.status === 401 || response.status === 403 || response.status === 404) {
-      return errorResponse(
-        `This GitHub account cannot access the private ${system.label} system.`,
-        403,
-        origin
-      );
+      // With a standalone code the repo read uses a server token, so a denial
+      // is a configuration problem, not the visitor's fault.
+      return standalone
+        ? errorResponse(`The private ${system.label} system could not be loaded.`, 502, origin)
+        : errorResponse(`This GitHub account cannot access the private ${system.label} system.`, 403, origin);
     }
     if (!response.ok || !response.body) {
       return errorResponse(`The private ${system.label} system could not be loaded.`, 502, origin);
@@ -306,12 +348,14 @@ export default {
       case "auth":
         return handleAuth(payload, env, origin);
       case "gpl-system":
-        return handleAccountingSystem(request.headers.get("Authorization"), origin, "gpl");
+        return handleAccountingSystem(request.headers.get("Authorization"), env, origin, "gpl", payload);
       case "accounting-system":
         return handleAccountingSystem(
           request.headers.get("Authorization"),
+          env,
           origin,
-          typeof payload.system === "string" ? payload.system.toLowerCase() : ""
+          typeof payload.system === "string" ? payload.system.toLowerCase() : "",
+          payload
         );
       case "load":
       case "save": {

@@ -68,6 +68,10 @@ Each public `systems/<Company>_System.html` URL is a sign-in page, not the appli
 
 Access is granted only when GitHub authorizes that signed-in account to read the private file. The Worker returns the HTML with caching disabled; the full systems and their embedded workbook data are not stored in this public repository's current files. When a shell is embedded in the Accounting view it hides its standalone back link — the workspace provides **Back to Accounting**, **Full screen**, and Escape-to-exit.
 
+### Standalone access code (no GitHub sign-in)
+
+Each shell also offers an **access-code** path for people without a GitHub account (e.g. auditors). The visitor enters a per-system code; the Worker checks it against the `GPL_STANDALONE_CODE` / `EIC_STANDALONE_CODE` / `MPL_STANDALONE_CODE` secret (constant-time) and, on a match, reads the private repo with a **server-side read-only token** (`GH_REPO_READ_TOKEN`) instead of the visitor's token. The data is still never served without a valid code, and the system's own username/password login still governs module permissions once it loads. The code is kept only in `sessionStorage` for the tab session. A system's standalone path stays disabled until both its code secret and `GH_REPO_READ_TOKEN` are configured (fail-closed, 503). Set secrets with `wrangler secret put <NAME>` from `worker/`; the read token must be a fine-grained GitHub PAT with **Contents: read** on the private repos only.
+
 ## Screenshot
 
 _Screenshot coming soon._

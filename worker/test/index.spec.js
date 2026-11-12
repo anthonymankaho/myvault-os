@@ -270,13 +270,15 @@ describe("accounting-system action", () => {
     expect(await response.json()).toEqual({ error: "Origin is not allowed." });
   });
 
-  it("requires a signed-in GitHub account", async () => {
+  it("requires a GitHub account or a standalone access code", async () => {
     const response = await worker.fetch(
       makePagesRequest("accounting-system", { system: "eic" }),
       {}
     );
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "A signed-in GitHub account is required." });
+    expect(await response.json()).toEqual({
+      error: "A signed-in GitHub account or a standalone access code is required."
+    });
   });
 
   it("rejects unknown system keys", async () => {
@@ -354,6 +356,112 @@ describe("accounting-system action", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(html);
+    expect(fetchMock).toHaveBeenCalledWith(
+      SYSTEM_URLS.gpl,
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer user-token" })
+      })
+    );
+  });
+});
+
+describe("accounting-system standalone access code", () => {
+  const STANDALONE_ENV = { GPL_STANDALONE_CODE: "gpl-code-123", GH_REPO_READ_TOKEN: "server-pat" };
+
+  it("unlocks with a valid code and reads the repo using the server token", async () => {
+    const html = "<!doctype html><title>GPL via code</title>";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(html, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "gpl-code-123" }),
+      STANDALONE_ENV
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(html);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+    expect(fetchMock).toHaveBeenCalledWith(
+      SYSTEM_URLS.gpl,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer server-pat",
+          Accept: "application/vnd.github.raw+json"
+        })
+      })
+    );
+  });
+
+  it("trims whitespace around the submitted code", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html></html>", { status: 200 })));
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "  gpl-code-123  " }),
+      STANDALONE_ENV
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("rejects an incorrect code with 403 and never reads the repo", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "wrong-code" }),
+      STANDALONE_ENV
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Incorrect access code." });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when standalone access is not configured for the system", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "eic", code: "any-code" }),
+      { GH_REPO_READ_TOKEN: "server-pat" }
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "Standalone access is not configured for the EIC system."
+    });
+  });
+
+  it("returns 503 when the server read token is missing", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "gpl-code-123" }),
+      { GPL_STANDALONE_CODE: "gpl-code-123" }
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "Standalone access is not configured for the GPL system."
+    });
+  });
+
+  it("does not let one system's code unlock another system", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "eic", code: "gpl-code-123" }),
+      { ...STANDALONE_ENV, EIC_STANDALONE_CODE: "eic-code-456" }
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Incorrect access code." });
+  });
+
+  it("maps a server-token repo denial to 502 (configuration), not a user 403", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 403 })));
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "gpl-code-123" }),
+      STANDALONE_ENV
+    );
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "The private GPL system could not be loaded." });
+  });
+
+  it("still prefers a GitHub token when both are supplied", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("<html></html>", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "gpl-code-123" }, "Bearer user-token"),
+      STANDALONE_ENV
+    );
+    expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(
       SYSTEM_URLS.gpl,
       expect.objectContaining({

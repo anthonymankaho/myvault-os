@@ -18,15 +18,20 @@
     button.secondary, .button.secondary { color: #26364e; background: #edf1f6; }
     button:hover, .button:hover { filter: brightness(.96); }
     #lock[hidden], #gate[hidden], #system[hidden], #clear[hidden] { display: none; }
-    #gate { width: min(640px, calc(100% - 32px)); margin: 9vh auto; padding: 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; }
+    #gate { width: min(640px, calc(100% - 32px)); margin: 7vh auto; padding: 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; }
     #gate h1 { margin: 0 0 8px; font-size: 23px; }
     #gate p { color: #59677a; margin: 8px 0 18px; }
     #message { min-height: 24px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
     .note { margin-top: 18px !important; font-size: 13px; }
+    .code-gate { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e6ebf2; }
+    .code-gate label { display: block; font-size: 13px; font-weight: 650; color: #26364e; margin-bottom: 8px; }
+    .code-row { display: flex; gap: 10px; }
+    .code-row input { flex: 1; min-width: 0; min-height: 38px; padding: 8px 12px; border: 1px solid #c8d2e0; border-radius: 8px; font: inherit; color: #1e293b; background: #fff; }
+    .code-row input:focus { outline: 2px solid #315de855; border-color: #315de8; }
     #system { flex: 1; min-height: 0; }
     #system iframe { display: block; width: 100%; height: calc(100vh - 58px); border: 0; background: #fff; }
-    @media (max-width: 520px) { header { padding: 9px 12px; } .brand { gap: 8px; } .brand strong { font-size: 14px; } #gate { padding: 22px; } }
+    @media (max-width: 520px) { header { padding: 9px 12px; } .brand { gap: 8px; } .brand strong { font-size: 14px; } #gate { padding: 22px; } .code-row { flex-direction: column; } }
   </style>
 </head>
 <body>
@@ -39,24 +44,35 @@
   </header>
   <main id="gate">
     <h1>Sign in required</h1>
-    <p id="message">Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.</p>
+    <p id="message">Sign in to MyVault OS with a GitHub account that has access to the private GPL repository, or unlock with a standalone access code.</p>
     <div class="actions">
       <a class="button" href="../index.html" target="_blank" rel="noopener noreferrer">Open MyVault OS sign-in</a>
       <button id="retry" class="secondary" type="button">Check sign-in</button>
       <button id="clear" class="secondary" type="button" hidden>Clear sign-in</button>
     </div>
-    <p class="note">After signing in, return to this page. The GPL system will load automatically when access is confirmed.</p>
+    <div class="code-gate">
+      <label for="code">Or unlock with a standalone access code</label>
+      <div class="code-row">
+        <input id="code" type="password" autocomplete="off" placeholder="Access code" aria-label="Standalone access code">
+        <button id="unlock" type="button">Unlock</button>
+      </div>
+    </div>
+    <p class="note">After signing in or unlocking, the GPL system loads automatically when access is confirmed. The code is kept only for this browser tab session.</p>
   </main>
   <section id="system" hidden aria-label="GPL accounting system"></section>
   <script>
     const API = "https://myvault-api.anthonym-354.workers.dev";
     const TOKEN_KEY = "myvault_token";
+    const SYSTEM_KEY = "gpl";
+    const CODE_KEY = "myvault_standalone_code_gpl";
     const gate = document.querySelector("#gate");
     const message = document.querySelector("#message");
     const system = document.querySelector("#system");
     const lockButton = document.querySelector("#lock");
     const retryButton = document.querySelector("#retry");
     const clearButton = document.querySelector("#clear");
+    const codeInput = document.querySelector("#code");
+    const unlockButton = document.querySelector("#unlock");
     let loading = false;
 
     // When opened inside the MyVault OS Accounting view, the parent chrome
@@ -75,38 +91,48 @@
       clearButton.hidden = !denied;
     }
 
+    function renderSystem(html) {
+      const frame = document.createElement("iframe");
+      frame.title = "GPL System";
+      frame.referrerPolicy = "no-referrer";
+      frame.srcdoc = html;
+      system.replaceChildren(frame);
+      gate.hidden = true;
+      system.hidden = false;
+      lockButton.hidden = false;
+    }
+
     async function loadSystem() {
+      const code = sessionStorage.getItem(CODE_KEY);
       const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.");
+      if (!code && !token) {
+        showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository, or unlock with a standalone access code.");
         return;
       }
       if (loading) return;
       loading = true;
-      message.textContent = "Checking your GitHub access and loading GPL…";
+      message.textContent = "Checking access and loading GPL…";
       gate.hidden = false;
       clearButton.hidden = true;
       try {
+        const headers = { "Content-Type": "application/json" };
+        const payload = { system: SYSTEM_KEY };
+        if (code) payload.code = code;
+        else headers.Authorization = "Bearer " + token;
         const response = await fetch(API, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-          },
+          headers,
           cache: "no-store",
-          body: JSON.stringify({ action: "gpl-system" })
+          body: JSON.stringify({ action: "accounting-system", payload })
         });
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));
           if (response.status === 401 || response.status === 403) {
-            showGate(result.error || "This GitHub account cannot access the private GPL repository.", true);
+            if (code) sessionStorage.removeItem(CODE_KEY);
+            showGate(result.error || "Access was denied.", true);
           } else {
             showGate(result.error || "GPL could not be loaded. Please try again.", false);
           }
-          return;
-        }
-        if (localStorage.getItem(TOKEN_KEY) !== token) {
-          showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
           return;
         }
         const html = await response.text();
@@ -114,14 +140,7 @@
           showGate("The private GPL system returned an empty file. Please contact the administrator.", false);
           return;
         }
-        const frame = document.createElement("iframe");
-        frame.title = "GPL System";
-        frame.referrerPolicy = "no-referrer";
-        frame.srcdoc = html;
-        system.replaceChildren(frame);
-        gate.hidden = true;
-        system.hidden = false;
-        lockButton.hidden = false;
+        renderSystem(html);
       } catch {
         showGate("Could not reach the GPL access service. Check your connection and try again.", false);
       } finally {
@@ -129,25 +148,38 @@
       }
     }
 
+    unlockButton.addEventListener("click", async () => {
+      const value = codeInput.value.trim();
+      if (!value) { message.textContent = "Enter the standalone access code first."; return; }
+      sessionStorage.setItem(CODE_KEY, value);
+      codeInput.value = "";
+      await loadSystem();
+    });
+    codeInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); unlockButton.click(); }
+    });
     retryButton.addEventListener("click", () => {
-      if (localStorage.getItem(TOKEN_KEY)) loadSystem();
-      else message.textContent = "No MyVault sign-in was found in this browser. Open MyVault OS and sign in first.";
+      if (sessionStorage.getItem(CODE_KEY) || localStorage.getItem(TOKEN_KEY)) loadSystem();
+      else message.textContent = "No MyVault sign-in or access code was found in this browser. Sign in first, or enter an access code.";
     });
     clearButton.addEventListener("click", () => {
       localStorage.removeItem(TOKEN_KEY);
-      showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository.");
+      sessionStorage.removeItem(CODE_KEY);
+      showGate("Sign in to MyVault OS with a GitHub account that has access to the private GPL repository, or unlock with a standalone access code.");
     });
     lockButton.addEventListener("click", () => {
       localStorage.removeItem(TOKEN_KEY);
-      showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+      sessionStorage.removeItem(CODE_KEY);
+      showGate("Signed out. Sign in or enter an access code to reopen GPL.");
     });
     window.addEventListener("storage", (event) => {
       if (event.key !== TOKEN_KEY) return;
-      if (!event.newValue) showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+      if (!event.newValue && !sessionStorage.getItem(CODE_KEY)) showGate("Signed out. Sign in or enter an access code to reopen GPL.");
       else loadSystem();
     });
     window.addEventListener("focus", () => {
-      if (!localStorage.getItem(TOKEN_KEY)) showGate("Signed out. Sign in to MyVault OS again to reopen GPL.");
+      const hasAccess = sessionStorage.getItem(CODE_KEY) || localStorage.getItem(TOKEN_KEY);
+      if (!hasAccess) showGate("Signed out. Sign in or enter an access code to reopen GPL.");
       else if (!gate.hidden) loadSystem();
     });
     loadSystem();
