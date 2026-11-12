@@ -135,18 +135,22 @@ html { scrollbar-color: #33454a #111719; scrollbar-width: thin; }
 .accounting-admin-head h2 span { font-size: .78em; color: var(--muted); margin-left: 8px; }
 .accounting-admin-head p { margin: 8px 0 0; max-width: 80ch; color: var(--muted); font-size: 12.5px; line-height: 1.65; }
 .accounting-admin-rows { display: grid; gap: 10px; }
-.accounting-admin-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) auto minmax(260px, 1.4fr); align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #ffffff05; }
+.accounting-admin-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) auto minmax(330px, 1.6fr); align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #ffffff05; }
 .accounting-admin-company { font-size: 12.5px; color: var(--muted); }
 .accounting-admin-company b { display: inline-block; margin-right: 8px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; color: var(--text); background: #ffffff08; }
 .accounting-admin-status { justify-self: start; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; letter-spacing: .03em; white-space: nowrap; border: 1px solid var(--line); color: var(--muted); }
 .accounting-admin-status[data-state="set"] { border-color: #2f6b45; color: #8fe6b0; background: #22c55e14; }
 .accounting-admin-status[data-state="unset"] { border-color: #6b5a2e; color: #ecd9a8; background: #d4a53c12; }
 .accounting-admin-status[data-state="error"] { border-color: #7a3a36; color: var(--danger); background: #ffb0aa10; }
-.accounting-admin-form { display: flex; gap: 8px; }
-.accounting-admin-form input { flex: 1; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #10171a; color: var(--text); font: 500 13px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; }
+.accounting-admin-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.accounting-admin-form input { flex: 1 1 160px; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #10171a; color: var(--text); font: 500 13px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; }
 .accounting-admin-form input::placeholder { font-family: inherit; letter-spacing: .02em; color: #5d6a7e; }
 .accounting-admin-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px #b9e8d122; }
 .accounting-admin-form .button { min-height: 40px; white-space: nowrap; }
+.accounting-admin-current { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.accounting-admin-current[hidden] { display: none; }
+.accounting-admin-current code { padding: 8px 14px; border: 1px solid #2f6b45; border-radius: 9px; background: #22c55e10; color: #a7f3c9; font: 600 14px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; user-select: all; overflow-wrap: anywhere; }
+.accounting-admin-current .button { min-height: 38px; }
 .accounting-admin-msg { grid-column: 1 / -1; min-height: 0; font-size: 11.5px; color: var(--muted); }
 .accounting-admin-msg:empty { display: none; }
 .accounting-admin-msg[data-kind="success"] { color: #8fe6b0; }

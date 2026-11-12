@@ -830,7 +830,7 @@ function renderAccounting() {
       <div class="accounting-admin-head">
         <p class="eyebrow">OWNER CONSOLE · 管理員</p>
         <h2>Auditor access codes <span lang="zh-Hant">審計員存取碼</span></h2>
-        <p>Set the code the auditor enters at the portal for each company. Codes are stored server-side and never shown again — type a new one any time to replace it. <span lang="zh-Hant">設定審計員於入口為每家公司輸入的代碼。代碼存於伺服器、不會再次顯示——隨時輸入新代碼即可取代。</span></p>
+        <p>This is the code the auditor enters at the portal — and on each system's standalone "Unlock" screen. Set or replace it here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">這就是審計員於入口及每個系統獨立「Unlock」畫面輸入的代碼。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
       </div>
       <div class="accounting-admin-rows">
         ${ACCOUNTING_COMPANIES.map(
@@ -841,7 +841,9 @@ function renderAccounting() {
           <span class="accounting-admin-form">
             <input type="password" data-code-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="New access code · 新存取碼" aria-label="New ${company.code} auditor access code">
             <button class="button button-primary" type="button" data-code-save>Save code <span lang="zh-Hant">儲存</span></button>
+            <button class="button button-quiet" type="button" data-code-reveal aria-pressed="false">Show code <span lang="zh-Hant">顯示</span></button>
           </span>
+          <span class="accounting-admin-current" data-code-current hidden><code data-code-value></code><button class="button button-quiet" type="button" data-code-copy>Copy <span lang="zh-Hant">複製</span></button></span>
           <span class="accounting-admin-msg" data-code-msg role="status"></span>
         </div>`,
         ).join("")}
@@ -924,6 +926,18 @@ function renderAccounting() {
       const input = row.querySelector("[data-code-input]");
       const save = row.querySelector("[data-code-save]");
       const msg = row.querySelector("[data-code-msg]");
+      const reveal = row.querySelector("[data-code-reveal]");
+      const current = row.querySelector("[data-code-current]");
+      const value = row.querySelector("[data-code-value]");
+      const copy = row.querySelector("[data-code-copy]");
+      const setRevealed = (shown) => {
+        current.hidden = !shown;
+        reveal.setAttribute("aria-pressed", String(shown));
+        reveal.innerHTML = shown
+          ? 'Hide <span lang="zh-Hant">隱藏</span>'
+          : 'Show code <span lang="zh-Hant">顯示</span>';
+        if (!shown) value.textContent = "";
+      };
       const saveCode = async () => {
         const code = input.value.trim();
         if (code.length < 4) {
@@ -938,6 +952,7 @@ function renderAccounting() {
         try {
           await call("set-standalone-code", { system: row.dataset.codeSystem, code });
           input.value = "";
+          setRevealed(false);
           msg.textContent = "Saved — the auditor can use it right away. · 已儲存，審計員可即時使用。";
           msg.dataset.kind = "success";
           refreshCodeStatus();
@@ -953,6 +968,35 @@ function renderAccounting() {
         if (event.key === "Enter") {
           event.preventDefault();
           saveCode();
+        }
+      });
+      reveal.addEventListener("click", async () => {
+        if (!current.hidden) {
+          setRevealed(false);
+          return;
+        }
+        reveal.disabled = true;
+        try {
+          const result = await call("reveal-standalone-code", { system: row.dataset.codeSystem });
+          value.textContent = result.code || "";
+          setRevealed(true);
+          msg.textContent = "Visible to you only — auditors never see this panel. · 只有你見到——審計員看不到此面板。";
+          delete msg.dataset.kind;
+        } catch (error) {
+          msg.textContent = error.message || "Could not show the code. · 無法顯示代碼。";
+          msg.dataset.kind = "error";
+        } finally {
+          reveal.disabled = false;
+        }
+      });
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(value.textContent);
+          msg.textContent = "Copied. · 已複製。";
+          msg.dataset.kind = "success";
+        } catch {
+          msg.textContent = "Copy unavailable — select the code manually. · 無法自動複製——請手動選取代碼。";
+          delete msg.dataset.kind;
         }
       });
     });

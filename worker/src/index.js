@@ -115,6 +115,31 @@ async function handleStandaloneCodeStatus(authorization, env, origin) {
   return jsonResponse({ systems }, 200, origin);
 }
 
+// Owner-only reveal: the administrator can retrieve a code they set (e.g. to
+// hand it to the auditor or re-enter it on a standalone shell). The GitHub
+// identity is verified server-side; auditors never reach this action.
+async function handleRevealStandaloneCode(payload, authorization, env, origin) {
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return errorResponse("Origin is not allowed.", 403, origin);
+  }
+  const owner = await verifyOwner(authorization, env);
+  if (!owner.ok) return errorResponse(owner.error, owner.status, origin);
+
+  const systemKey = typeof payload?.system === "string" ? payload.system.toLowerCase() : "";
+  if (!ACCOUNTING_SYSTEMS[systemKey]) {
+    return errorResponse("Unknown accounting system.", 400, origin);
+  }
+  const code = await readStandaloneCode(env, systemKey);
+  if (!code) {
+    return errorResponse(
+      `No access code is configured for the ${ACCOUNTING_SYSTEMS[systemKey].label} system.`,
+      404,
+      origin
+    );
+  }
+  return jsonResponse({ system: systemKey, code }, 200, origin);
+}
+
 // Constant-time-ish string compare for access codes (length is not secret).
 function constantTimeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string") return false;
@@ -453,6 +478,8 @@ export default {
         return handleSetStandaloneCode(payload, request.headers.get("Authorization"), env, origin);
       case "standalone-code-status":
         return handleStandaloneCodeStatus(request.headers.get("Authorization"), env, origin);
+      case "reveal-standalone-code":
+        return handleRevealStandaloneCode(payload, request.headers.get("Authorization"), env, origin);
       case "load":
       case "save": {
         const authorization = request.headers.get("Authorization");

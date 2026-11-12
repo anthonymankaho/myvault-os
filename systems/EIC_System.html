@@ -26,6 +26,8 @@
     .note { margin-top: 18px !important; font-size: 13px; }
     .code-gate { margin-top: 22px; padding-top: 20px; border-top: 1px solid #e6ebf2; }
     .code-gate label { display: block; font-size: 13px; font-weight: 650; color: #26364e; margin-bottom: 8px; }
+    .code-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: #59677a; }
+    .code-hint a { color: #315de8; font-weight: 650; }
     .code-row { display: flex; gap: 10px; }
     .code-row input { flex: 1; min-width: 0; min-height: 38px; padding: 8px 12px; border: 1px solid #c8d2e0; border-radius: 8px; font: inherit; color: #1e293b; background: #fff; }
     .code-row input:focus { outline: 2px solid #315de855; border-color: #315de8; }
@@ -56,6 +58,7 @@
         <input id="code" type="password" autocomplete="off" placeholder="Access code" aria-label="Standalone access code">
         <button id="unlock" type="button">Unlock</button>
       </div>
+      <p class="code-hint">The administrator sets this code in MyVault OS → Accounting System → Owner Console (Show code / Copy). <span lang="zh-Hant">此代碼由管理員於 MyVault OS → Accounting System → Owner Console 設定（Show code 顯示／Copy 複製）。</span> <a href="../index.html#accounting">Open Owner Console ↗</a></p>
     </div>
     <p class="note">After signing in or unlocking, the EIC system loads automatically when access is confirmed. The code is kept only for this browser tab session.</p>
   </main>

@@ -581,6 +581,55 @@ describe("auditor code management (owner only)", () => {
     );
     expect(response.status).toBe(401);
   });
+
+  it("reveal-standalone-code returns the code to the verified owner", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const kv = makeKV({ "auditor-code:gpl": JSON.stringify({ code: "owner-chosen-code" }) });
+    const response = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "gpl" }, "Bearer owner-token"),
+      { QWEN_USAGE: kv }
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ system: "gpl", code: "owner-chosen-code" });
+  });
+
+  it("reveal-standalone-code falls back to the env secret", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const response = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "eic" }, "Bearer owner-token"),
+      { QWEN_USAGE: makeKV(), EIC_STANDALONE_CODE: "legacy-eic-code" }
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ system: "eic", code: "legacy-eic-code" });
+  });
+
+  it("reveal-standalone-code requires the owner", async () => {
+    const noAuth = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "gpl" }),
+      { QWEN_USAGE: makeKV({ "auditor-code:gpl": JSON.stringify({ code: "x" }) }) }
+    );
+    expect(noAuth.status).toBe(401);
+    vi.stubGlobal("fetch", ownerFetch("someone-else"));
+    const other = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "gpl" }, "Bearer other-token"),
+      { QWEN_USAGE: makeKV({ "auditor-code:gpl": JSON.stringify({ code: "x" }) }), QWEN_ALLOWED_GITHUB_USER: "anthonymankaho" }
+    );
+    expect(other.status).toBe(403);
+  });
+
+  it("reveal-standalone-code reports 404 when nothing is configured and 400 for unknown systems", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const missing = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "mpl" }, "Bearer owner-token"),
+      { QWEN_USAGE: makeKV() }
+    );
+    expect(missing.status).toBe(404);
+    const unknown = await worker.fetch(
+      makePagesRequest("reveal-standalone-code", { system: "xxx" }, "Bearer owner-token"),
+      { QWEN_USAGE: makeKV() }
+    );
+    expect(unknown.status).toBe(400);
+  });
 });
 
 describe("accounting-system with KV-stored codes", () => {
