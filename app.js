@@ -811,10 +811,49 @@ function renderAccounting() {
       </div>
     </article>`,
   ).join("");
+  const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
+  const auditorLink = `
+    <a class="accounting-auditor-link" href="https://anthonymankaho.github.io/auditor-portal/" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 64 64" aria-hidden="true" fill="none">
+        <path d="M32 4 56 18v28L32 60 8 46V18Z" stroke="currentColor" stroke-width="3.5"/>
+        <path d="M32 18v24M22 26l10-8 10 8M20 34h8l-4 8h-8zM36 34h8l4 8h-8z" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="accounting-auditor-copy">
+        <strong>Auditor Access Portal <span lang="zh-Hant">審計員入口</span></strong>
+        <small>Independent read-only entry for the external auditor. One-way link — the portal shows nothing else from this workspace. <span lang="zh-Hant">獨立唯讀入口，單向連結——入口不會顯示此工作區的其他內容。</span></small>
+      </span>
+      <span class="accounting-auditor-arrow" aria-hidden="true">↗</span>
+    </a>`;
+  const codeConsole = signedIn
+    ? `
+    <section class="accounting-admin" aria-label="Auditor access codes">
+      <div class="accounting-admin-head">
+        <p class="eyebrow">OWNER CONSOLE · 管理員</p>
+        <h2>Auditor access codes <span lang="zh-Hant">審計員存取碼</span></h2>
+        <p>Set the code the auditor enters at the portal for each company. Codes are stored server-side and never shown again — type a new one any time to replace it. <span lang="zh-Hant">設定審計員於入口為每家公司輸入的代碼。代碼存於伺服器、不會再次顯示——隨時輸入新代碼即可取代。</span></p>
+      </div>
+      <div class="accounting-admin-rows">
+        ${ACCOUNTING_COMPANIES.map(
+          (company) => `
+        <div class="accounting-admin-row" data-code-system="${company.key}">
+          <span class="accounting-admin-company"><b>${company.code}</b> ${escapeHtml(company.name)}</span>
+          <span class="accounting-admin-status" data-code-status data-state="loading">Checking…</span>
+          <span class="accounting-admin-form">
+            <input type="password" data-code-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="New access code · 新存取碼" aria-label="New ${company.code} auditor access code">
+            <button class="button button-primary" type="button" data-code-save>Save code <span lang="zh-Hant">儲存</span></button>
+          </span>
+          <span class="accounting-admin-msg" data-code-msg role="status"></span>
+        </div>`,
+        ).join("")}
+      </div>
+    </section>`
+    : "";
   viewContainer.innerHTML = `
     ${pageHeading("Accounting System", "The three company books, online under one roof — each system loads live from its private GitHub repository.")}
     <section class="accounting-library" aria-label="Company accounting systems">
+      ${auditorLink}
       <div class="accounting-grid">${cards}</div>
+      ${codeConsole}
       <div class="accounting-play-area" id="accounting-play-area" hidden>
         <div class="game-play-heading">
           <div><p class="eyebrow">NOW OPEN</p><h2 id="accounting-play-title">Accounting system</h2></div>
@@ -860,6 +899,64 @@ function renderAccounting() {
     frame.src = "about:blank";
     area.hidden = true;
   });
+
+  const codeRows = viewContainer.querySelectorAll("[data-code-system]");
+  if (codeRows.length) {
+    const refreshCodeStatus = async () => {
+      try {
+        const result = await call("standalone-code-status");
+        codeRows.forEach((row) => {
+          const info = result.systems?.[row.dataset.codeSystem];
+          const chip = row.querySelector("[data-code-status]");
+          chip.textContent = info?.configured ? "Code set · 已設定" : "Not set · 未設定";
+          chip.dataset.state = info?.configured ? "set" : "unset";
+        });
+      } catch {
+        codeRows.forEach((row) => {
+          const chip = row.querySelector("[data-code-status]");
+          chip.textContent = "Status unavailable · 無法取得狀態";
+          chip.dataset.state = "error";
+        });
+      }
+    };
+    refreshCodeStatus();
+    codeRows.forEach((row) => {
+      const input = row.querySelector("[data-code-input]");
+      const save = row.querySelector("[data-code-save]");
+      const msg = row.querySelector("[data-code-msg]");
+      const saveCode = async () => {
+        const code = input.value.trim();
+        if (code.length < 4) {
+          msg.textContent = "Use at least 4 characters. · 至少 4 個字元。";
+          msg.dataset.kind = "error";
+          input.focus();
+          return;
+        }
+        save.disabled = true;
+        msg.textContent = "Saving… · 儲存中";
+        delete msg.dataset.kind;
+        try {
+          await call("set-standalone-code", { system: row.dataset.codeSystem, code });
+          input.value = "";
+          msg.textContent = "Saved — the auditor can use it right away. · 已儲存，審計員可即時使用。";
+          msg.dataset.kind = "success";
+          refreshCodeStatus();
+        } catch (error) {
+          msg.textContent = error.message || "Could not save the code. · 無法儲存代碼。";
+          msg.dataset.kind = "error";
+        } finally {
+          save.disabled = false;
+        }
+      };
+      save.addEventListener("click", saveCode);
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          saveCode();
+        }
+      });
+    });
+  }
 }
 
 function fieldHtml(field, item = {}) {

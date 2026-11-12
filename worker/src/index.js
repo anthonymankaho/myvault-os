@@ -23,6 +23,98 @@ const ACCOUNTING_SYSTEMS = {
   }
 };
 
+const auditorCodeKey = (system) => `auditor-code:${system}`;
+
+// Auditor codes live in KV so the owner can set them from the Accounting
+// view; the original per-system env secret remains as a fallback.
+async function readStandaloneCode(env, systemKey) {
+  if (env.QWEN_USAGE) {
+    try {
+      const record = await env.QWEN_USAGE.get(auditorCodeKey(systemKey), "json");
+      if (record && typeof record.code === "string" && record.code) return record.code;
+    } catch {
+      // fall through to the env secret
+    }
+  }
+  return env[ACCOUNTING_SYSTEMS[systemKey].standaloneSecret] || "";
+}
+
+async function verifyOwner(authorization, env) {
+  if (typeof authorization !== "string" || !/^Bearer\s+\S+$/i.test(authorization)) {
+    return { ok: false, status: 401, error: "Sign in with GitHub to manage auditor access codes." };
+  }
+  let response;
+  try {
+    response = await fetch("https://api.github.com/user", {
+      headers: githubHeaders(authorization),
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch {
+    return { ok: false, status: 503, error: "Could not verify your GitHub session. Please retry." };
+  }
+  if (!response.ok) {
+    return { ok: false, status: 401, error: "Your GitHub session could not be verified. Sign in again." };
+  }
+  const user = await response.json().catch(() => ({}));
+  const login = String(user.login || "");
+  const allowed = String(env.QWEN_ALLOWED_GITHUB_USER || "anthonymankaho");
+  if (login.toLowerCase() !== allowed.toLowerCase()) {
+    return { ok: false, status: 403, error: "Only the vault owner can manage auditor access codes." };
+  }
+  return { ok: true };
+}
+
+async function handleSetStandaloneCode(payload, authorization, env, origin) {
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return errorResponse("Origin is not allowed.", 403, origin);
+  }
+  const owner = await verifyOwner(authorization, env);
+  if (!owner.ok) return errorResponse(owner.error, owner.status, origin);
+
+  const systemKey = typeof payload?.system === "string" ? payload.system.toLowerCase() : "";
+  if (!ACCOUNTING_SYSTEMS[systemKey]) {
+    return errorResponse("Unknown accounting system.", 400, origin);
+  }
+  const code = typeof payload?.code === "string" ? payload.code.trim() : "";
+  if (code.length < 4 || code.length > 128) {
+    return errorResponse("Access code must be 4–128 characters.", 400, origin);
+  }
+  if (!env.QWEN_USAGE) {
+    return errorResponse("Code storage is not configured.", 503, origin);
+  }
+  const updatedAt = new Date().toISOString();
+  await env.QWEN_USAGE.put(auditorCodeKey(systemKey), JSON.stringify({ code, updatedAt }));
+  return jsonResponse({ ok: true, system: systemKey, updatedAt }, 200, origin);
+}
+
+async function handleStandaloneCodeStatus(authorization, env, origin) {
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return errorResponse("Origin is not allowed.", 403, origin);
+  }
+  const owner = await verifyOwner(authorization, env);
+  if (!owner.ok) return errorResponse(owner.error, owner.status, origin);
+
+  const systems = {};
+  for (const key of Object.keys(ACCOUNTING_SYSTEMS)) {
+    let record = null;
+    if (env.QWEN_USAGE) {
+      try {
+        record = await env.QWEN_USAGE.get(auditorCodeKey(key), "json");
+      } catch {
+        record = null;
+      }
+    }
+    const kvCode = record && typeof record.code === "string" && record.code ? record.code : "";
+    const envCode = env[ACCOUNTING_SYSTEMS[key].standaloneSecret] || "";
+    systems[key] = {
+      configured: Boolean(kvCode || envCode),
+      source: kvCode ? "portal" : envCode ? "secret" : "none",
+      updatedAt: kvCode && record.updatedAt ? record.updatedAt : null
+    };
+  }
+  return jsonResponse({ systems }, 200, origin);
+}
+
 // Constant-time-ish string compare for access codes (length is not secret).
 function constantTimeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string") return false;
@@ -233,7 +325,7 @@ async function handleAccountingSystem(authorization, env, origin, systemKey, pay
   if (hasGitHub) {
     repoAuthorization = authorization;
   } else if (standaloneCode) {
-    const expected = env[system.standaloneSecret];
+    const expected = await readStandaloneCode(env, systemKey);
     if (!expected || !env.GH_REPO_READ_TOKEN) {
       return errorResponse(
         `Standalone access is not configured for the ${system.label} system.`,
@@ -357,6 +449,10 @@ export default {
           typeof payload.system === "string" ? payload.system.toLowerCase() : "",
           payload
         );
+      case "set-standalone-code":
+        return handleSetStandaloneCode(payload, request.headers.get("Authorization"), env, origin);
+      case "standalone-code-status":
+        return handleStandaloneCodeStatus(request.headers.get("Authorization"), env, origin);
       case "load":
       case "save": {
         const authorization = request.headers.get("Authorization");

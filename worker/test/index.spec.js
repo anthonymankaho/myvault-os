@@ -470,3 +470,144 @@ describe("accounting-system standalone access code", () => {
     );
   });
 });
+
+function makeKV(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  return {
+    store,
+    get: vi.fn(async (key, type) => {
+      const raw = store.get(key);
+      if (raw === undefined) return null;
+      return type === "json" ? JSON.parse(raw) : raw;
+    }),
+    put: vi.fn(async (key, value) => {
+      store.set(key, value);
+    })
+  };
+}
+
+function ownerFetch(login = "anthonymankaho") {
+  return vi.fn(async (url) => {
+    if (String(url) === "https://api.github.com/user") {
+      return Response.json({ login });
+    }
+    return new Response("<html></html>", { status: 200 });
+  });
+}
+
+describe("auditor code management (owner only)", () => {
+  it("set-standalone-code requires GitHub sign-in", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("set-standalone-code", { system: "gpl", code: "new-code" }),
+      { QWEN_USAGE: makeKV() }
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it("set-standalone-code rejects a non-owner GitHub account", async () => {
+    vi.stubGlobal("fetch", ownerFetch("someone-else"));
+    const kv = makeKV();
+    const response = await worker.fetch(
+      makePagesRequest("set-standalone-code", { system: "gpl", code: "new-code" }, "Bearer other-token"),
+      { QWEN_USAGE: kv, QWEN_ALLOWED_GITHUB_USER: "anthonymankaho" }
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Only the vault owner can manage auditor access codes." });
+    expect(kv.put).not.toHaveBeenCalled();
+  });
+
+  it("set-standalone-code stores the code in KV for the owner", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const kv = makeKV();
+    const response = await worker.fetch(
+      makePagesRequest("set-standalone-code", { system: "gpl", code: "  owner-chosen-code  " }, "Bearer owner-token"),
+      { QWEN_USAGE: kv }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.system).toBe("gpl");
+    expect(kv.put).toHaveBeenCalledTimes(1);
+    const [key, value] = kv.put.mock.calls[0];
+    expect(key).toBe("auditor-code:gpl");
+    expect(JSON.parse(value).code).toBe("owner-chosen-code");
+  });
+
+  it("set-standalone-code validates system and code length", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const env = { QWEN_USAGE: makeKV() };
+    const badSystem = await worker.fetch(
+      makePagesRequest("set-standalone-code", { system: "xxx", code: "new-code" }, "Bearer owner-token"),
+      env
+    );
+    expect(badSystem.status).toBe(400);
+    const shortCode = await worker.fetch(
+      makePagesRequest("set-standalone-code", { system: "gpl", code: "abc" }, "Bearer owner-token"),
+      env
+    );
+    expect(shortCode.status).toBe(400);
+  });
+
+  it("set-standalone-code rejects foreign origins", async () => {
+    const request = new Request("https://myvault-api.example/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://evil.example", Authorization: "Bearer owner-token" },
+      body: JSON.stringify({ action: "set-standalone-code", payload: { system: "gpl", code: "new-code" } })
+    });
+    const response = await worker.fetch(request, { QWEN_USAGE: makeKV() });
+    expect(response.status).toBe(403);
+  });
+
+  it("standalone-code-status reports configured state without revealing codes", async () => {
+    vi.stubGlobal("fetch", ownerFetch());
+    const kv = makeKV({ "auditor-code:gpl": JSON.stringify({ code: "secret-gpl", updatedAt: "2026-11-12T00:00:00.000Z" }) });
+    const response = await worker.fetch(
+      makePagesRequest("standalone-code-status", {}, "Bearer owner-token"),
+      { QWEN_USAGE: kv, EIC_STANDALONE_CODE: "secret-eic" }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.systems.gpl).toEqual({ configured: true, source: "portal", updatedAt: "2026-11-12T00:00:00.000Z" });
+    expect(body.systems.eic).toEqual({ configured: true, source: "secret", updatedAt: null });
+    expect(body.systems.mpl.configured).toBe(false);
+    expect(JSON.stringify(body)).not.toContain("secret-gpl");
+    expect(JSON.stringify(body)).not.toContain("secret-eic");
+  });
+
+  it("standalone-code-status requires the owner", async () => {
+    const response = await worker.fetch(
+      makePagesRequest("standalone-code-status", {}),
+      { QWEN_USAGE: makeKV() }
+    );
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("accounting-system with KV-stored codes", () => {
+  it("unlocks with the owner-set KV code even when no env secret exists", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>KV</html>", { status: 200 })));
+    const kv = makeKV({ "auditor-code:mpl": JSON.stringify({ code: "owner-mpl-code" }) });
+    const response = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "mpl", code: "owner-mpl-code" }),
+      { QWEN_USAGE: kv, GH_REPO_READ_TOKEN: "server-pat" }
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("<html>KV</html>");
+  });
+
+  it("prefers the KV code over the env secret", async () => {
+    const kv = makeKV({ "auditor-code:gpl": JSON.stringify({ code: "new-kv-code" }) });
+    const env = { QWEN_USAGE: kv, GPL_STANDALONE_CODE: "old-secret-code", GH_REPO_READ_TOKEN: "server-pat" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html></html>", { status: 200 })));
+    const withNew = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "new-kv-code" }),
+      env
+    );
+    expect(withNew.status).toBe(200);
+    const withOld = await worker.fetch(
+      makePagesRequest("accounting-system", { system: "gpl", code: "old-secret-code" }),
+      env
+    );
+    expect(withOld.status).toBe(403);
+  });
+});

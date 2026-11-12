@@ -8,7 +8,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Features
 
 - Personal dashboard for skills, projects, documents, and chats
-- Accounting System section launching the GPL, EIC, and MPL company systems from private repos via GitHub access
+- Accounting System section launching the GPL, EIC, and MPL company systems from private repos via GitHub access, with a one-way **Auditor Access Portal** link and an owner-only console for auditor access codes
 - Games library with an isolated, playable Three.js arcade racer
 - Responsive overview with active projects, recent items, and quick capture
 - Search across the vault (`/` shortcut), filter projects and skills, and sort records
@@ -70,7 +70,20 @@ Access is granted only when GitHub authorizes that signed-in account to read the
 
 ### Standalone access code (no GitHub sign-in)
 
-Each shell also offers an **access-code** path for people without a GitHub account (e.g. auditors). The visitor enters a per-system code; the Worker checks it against the `GPL_STANDALONE_CODE` / `EIC_STANDALONE_CODE` / `MPL_STANDALONE_CODE` secret (constant-time) and, on a match, reads the private repo with a **server-side read-only token** (`GH_REPO_READ_TOKEN`) instead of the visitor's token. The data is still never served without a valid code, and the system's own username/password login still governs module permissions once it loads. The code is kept only in `sessionStorage` for the tab session. A system's standalone path stays disabled until both its code secret and `GH_REPO_READ_TOKEN` are configured (fail-closed, 503). Set secrets with `wrangler secret put <NAME>` from `worker/`; the read token must be a fine-grained GitHub PAT with **Contents: read** on the private repos only.
+Each shell also offers an **access-code** path for people without a GitHub account (e.g. auditors). The visitor enters a per-system code; the Worker checks it (constant-time) against the code stored in the `QWEN_USAGE` KV namespace under `auditor-code:<system>`, falling back to the `GPL_STANDALONE_CODE` / `EIC_STANDALONE_CODE` / `MPL_STANDALONE_CODE` env secret, and on a match reads the private repo with a **server-side read-only token** (`GH_REPO_READ_TOKEN`) instead of the visitor's token. The data is never served without a valid code. The code is kept only in `sessionStorage` for the tab session. A system's standalone path stays disabled until a code and `GH_REPO_READ_TOKEN` are both configured (fail-closed, 503).
+
+**The owner sets the codes in the app, not on the command line:** sign in with GitHub, open **Accounting System**, and use the **Owner Console / 管理員** panel (visible only to the signed-in owner) to type a new code per company and press **Save code**. The Worker actions `set-standalone-code` and `standalone-code-status` verify the caller's GitHub identity against `QWEN_ALLOWED_GITHUB_USER` server-side; the status response reports only configured/not-set, never the code value. `GH_REPO_READ_TOKEN` is still set with `wrangler secret put GH_REPO_READ_TOKEN` from `worker/`; it should be a fine-grained GitHub PAT with **Contents: read** on the private repos only.
+
+### Auditor Access Portal (one-way link)
+
+The Accounting view carries a banner link to the independent **Auditor Access Portal** at <https://anthonymankaho.github.io/auditor-portal/> (repo `anthonymankaho/auditor-portal`). The link is one-way: the portal shows only the three companies and never links back to MyVault or exposes any vault content. Auditors enter the per-company code there; the portal then opens each system in a full-screen viewer and provisions a dedicated read-only `auditor` session through the system's own account machinery (MPL in review mode, external FINSYS tile hidden), so no second username/password login is needed. An existing session in the same browser (e.g. the owner's master account) is never replaced.
+
+### Processing status · 處理狀態 (2026-11-12, for office Qwen)
+
+- Deployed: Worker `myvault-api` now supports owner-managed auditor codes (`set-standalone-code`, `standalone-code-status`, KV-backed with env-secret fallback) and the Accounting view shows the auditor portal banner + Owner Console. Frontend tests 16/16 (`node --test test/app.test.cjs`), accounting UI 21/21 in real Chrome, owner code cycle verified live (set → status → portal unlock → cleanup).
+- The previously generated `*_STANDALONE_CODE` env secrets were **deleted**; no codes are configured right now. **Owner action pending:** sign in at <https://anthonymankaho.github.io/myvault-os/#accounting> and set one code per company in the Owner Console. Until then the auditor portal fails closed with "Service not ready" (503).
+- `GH_REPO_READ_TOKEN` currently reuses the owner's gh OAuth token (broad repo scope) as an interim measure; replace it with a fine-grained Contents-read-only PAT on GPL/EIC/MPL when convenient.
+- Local note: workerd/vitest cannot run on the Surface Book (directory-creation blocked); Worker changes are verified by deploying and probing the live endpoint. The desktop `myvault-os` clone is diverged (ahead 54 / behind 75) — deploy from a fresh `origin/main` worktree, never from that clone.
 
 ## Screenshot
 
