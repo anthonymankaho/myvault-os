@@ -15,6 +15,12 @@ function workspace() {
     URL,
     crypto,
     structuredClone,
+    window: {
+      location: {
+        origin: "https://anthonymankaho.github.io",
+        pathname: "/myvault-os/",
+      },
+    },
     localStorage: {
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
@@ -278,4 +284,13 @@ test("auto-generation does nothing outside the window", () => {
   `);
   assert.equal(w.run('autoGenerateRecurringTasks("2026-11-15").length'), 0);
   assert.equal(w.run("state.vault.tasks.length"), 1);
+});
+
+test("OAuth redirect_uri is canonical regardless of index.html or trailing slash", () => {
+  const w = workspace();
+  const canonical = "https://anthonymankaho.github.io/myvault-os/";
+  for (const pathname of ["/myvault-os/", "/myvault-os/index.html", "/myvault-os"]) {
+    w.context.window.location.pathname = pathname;
+    assert.equal(w.run("oauthRedirectUri()"), canonical, `pathname ${pathname}`);
+  }
 });

@@ -353,12 +353,24 @@ function updateSaveButton() {
   indicator.dataset.kind = state.dirty ? "pending" : "";
 }
 
+// GitHub requires the OAuth redirect_uri to exactly match the app's registered
+// callback URL. The app can be opened as ".../myvault-os/" or ".../myvault-os/
+// index.html" (e.g. via a system shell's sign-in link); those produce different
+// pathnames and the index.html form is rejected ("redirect_uri is not associated
+// with this application"). Normalize to the canonical directory URL in both the
+// authorize request and the token exchange so they always agree.
+function oauthRedirectUri() {
+  let path = window.location.pathname.replace(/index\.html$/, "");
+  if (!path.endsWith("/")) path += "/";
+  return `${window.location.origin}${path}`;
+}
+
 function startLogin() {
   const stateParam = Array.from(
     crypto.getRandomValues(new Uint8Array(24)),
     (value) => value.toString(16).padStart(2, "0"),
   ).join("");
-  const redirectUri = `${window.location.origin}${window.location.pathname}`;
+  const redirectUri = oauthRedirectUri();
   const authorizationUrl = new URL("https://github.com/login/oauth/authorize");
   authorizationUrl.searchParams.set("client_id", CLIENT_ID);
   authorizationUrl.searchParams.set("redirect_uri", redirectUri);
@@ -405,7 +417,7 @@ async function handleOAuthCallback() {
   try {
     const result = await call("auth", {
       code,
-      redirect_uri: `${window.location.origin}${window.location.pathname}`,
+      redirect_uri: oauthRedirectUri(),
     });
     const token = result.token || result.access_token;
     if (!token) {
