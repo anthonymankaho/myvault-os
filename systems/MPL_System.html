@@ -17,7 +17,7 @@
     button, .button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 14px; border: 0; border-radius: 8px; background: #315de8; color: #fff; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
     button.secondary, .button.secondary { color: #26364e; background: #edf1f6; }
     button:hover, .button:hover { filter: brightness(.96); }
-    #lock[hidden], #gate[hidden], #system[hidden], #clear[hidden] { display: none; }
+    #lock[hidden], #gate[hidden], #system[hidden], #clear[hidden], #loading[hidden] { display: none; }
     #gate { width: min(640px, calc(100% - 32px)); margin: 7vh auto; padding: 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; }
     #gate h1 { margin: 0 0 8px; font-size: 23px; }
     #gate p { color: #59677a; margin: 8px 0 18px; }
@@ -28,9 +28,17 @@
     .auditor-hint strong { display: block; font-size: 13px; color: #26364e; margin-bottom: 6px; }
     .auditor-hint p { margin: 0 0 12px; font-size: 12.5px; line-height: 1.6; }
     .auditor-hint .button { font-size: 13.5px; }
+    #loading { flex: 1; min-height: 0; }
+    .loading-card { width: min(640px, calc(100% - 32px)); margin: 7vh auto; padding: 34px 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; text-align: center; }
+    .spinner { display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 3px solid #dce2ea; border-top-color: #315de8; animation: shell-spin .9s linear infinite; }
+    @keyframes shell-spin { to { transform: rotate(360deg); } }
+    .loading-card h1 { margin: 16px 0 8px; font-size: 21px; color: #15243a; }
+    .loading-card h1 span { font-size: .78em; color: #59677a; margin-left: 6px; }
+    .loading-card p { margin: 0; color: #59677a; font-size: 13px; line-height: 1.65; }
     #system { flex: 1; min-height: 0; }
     #system iframe { display: block; width: 100%; height: calc(100vh - 58px); border: 0; background: #fff; }
-    @media (max-width: 520px) { header { padding: 9px 12px; } .brand { gap: 8px; } .brand strong { font-size: 14px; } #gate { padding: 22px; } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+    @media (max-width: 520px) { header { padding: 9px 12px; } .brand { gap: 8px; } .brand strong { font-size: 14px; } #gate { padding: 22px; } .loading-card { padding: 26px 20px; } }
   </style>
 </head>
 <body>
@@ -56,6 +64,13 @@
     </div>
     <p class="note">After signing in, the MPL system loads automatically when access is confirmed.</p>
   </main>
+  <section id="loading" hidden aria-live="polite">
+    <div class="loading-card">
+      <span class="spinner" aria-hidden="true"></span>
+      <h1>Opening MPL System <span lang="zh-Hant">開啟中</span></h1>
+      <p>Checking your GitHub access and loading MPL from the private repository… <span lang="zh-Hant">正在驗證 GitHub 權限，從私人儲存庫載入 MPL……</span></p>
+    </div>
+  </section>
   <section id="system" hidden aria-label="MPL accounting system"></section>
   <script>
     const API = "https://myvault-api.anthonym-354.workers.dev";
@@ -63,6 +78,7 @@
     const SYSTEM_KEY = "mpl";
     const gate = document.querySelector("#gate");
     const message = document.querySelector("#message");
+    const loadingPanel = document.querySelector("#loading");
     const system = document.querySelector("#system");
     const lockButton = document.querySelector("#lock");
     const retryButton = document.querySelector("#retry");
@@ -79,6 +95,7 @@
     function showGate(text, denied = false) {
       system.replaceChildren();
       system.hidden = true;
+      loadingPanel.hidden = true;
       gate.hidden = false;
       lockButton.hidden = true;
       message.textContent = text;
@@ -91,6 +108,7 @@
       frame.referrerPolicy = "no-referrer";
       frame.srcdoc = html;
       system.replaceChildren(frame);
+      loadingPanel.hidden = true;
       gate.hidden = true;
       system.hidden = false;
       lockButton.hidden = false;
@@ -104,9 +122,8 @@
       }
       if (loading) return;
       loading = true;
-      message.textContent = "Checking access and loading MPL…";
-      gate.hidden = false;
-      clearButton.hidden = true;
+      gate.hidden = true;
+      loadingPanel.hidden = false;
       try {
         const response = await fetch(API, {
           method: "POST",
