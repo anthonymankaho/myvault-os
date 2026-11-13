@@ -88,19 +88,6 @@ export function slipstreamAmount(player, rivals, window = SLIP_WINDOW, lane = SL
   return best;
 }
 
-export function stepPlayerSpeed(speed, dt, input) {
-  const slip = clamp(input.slip || 0, 0, 1);
-  let next = speed;
-  if (input.accelerating) next += (input.boosting ? 112 : 70) * (1 + slip * 0.35) * dt;
-  else next -= 17 * dt;
-  if (input.braking) next -= (input.drifting ? 58 : 145) * dt;
-  if (input.drifting) next -= 14 * dt;
-  const cap = input.boosting ? 292 : 238 + slip * 18;
-  next = Math.min(cap, Math.max(42, next));
-  if (input.offroad) next = Math.max(42, next - 48 * dt);
-  return next;
-}
-
 export function stepRival(rival, dt, world) {
   const limit = Math.max(0, world.laneMax - 0.6);
   if (!world.racing) {
@@ -110,9 +97,10 @@ export function stepRival(rival, dt, world) {
   const corner = clamp(world.curvature?.(rival.progress) ?? 0, 0, 1);
   const ahead = scoreOf(rival) - scoreOf(world.player);
   let target = rival.pace * (1 - corner * CORNER_DRAG);
+  if (Number.isFinite(world.cornerKmh)) target = Math.min(target, Math.max(72, world.cornerKmh));
   if (ahead < -CHASE_GAP) target *= CHASE_SCALE;
   target = Math.min(RIVAL_SPEED_CAP, target);
-  const rate = rival.speed < target ? 64 : 48;
+  const rate = rival.speed < target ? 22 : 42;
   if (rival.speed < target) rival.speed = Math.min(target, rival.speed + rate * dt);
   else rival.speed = Math.max(target, rival.speed - rate * dt);
 
