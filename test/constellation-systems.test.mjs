@@ -16,6 +16,7 @@ const mixedNodes = [
   { key: 'skills:s1', kind: 'skills', name: 'Skill one' },
   { key: 'docs:d1', kind: 'docs', name: 'A document' },
   { key: 'chats:c1', kind: 'chats', name: 'A chat' },
+  { key: 'reports:r1', kind: 'reports', name: 'Monthly report' },
   { key: 'tasks:t1', kind: 'tasks', name: 'A task' },
   { key: 'tasks:t2', kind: 'tasks', name: 'Another task' },
   { key: 'accounting:gpl', kind: 'accounting', name: 'Gold Plume Limited' },
@@ -23,11 +24,11 @@ const mixedNodes = [
 ];
 
 test('every section has distinct sun and star colors', () => {
-  assert.equal(SECTION_ORDER.length, 7);
+  assert.equal(SECTION_ORDER.length, 8);
   const suns = new Set(SECTION_ORDER.map((kind) => SECTION_META[kind].sun));
   const stars = new Set(SECTION_ORDER.map((kind) => SECTION_META[kind].star));
-  assert.equal(suns.size, 7);
-  assert.equal(stars.size, 7);
+  assert.equal(suns.size, 8);
+  assert.equal(stars.size, 8);
   SECTION_ORDER.forEach((kind) => {
     assert.ok(SECTION_META[kind].label);
     assert.ok(SECTION_META[kind].zh);
@@ -105,7 +106,7 @@ test('large vaults keep every star finite and separated', () => {
 test('2D map gives every section a sun and every item a unique finite position', () => {
   const { positions, centers } = layoutSystemMap(mixedNodes);
   assert.equal(positions.length, mixedNodes.length);
-  assert.equal(centers.length, 7);
+  assert.equal(centers.length, 8);
   assert.ok(positions.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)));
   assert.equal(new Set(positions.map(({ x, y }) => `${x}:${y}`)).size, mixedNodes.length);
   centers.forEach((center) => {

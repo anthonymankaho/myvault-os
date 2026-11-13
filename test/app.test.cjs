@@ -294,3 +294,48 @@ test("OAuth redirect_uri is canonical regardless of index.html or trailing slash
     assert.equal(w.run("oauthRedirectUri()"), canonical, `pathname ${pathname}`);
   }
 });
+
+test("reports collection is wired into views, normalize and validate", () => {
+  const w = workspace();
+  assert.equal(w.run("COLLECTIONS.reports.title"), "Report");
+  assert.equal(w.run("VIEWS.reports.title"), "Report");
+  assert.equal(w.run("COLLECTIONS.reports.fields[0].key"), "name");
+  assert.equal(w.run("COLLECTIONS.reports.fields[0].required"), true);
+  const v = w.run(
+    'normalizeVault({ reports: [{ name: "MTC Sales 2026-11", company: "MTC" }] })',
+  );
+  assert.equal(v.reports.length, 1);
+  assert.equal(v.reports[0].company, "MTC");
+  assert.equal(w.run("normalizeVault({}).reports.length"), 0);
+  assert.equal(w.run("validateVaultJson(JSON.stringify({ reports: [] })).ok"), true);
+  assert.equal(w.run('validateVaultJson(JSON.stringify({ reports: "x" })).ok'), false);
+});
+
+test("reports filter by company while projects/skills filters are unchanged", () => {
+  const w = workspace();
+  w.run(`
+    state.vault.reports = [
+      { name: "GPL close", company: "GPL", status: "Final" },
+      { name: "MTC sales", company: "MTC", status: "Draft" },
+    ];
+    ui.filters.reports = "MTC";
+  `);
+  assert.equal(
+    w.run('JSON.stringify(filteredItems("reports").map(({ item }) => item.name))'),
+    '["MTC sales"]',
+  );
+  w.run(`
+    state.vault.projects = [{ name: "A", status: "Active" }, { name: "B", status: "Done" }];
+    ui.filters.projects = "Active";
+    state.vault.skills = [{ name: "X", level: "Expert" }, { name: "Y", level: "Beginner" }];
+    ui.filters.skills = "Expert";
+  `);
+  assert.equal(
+    w.run('JSON.stringify(filteredItems("projects").map(({ item }) => item.name))'),
+    '["A"]',
+  );
+  assert.equal(
+    w.run('JSON.stringify(filteredItems("skills").map(({ item }) => item.name))'),
+    '["X"]',
+  );
+});

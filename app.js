@@ -11,6 +11,7 @@ const DEFAULT_VAULT = {
   docs: [],
   cards: [],
   chats: [],
+  reports: [],
   tasks: [],
   meta: {
     created: new Date().toISOString().slice(0, 10),
@@ -66,6 +67,29 @@ const COLLECTIONS = {
     fields: [
       { key: "title", label: "Title", required: true },
       { key: "url", label: "Link", type: "url" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  reports: {
+    title: "Report",
+    singular: "report",
+    fields: [
+      { key: "name", label: "Report name", required: true },
+      {
+        key: "company",
+        label: "Company / Entity",
+        type: "select",
+        options: ["GPL", "EIC", "MPL", "MTC", "ALUM", "GPR", "Personal", "Other"],
+      },
+      { key: "period", label: "Period (e.g. 2026-11)" },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        options: ["Draft", "In review", "Final", "Archived"],
+      },
+      { key: "url", label: "Link", type: "url" },
+      { key: "tags", label: "Tags (comma separated)" },
       { key: "notes", label: "Notes", type: "textarea" },
     ],
   },
@@ -166,7 +190,7 @@ function normalizeVault(raw) {
     ...DEFAULT_VAULT,
     ...(raw && typeof raw === "object" ? raw : {}),
   };
-  for (const key of ["skills", "projects", "docs", "cards", "chats", "tasks"]) {
+  for (const key of ["skills", "projects", "docs", "cards", "chats", "reports", "tasks"]) {
     vault[key] = Array.isArray(vault[key])
       ? vault[key].map((item) =>
           item && typeof item === "object" ? item : { name: String(item) },
@@ -587,6 +611,8 @@ const ICON_PATHS = {
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
   accounting:
     '<path d="M5 3h14v18H5z"/><path d="M9 3v18"/><path d="M12 7h4M12 10h4M12 13h4M12 16h2"/>',
+  reports:
+    '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5"/><path d="M9 17v-3m3 3v-5m3 5v-2"/>',
   games:
     '<path d="M6 8h12a4 4 0 0 1 3.8 5.2l-1.3 4.1a2 2 0 0 1-3.2 1l-3.1-2.4h-4.4l-3.1 2.4a2 2 0 0 1-3.2-1l-1.3-4.1A4 4 0 0 1 6 8Z"/><path d="M8 11v4m-2-2h4m6-1h.01M18 14h.01"/>',
   tasks:
@@ -656,12 +682,13 @@ function renderHome() {
     skills: "Keep your curiosity growing",
     docs: "Knowledge, within reach",
     chats: "Conversations worth keeping",
+    reports: "Every report, in one register",
   };
   const notes = voiceNotes();
   const recent = recentItems();
   viewContainer.innerHTML = `
     ${pageHeading(greeting, "A little clarity for everything you’re building.", `<div class="date-chip">${icon("calendar")}${escapeHtml(new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))}</div>`)}
-    <section class="card-grid" aria-label="Vault overview">${["projects", "skills", "docs", "chats"].map((key) => `<button class="card" type="button" data-navigate="${key}"><span class="card-top"><span class="card-icon">${icon(key)}</span><span class="card-arrow">›</span></span><span class="card-label">${escapeHtml(captions[key])}</span><p class="card-value">${state.vault[key].length}</p><span class="card-caption">${escapeHtml(key === "projects" ? "active projects" : key)}</span></button>`).join("")}</section>
+    <section class="card-grid" aria-label="Vault overview">${["projects", "skills", "docs", "chats", "reports"].map((key) => `<button class="card" type="button" data-navigate="${key}"><span class="card-top"><span class="card-icon">${icon(key)}</span><span class="card-arrow">›</span></span><span class="card-label">${escapeHtml(captions[key])}</span><p class="card-value">${state.vault[key].length}</p><span class="card-caption">${escapeHtml(key === "projects" ? "active projects" : key)}</span></button>`).join("")}</section>
     <div class="dashboard-grid"><div>
       <section class="panel" aria-labelledby="projects-heading"><div class="panel-heading"><div><h2 id="projects-heading">In focus</h2><p class="section-caption">Your active projects, all in one place.</p></div></div>
         ${
@@ -1056,7 +1083,7 @@ function openItemDialog(key, index = null) {
     }
     if (key === "projects" || key === "skills")
       data.links = String(data.links || "").split(/\n/).map((link) => link.trim()).filter(Boolean);
-    if (key === "docs")
+    if (key === "docs" || key === "reports")
       data.tags = data.tags
         .split(",")
         .map((tag) => tag.trim())
@@ -1107,7 +1134,9 @@ function safeUrl(value) {
 
 function filteredItems(key) {
   const query = (ui.queries[key] ?? "").trim().toLowerCase();
-  const filterField = key === "projects" ? "status" : "level";
+  const filterField = COLLECTIONS[key].fields.find(
+    (field) => field.type === "select",
+  )?.key;
   const items = state.vault[key]
     .map((item, index) => ({ item, index }))
     .filter(
@@ -1144,6 +1173,8 @@ function renderItems(key) {
   return `<div class="item-list">${items
     .map(({ item, index }) => {
       const badges = [
+        item.company,
+        item.period,
         item.status,
         item.level,
         ...(Array.isArray(item.tags) ? item.tags : normalizeTags(item.tags)),
@@ -1161,6 +1192,7 @@ function renderCollection(key) {
     skills: "Everything you know, and everything you’re learning.",
     docs: "Keep useful knowledge close at hand.",
     chats: "Good conversations deserve a place to live.",
+    reports: "Monthly, quarterly and one-off reports — every deliverable in one register.",
   };
   const field = config.fields.find((field) => field.type === "select");
   const filterValues = field
@@ -1241,7 +1273,7 @@ function renderSearch() {
       .map((item, index) => ({ key, config, item, index }))
       .filter(({ item }) => itemMatches(item, query)),
   );
-  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, and chats.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`).join("")) : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
+  viewContainer.innerHTML = `${pageHeading("Find your next thread.", "Search across your projects, skills, documents, chats, and reports.")}<section class="panel" aria-label="Search results"><div class="panel-heading"><div><h2>Results</h2><p class="section-caption">${matches.length} match${matches.length === 1 ? "" : "es"}</p></div></div>${matches.length ? matches.map(({ key, config, item, index }) => openRecordButton(key, index, item, `${config.title} · ${formatTime(item.created) || "recent"}`)).join("") : emptyState("search", "No matches found", "Try another query or add something new.")}</section>`;
   bindWorkspaceActions();
 }
 
@@ -1756,7 +1788,7 @@ function validateVaultJson(text) {
     errors.push("Vault must be a JSON object.");
     return { ok: false, errors, parsed };
   }
-  for (const key of ["skills", "projects", "docs", "cards", "chats", "tasks"]) {
+  for (const key of ["skills", "projects", "docs", "cards", "chats", "reports", "tasks"]) {
     if (parsed[key] !== undefined && !Array.isArray(parsed[key])) {
       errors.push(`"${key}" should be an array.`);
     }
@@ -1856,7 +1888,7 @@ function renderBuild() {
 let constellationCleanup = null;
 let constellationDataKey = "";
 let constellationRequest = 0;
-const CONSTELLATION_COLLECTIONS = ["projects", "skills", "docs", "chats", "tasks"];
+const CONSTELLATION_COLLECTIONS = ["projects", "skills", "docs", "chats", "reports", "tasks"];
 
 function normalizeTags(value) {
   const list = Array.isArray(value)
@@ -1897,7 +1929,9 @@ function buildConstellationModel() {
             ? normalizeTags(item.tags).join(", ") || "Document"
             : kind === "chats"
               ? "Chat"
-              : `${item.company || "OTHER"} · ${item.status || "Not Started"}`;
+              : kind === "reports"
+                ? [item.company, item.period, item.status].filter(Boolean).join(" · ") || "Report"
+                : `${item.company || "OTHER"} · ${item.status || "Not Started"}`;
       return {
         key: `${kind}:${id}`,
         id,
@@ -1984,7 +2018,7 @@ async function updateConstellationBackground() {
   const request = ++constellationRequest;
   const model = buildConstellationModel();
   try {
-    const { createMyVaultConstellation } = await import("./constellation.mjs?v=5");
+    const { createMyVaultConstellation } = await import("./constellation.mjs?v=6");
     if (request !== constellationRequest) return;
     const constellation = createMyVaultConstellation({
       container,
@@ -2059,6 +2093,7 @@ async function updateLegacyConstellationBackground() {
     docs: "#d7c8ff",
     chats: "#a8e8d7",
     cards: "#ffcdb9",
+    reports: "#fff3c4",
   };
   const KIND_LABEL_COLOR = {
     skills: "#cfe6ff",
@@ -2066,6 +2101,7 @@ async function updateLegacyConstellationBackground() {
     docs: "#bdabf3",
     chats: "#8ed0bc",
     cards: "#e6a98e",
+    reports: "#f5e6a8",
   };
   const nodes = CONSTELLATION_COLLECTIONS.flatMap((kind) =>
     state.vault[kind].map((item) => ({ item, kind })),

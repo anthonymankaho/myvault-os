@@ -10,11 +10,12 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 ## Features
 
 - Personal dashboard for skills, projects, documents, and chats
-- **Galaxy constellation**: every item in MyVault OS is a star — projects, skills, documents, chats, monthly tasks, the three accounting systems and the game — and every section is its own solar system with a glowing sun, orbiting stars, orbit rings and cross-system link lines. Animated 3D (Three.js, vendored locally so it works offline) with a dependency-free 2D solar-system map as fallback
+- **Report** register: a first-class section (same level as Skills) for monthly, quarterly and one-off reports — name, company/entity, period, status, link, tags and notes, with search, company filter, sort, a Dashboard count and its own solar system in the galaxy
+- **Galaxy constellation**: every item in MyVault OS is a star — projects, skills, documents, chats, reports, monthly tasks, the three accounting systems and the game — and every section is its own solar system with a glowing sun, orbiting stars, orbit rings and cross-system link lines. Animated 3D (Three.js, vendored locally so it works offline) with a dependency-free 2D solar-system map as fallback
 - Accounting System section launching the GPL, EIC, and MPL company systems from private repos via GitHub access — the signed-in owner and team open each system directly, no access code — plus a one-way **Auditor Access Portal** link and an owner-only console for the auditors' portal codes
 - Games library with an isolated, playable Three.js arcade racer
 - Responsive overview with active projects, recent items, and quick capture
-- Search across the vault (`/` shortcut), filter projects and skills, and sort records
+- Search across the vault (`/` shortcut), filter projects, skills and reports, and sort records
 - Keyboard-accessible add/edit dialogs that preserve imported metadata and links
 - Clear local/synced status with pending changes preserved across refreshes
 - Structured views with add, edit, delete, and search — no JSON editing needed for day-to-day use
@@ -36,6 +37,7 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
   "docs":     [{ "id", "title", "url", "tags", "notes", "created" }],
   "cards":    [],
   "chats":    [{ "id", "title", "url", "notes", "created" }],
+  "reports":  [{ "id", "name", "company", "period", "status", "url", "tags", "notes", "created" }],
   "meta":     { "created", "owner", "version", "voiceNotes" }
 }
 ```
@@ -46,6 +48,17 @@ MyVault OS is a multi-platform AI personal operating system, with a lightweight 
 - `styles.css` — responsive workspace styling and reduced-motion support
 - `test/app.test.cjs` — frontend data and synchronization checks (`node --test test/app.test.cjs`)
 - `worker/` — Cloudflare Worker that proxies GitHub OAuth, vault storage, and authenticated private accounting-system file access (`npm test` runs the vitest suite)
+
+## Report
+
+The **Report** view is a first-class workspace section at the same level as Skills, Projects, Documents and Chats. It is a register for the reports you produce — monthly, quarterly and one-off — so every deliverable has a home. Each report records a **name**, **company/entity** (GPL, EIC, MPL, MTC, ALUM, GPR, Personal, Other), **period** (e.g. `2026-11`), **status** (Draft, In review, Final, Archived), an optional **link**, **tags** and **notes**. Reports support the same add/edit/delete dialogs, full-text search, company filter and name/recent sort as the other collections, show a live count in the sidebar and a card on the Dashboard, appear in global search and "Recently added", sync with the vault, and form their own gold solar system in the galaxy constellation.
+
+### Processing status · 處理狀態 (2026-11-13, office Qwen — Report section)
+
+- Shipped (local commit; push gated on Anthony): added the **Report** collection end-to-end — `COLLECTIONS.reports`, `DEFAULT_VAULT.reports`, `normalizeVault`/`validateVaultJson`, sidebar nav + count, Dashboard overview card, collection search/company-filter/sort, global search, "Recently added", and a gold **Report 報告** solar system in both the 2D map and 3D galaxy (`SECTION_ORDER`/`SECTION_META`, `CONSTELLATION_COLLECTIONS`, `buildConstellationModel`). Cache busters bumped (`app.js`/`styles.css` → `report-1`, constellation modules → `v=6`).
+- **Bug fix included:** `renderSearch()` called `.join("")` inside the `.map()` callback (`openRecordButton(...).join`), which threw `TypeError` whenever a global search returned any match. Moved `.join("")` outside the callback so search results render. This was a pre-existing defect exposed by the Report search test.
+- **Worker unchanged** — `handleSave` stores the vault verbatim, so `reports` syncs without any Worker change or deploy.
+- Verified on the office PC: `node --check app.js` clean; frontend Node suites **72/72** (incl. 2 new Report tests + 8-section constellation tests); Worker vitest **75/75**; headless Chromium (loopback, signed-out) **28/28** — nav/count, create/edit/delete, company filter, search, sort, Dashboard card, global search, Report solar-system chip, mobile 390×844, zero page errors. Screenshots inspected (mobile register + 3D galaxy): `.qwen\tmp\shots\myvault-report-*.png`.
 
 ## Games
 

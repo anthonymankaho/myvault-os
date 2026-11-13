@@ -1,5 +1,5 @@
 // The everyday map has no network, canvas, or WebGL dependency.
-import { SECTION_META, sectionMeta, layoutSystemMap, layoutConstellation } from './constellation-systems.mjs?v=5';
+import { SECTION_META, sectionMeta, layoutSystemMap, layoutConstellation } from './constellation-systems.mjs?v=6';
 export { layoutConstellation };
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const color = (node) => sectionMeta(node.kind).star;
@@ -202,7 +202,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen, on
     const request = ++threeRequest;
     threeButton.disabled = true; threeButton.textContent = 'Loading 3D…'; notice.hidden = true;
     try {
-      const module = await Promise.race([import('./constellation-3d.mjs?v=5'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
+      const module = await Promise.race([import('./constellation-3d.mjs?v=6'), new Promise((_, reject) => setTimeout(() => reject(new Error('3D loading timed out')), 8000))]);
       if (disposed || request !== threeRequest) return;
       host3d.hidden = false; stage.hidden = true;
       threeD = module.createMyVaultConstellation({ container: host3d.querySelector('[data-three-host]'), nodes: realNodes, edges: realEdges, onOpen });
