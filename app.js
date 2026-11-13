@@ -733,8 +733,8 @@ function renderGames() {
         <div class="game-cover-copy">
           <p class="eyebrow">ARCADE / 3D RACING</p>
           <h2 id="games-library-heading">Neon Apex</h2>
-          <p>Take the inside line, pass the field, and finish three laps under the lights. Play here or install the standalone game on your iPad.</p>
-          <div class="game-facts"><span>3 laps</span><span>4 drivers</span><span>Keyboard + touch</span></div>
+          <p>Start at the back of a four-car grid, draft the car ahead, and take the win over three laps. Play here or install the standalone game on your iPad.</p>
+          <div class="game-facts"><span>3 laps</span><span>4 drivers</span><span>Draft + boost</span><span>Keyboard + touch</span></div>
           <div class="game-actions"><button class="button button-primary" id="launch-neon-apex" type="button">Start a race <span aria-hidden="true">↗</span></button><a class="button button-quiet" href="games/neon-apex.html" target="_blank" rel="noopener">Open standalone / Install on iPad ↗</a></div>
           <p class="game-install-hint">On iPad, open the standalone game in Safari, then tap Share → Add to Home Screen → Open as Web App.</p>
         </div>
@@ -750,7 +750,7 @@ function renderGames() {
   neonApexArea = area;
   neonApexFrame = frame;
   viewContainer.querySelector("#launch-neon-apex").addEventListener("click", () => {
-    frame.src = "games/neon-apex.html?v=ipad-1";
+    frame.src = "games/neon-apex.html?v=race-2";
     area.hidden = false;
     area.scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -1932,11 +1932,11 @@ function buildConstellationModel() {
     kind: "games",
     name: "Neon Apex",
     meta: "Arcade racer",
-    description: "The built-in arcade racer — three maps, drift, boost and local best laps.",
+    description: "The built-in arcade racer — three maps, a fair grid, draft, drift, boost and local best laps.",
     links: [],
     safeName: "Neon Apex",
     safeMeta: "Arcade racer",
-    safeDescription: "The built-in arcade racer — three maps, drift, boost and local best laps.",
+    safeDescription: "The built-in arcade racer — three maps, a fair grid, draft, drift, boost and local best laps.",
   });
   const aliases = new Map();
   nodes.forEach((node, index) => {

@@ -37,6 +37,7 @@
       .mode-switch button { min-height: 38px; padding: 0 10px; border: 0; color: #dce8e4; background: transparent; font: 600 10px ui-monospace, monospace; letter-spacing: .04em; cursor: pointer; }
       .mode-switch button[aria-pressed="true"] { color: #072019; background: #7ce4c8; }
       .hud { top: calc(max(12px, env(safe-area-inset-top)) + 52px); right: max(12px, env(safe-area-inset-right)); left: max(12px, env(safe-area-inset-left)); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
+      .hud[hidden], .lap-progress[hidden] { display: none; }
       .stats { display: flex; gap: 8px; }
       .stat { min-width: 78px; padding: 10px 12px; border: 1px solid #6c87904a; border-radius: 10px; background: #08141ca8; backdrop-filter: blur(12px); }
       .stat small { display: block; font-size: 8px; }
@@ -87,6 +88,20 @@
       html.viewport-fill, html.viewport-fill body, html.viewport-fill #game { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; }
       .toast { top: 50%; left: 50%; padding: 12px 18px; border: 1px solid #ffffff38; border-radius: 999px; color: #fff0db; background: #0b1922d9; font: 700 12px ui-monospace, monospace; letter-spacing: .08em; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; transition: opacity .16s ease; }
       .toast.show { opacity: 1; }
+      .draft { display: inline-block; margin-left: 6px; padding: 2px 5px; border-radius: 99px; color: #072019; background: #7ce4c8; font: 800 8px ui-monospace, monospace; letter-spacing: .12em; vertical-align: 8px; }
+      .draft[hidden] { display: none; }
+      .minimap { position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left)); bottom: max(28px, env(safe-area-inset-bottom)); width: 118px; height: 118px; padding: 8px; border: 1px solid #6c87904a; border-radius: 12px; background: #08141ca8; backdrop-filter: blur(12px); pointer-events: none; }
+      .minimap[hidden] { display: none; }
+      .minimap svg { display: block; width: 100%; height: 100%; }
+      .minimap path { fill: none; stroke: #9fd8cc; stroke-width: 3.5; stroke-linejoin: round; opacity: .85; }
+      .countdown { position: absolute; z-index: 4; top: 40%; left: 50%; margin: 0; color: #fff0db; font: 500 clamp(72px, 16vw, 120px)/1 Georgia, serif; letter-spacing: -.05em; text-shadow: 0 12px 40px #02070c; transform: translate(-50%, -50%); pointer-events: none; }
+      .countdown[hidden] { display: none; }
+      .results { display: grid; gap: 6px; margin: 0 0 16px; padding: 0; list-style: none; }
+      .results[hidden] { display: none; }
+      .results li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 10px; border-radius: 8px; color: #c6d2d3; background: #17252ccc; font: 600 11px ui-monospace, monospace; }
+      .results li.is-player { color: #eafff7; background: #7ce4c81f; }
+      .results em { color: #ffbd89; font-style: normal; }
+      body.show-touch .minimap { bottom: calc(max(28px, env(safe-area-inset-bottom)) + clamp(96px, 16vh, 140px)); }
       @media (max-width: 650px) {
         .topline { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); left: max(10px, env(safe-area-inset-left)); }
         .brand strong { font-size: 19px; }
@@ -102,6 +117,7 @@
         .lap-progress { right: 10px; left: 10px; }
         .control-hint { display: none; }
         .mode-switch button { padding: 0 7px; }
+        .minimap { width: 92px; height: 92px; padding: 6px; }
       }
       @media (max-width: 560px) {
         .touch-group { gap: 6px; }
@@ -113,12 +129,13 @@
         .touch-steer .touch-btn { width: 60px; height: 60px; font-size: 18px; }
         .touch-controls { bottom: max(8px, env(safe-area-inset-bottom)); }
         body.show-touch .lap-progress { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 72px); }
+        .minimap, body.show-touch .minimap { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 78px); width: 76px; height: 76px; }
       }
       @media (max-height: 500px) and (orientation: landscape) {
         .overlay-card { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; width: min(700px, 100%); padding: 18px 24px; }
         .overlay-card .eyebrow, .overlay-card h1, .overlay-card .lede, .overlay-card .best { grid-column: 1; }
         .overlay-card .keys { display: none; }
-        .overlay-card .track-picker, .overlay-card .primary, .overlay-card .overlay-actions { grid-column: 2; }
+        .overlay-card .track-picker, .overlay-card .primary, .overlay-card .overlay-actions, .overlay-card .results { grid-column: 2; }
         .overlay-card .track-picker { margin: 0 0 12px; }
         .track-option { min-height: 0; padding: 6px 4px; }
         .track-option svg { width: 30px; height: 30px; }
@@ -141,17 +158,20 @@
           <button type="button" data-mode="keyboard" aria-pressed="false">Keyboard</button>
         </div>
         <button class="icon-button pause-button" id="pause-race" type="button" hidden>Pause</button>
+        <button class="icon-button" id="mute" type="button" aria-pressed="false" aria-label="Mute sound">Sound</button>
         <button class="icon-button fullscreen-button" id="fullscreen" type="button" aria-pressed="false" aria-label="Enter fullscreen">Fullscreen</button>
       </div>
     </div>
     <section class="hud" id="hud" aria-label="Race status" hidden>
       <div class="stats"><div class="stat"><small>Lap</small><strong id="lap">1 / 3</strong></div><div class="stat"><small>Position</small><strong id="position" class="position">4 / 4</strong></div><div class="stat"><small>Time</small><strong id="time">00:00</strong></div></div>
-      <div class="speed-box"><strong id="speed">000</strong><span class="speed-label">KM / H</span></div>
+      <div class="speed-box"><strong id="speed">000</strong><span class="speed-label">KM / H <span id="draft" class="draft" hidden>DRAFT</span></span></div>
       <div class="nitro"><div class="nitro-label"><span>BOOST</span><span id="boost-pct">100%</span></div><div class="nitro-track"><div class="nitro-fill" id="boost"></div></div></div>
     </section>
     <div class="lap-progress" id="progress" hidden><span id="progress-fill"></span></div>
+    <div class="minimap" id="minimap" hidden><svg id="minimap-svg" viewBox="0 0 64 64" aria-hidden="true"><path id="minimap-path" /></svg></div>
+    <p class="countdown" id="countdown" hidden role="status" aria-live="assertive"></p>
     <section class="overlay" id="start-screen">
-      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps. Three rivals. One clean line through the city lights. Keep your speed up and save boost for the long straight.</p><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div><div class="key"><kbd>SPACE</kbd> Drift while steering</div></div><p class="touch-hint">Hold BRAKE and steer above 95 km/h to drift.</p><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
+      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps from the back of the grid. Draft the car ahead, then pull out, and save boost for the long straight.</p><ol class="results" id="results" hidden></ol><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div><div class="key"><kbd>SPACE</kbd> Drift while steering</div><div class="key">Tuck in behind a car to draft</div></div><p class="touch-hint">Hold BRAKE and steer above 95 km/h to drift.</p><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
     </section>
     <div class="touch-controls" id="touch-controls" hidden aria-label="Touch race controls">
       <div class="touch-group touch-steer">
@@ -177,7 +197,22 @@
         shouldClearTouches,
         touchControlsVisible,
       } from "./neon-apex-input.mjs";
-      import { ROAD_HALF, TAU, TRACK_KEY, createTracks, normalizeTrackId, outlinePath } from "./neon-apex-tracks.mjs";
+      import { ROAD_HALF, TAU, TRACK_KEY, createTracks, normalizeTrackId, outlineFrame, outlinePath, projectPoint } from "./neon-apex-tracks.mjs";
+      import {
+        FORMATION_SPEED,
+        advanceProgress,
+        countdownCue,
+        countdownDone,
+        createCurvatureSampler,
+        createPositionWatch,
+        freshField,
+        orderIds,
+        resultRows,
+        slipstreamAmount,
+        standings,
+        stepPlayerSpeed,
+        stepRival,
+      } from "./neon-apex-race.mjs";
 
       const $ = (id) => document.getElementById(id);
       const sceneHost = $("scene");
@@ -438,15 +473,44 @@
         return car;
       }
 
-      const racers = [
-        { name: "YOU", car: makeCar(0xe8e9df, 0x9ce6d0, true), progress: .015, lane: 0, speed: 0, target: 218, player: true },
-        { name: "KAI", car: makeCar(0x24a59f, 0xffb982), progress: .004, lane: -3.5, speed: 199, target: 204 + Math.random() * 10 },
-        { name: "MIRA", car: makeCar(0xd19a43, 0x5ce4da), progress: .992, lane: 3.4, speed: 205, target: 208 + Math.random() * 8 },
-        { name: "SOL", car: makeCar(0x4e70c5, 0xff876f), progress: .982, lane: -3.2, speed: 194, target: 200 + Math.random() * 10 },
-      ];
-      racers.forEach((racer) => { racer.startLane = racer.lane; scene.add(racer.car); });
-      const player = racers[0];
-      const state = { phase: "ready", speed: 0, lane: 0, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, steer: 0, braking: false, drift: 0, driftSide: 0, smokeTimer: 0, lastStamp: 0, lastHud: 0, toastTimer: 0 };
+      function makeRacer(spec, isPlayer = false) {
+        return {
+          id: spec.id,
+          name: spec.name,
+          map: spec.map,
+          pace: spec.pace,
+          aggression: spec.aggression ?? 0,
+          phase: spec.phase ?? 0,
+          avoidSign: spec.avoidSign ?? 1,
+          homeLane: spec.homeLane ?? spec.lane,
+          lane: spec.lane,
+          progress: spec.progress,
+          laps: 0,
+          speed: 0,
+          player: isPlayer,
+          car: makeCar(spec.body, spec.trim, isPlayer),
+        };
+      }
+      const opening = freshField();
+      const player = makeRacer(opening.player, true);
+      const rivals = opening.rivals.map((spec) => makeRacer(spec));
+      const racers = [player, ...rivals];
+      racers.forEach((racer) => scene.add(racer.car));
+      const minimapSvg = $("minimap-svg");
+      const minimapDots = new Map();
+      for (const racer of [...rivals, player]) {
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("r", racer.player ? "3.3" : "2.3");
+        dot.setAttribute("fill", racer.map);
+        if (racer.player) { dot.setAttribute("stroke", "#ffffff"); dot.setAttribute("stroke-width", "1.1"); }
+        minimapSvg.append(dot);
+        minimapDots.set(racer.id, dot);
+      }
+      let minimapFrame = null;
+      let curvature = () => 0;
+      const positionWatch = createPositionWatch();
+      const state = { phase: "ready", speed: 0, lane: player.lane, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, steer: 0, braking: false, drift: 0, driftSide: 0, smokeTimer: 0, lastStamp: 0, lastHud: 0, toastTimer: 0, slip: 0, countElapsed: 0, countLabel: "", resumePhase: "racing", goBanner: 0, wasBoosting: false };
+      let audio;
       const smokeGeometry = new THREE.SphereGeometry(.38, 6, 4);
       const smokePuffs = Array.from({ length: 24 }, () => {
         const puff = new THREE.Mesh(smokeGeometry, new THREE.MeshBasicMaterial({ color: 0xc9d7d4, transparent: true, opacity: 0, depthWrite: false }));
@@ -482,31 +546,164 @@
       const totalLaps = 3;
       const lapEl = $("lap"), positionEl = $("position"), timeEl = $("time"), speedEl = $("speed"), boostEl = $("boost"), boostPctEl = $("boost-pct"), progressEl = $("progress-fill");
       const overlay = $("start-screen"), overlayTitle = $("overlay-title"), overlayCopy = $("overlay-copy"), startButton = $("start-race"), hud = $("hud");
+      function createRaceAudio() {
+        let ctx = null, engine = null, engineGain = null, noiseBuffer = null, muted = false;
+        try { muted = localStorage.getItem("myvault_neon_apex_muted") === "1"; } catch { muted = false; }
+        function ensure() {
+          if (ctx || muted) return;
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          try {
+            ctx = new AudioCtx();
+            engine = ctx.createOscillator();
+            engine.type = "sawtooth";
+            const filter = ctx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 480;
+            engineGain = ctx.createGain();
+            engineGain.gain.value = 0;
+            engine.frequency.value = 50;
+            engine.connect(filter);
+            filter.connect(engineGain);
+            engineGain.connect(ctx.destination);
+            engine.start();
+            noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+          } catch { ctx = null; }
+        }
+        function noise(type, frequency, duration, volume) {
+          if (!ctx || muted || !noiseBuffer) return;
+          try { playNoise(type, frequency, duration, volume); } catch { /* audio is optional */ }
+        }
+        function playNoise(type, frequency, duration, volume) {
+          const source = ctx.createBufferSource();
+          source.buffer = noiseBuffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = type;
+          filter.frequency.value = frequency;
+          const gain = ctx.createGain();
+          const now = ctx.currentTime;
+          gain.gain.setValueAtTime(volume, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+          source.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          source.start();
+          source.stop(now + duration + 0.02);
+        }
+        return {
+          get muted() { return muted; },
+          toggle() {
+            muted = !muted;
+            try { localStorage.setItem("myvault_neon_apex_muted", muted ? "1" : "0"); } catch { /* private browsing */ }
+            try { if (muted && engineGain && ctx) engineGain.gain.setTargetAtTime(0, ctx.currentTime, 0.03); } catch { /* audio is optional */ }
+            return muted;
+          },
+          resume() { try { ensure(); if (ctx?.state === "suspended") ctx.resume(); } catch { /* audio is optional */ } },
+          engine(speed, throttle) {
+            if (!ctx || !engineGain) return;
+            try {
+              const now = ctx.currentTime;
+              engine.frequency.setTargetAtTime(46 + speed * 0.42, now, 0.08);
+              engineGain.gain.setTargetAtTime(muted ? 0 : (throttle ? 0.05 : 0.018), now, 0.06);
+            } catch { /* audio is optional */ }
+          },
+          silence() { try { if (engineGain && ctx) engineGain.gain.setTargetAtTime(0, ctx.currentTime, 0.04); } catch { /* audio is optional */ } },
+          blip(freq) {
+            if (!ctx || muted) return;
+            try {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              const now = ctx.currentTime;
+              osc.type = "sine";
+              osc.frequency.value = freq;
+              gain.gain.setValueAtTime(0.0001, now);
+              gain.gain.exponentialRampToValueAtTime(0.07, now + 0.012);
+              gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(now + 0.18);
+            } catch { /* audio is optional */ }
+          },
+          thud() { noise("lowpass", 180, 0.22, 0.28); },
+          whoosh() { noise("bandpass", 900, 0.28, 0.12); },
+        };
+      }
+      audio = createRaceAudio();
       function formatTime(ms) { const mins = Math.floor(ms / 60000), secs = Math.floor(ms / 1000) % 60, milli = Math.floor(ms % 1000); return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}.${String(milli).padStart(3, "0")}`; }
+      function showCountdown(text) { const el = $("countdown"); el.hidden = false; el.textContent = text; }
+      function hideCountdown() { $("countdown").hidden = true; }
+      function renderResults(show) {
+        const list = $("results");
+        list.replaceChildren();
+        list.hidden = !show;
+        if (!show) return;
+        for (const row of resultRows(racers, state.elapsed)) {
+          const item = document.createElement("li");
+          if (row.player) item.className = "is-player";
+          const place = document.createElement("span");
+          place.textContent = String(row.place);
+          const name = document.createElement("b");
+          name.textContent = row.name;
+          const gap = document.createElement("em");
+          gap.textContent = row.player && row.place === 1 ? formatTime(state.elapsed) : row.gap;
+          item.append(place, name, gap);
+          list.append(item);
+        }
+      }
       function setOverlay(mode) {
         overlay.hidden = false;
         $("pause-from-overlay").hidden = mode !== "paused";
-        if (mode === "paused") { overlayTitle.innerHTML = "Take a<br />breather."; overlayCopy.textContent = "The race is paused. Your position and boost are waiting."; startButton.textContent = "Resume race"; }
-        else if (mode === "finished") { overlayTitle.innerHTML = "Race<br />complete."; overlayCopy.textContent = `You finished ${state.finishPosition === 1 ? "first" : `in position ${state.finishPosition}`} on ${activeTrack.name} in ${formatTime(state.elapsed)}. Want another run?`; startButton.textContent = "Race again"; }
+        if (mode === "paused" && state.resumePhase === "countdown") { overlayTitle.innerHTML = "Lights<br />held."; overlayCopy.textContent = "The start is paused. Your grid slot and the field are waiting."; startButton.textContent = "Resume start"; }
+        else if (mode === "paused") { overlayTitle.innerHTML = "Take a<br />breather."; overlayCopy.textContent = "The race is paused. Your position and boost are waiting."; startButton.textContent = "Resume race"; }
+        else if (mode === "finished") { overlayTitle.innerHTML = "Race<br />complete."; overlayCopy.textContent = `You finished ${state.finishPosition === 1 ? "first" : `in position ${state.finishPosition}`} on ${activeTrack.name} in ${formatTime(state.elapsed)}.`; startButton.textContent = "Race again"; }
         else { overlayTitle.innerHTML = activeTrack.title; overlayCopy.textContent = activeTrack.lede; startButton.textContent = "Start race"; }
         $("overlay-eyebrow").textContent = activeTrack.eyebrow;
         $("track-picker").hidden = mode === "paused";
         $("best-time").textContent = state.bestLap ? `Best lap · ${formatTime(state.bestLap)}` : "Best lap · --:--.---";
+        renderResults(mode === "finished");
       }
       function showToast(text) { const toast = $("toast"); toast.textContent = text; toast.classList.add("show"); clearTimeout(state.toastTimer); state.toastTimer = setTimeout(() => toast.classList.remove("show"), 900); }
-      function startRace() {
-        if (state.phase === "paused") { state.phase = "racing"; overlay.hidden = true; syncPauseButton(); return; }
-        state.phase = "racing"; state.speed = 80; state.lane = 0; state.progress = .015; state.lap = 0; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.smokeTimer = 0;
-        smokePuffs.forEach((puff) => puff.visible = false);
-        player.progress = state.progress; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
-        racers.forEach((racer) => { if (!racer.player) { racer.speed = racer.target; racer.laps = 0; } });
-        overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; updateHud(); syncPauseButton();
+      function syncPlayer() { player.progress = state.progress; player.lane = state.lane; player.laps = state.lap; player.speed = state.speed; }
+      function placeRacer(racer, spec) { racer.progress = spec.progress; racer.lane = spec.lane; racer.homeLane = spec.homeLane ?? spec.lane; racer.laps = 0; racer.speed = 0; }
+      function resetGrid() {
+        const field = freshField();
+        placeRacer(player, field.player);
+        rivals.forEach((rival, index) => placeRacer(rival, field.rivals[index]));
+        state.progress = player.progress; state.lane = player.lane; state.lap = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.driftSide = 0; state.slip = 0;
       }
-      function pauseRace() { if (state.phase !== "racing") return; clearAllTouches("pause"); state.phase = "paused"; setOverlay("paused"); syncPauseButton(); }
-      function finishRace() { state.phase = "finished"; state.finishPosition = currentPosition(); state.speed = 0; state.drift = 0; setOverlay("finished"); syncPauseButton(); }
-      function currentPosition() {
-        const ordered = racers.map((racer, index) => ({ racer, index, score: (racer.player ? state.lap : racer.laps || 0) + racer.progress } )).sort((a, b) => b.score - a.score);
-        return ordered.findIndex((entry) => entry.index === 0) + 1;
+      function startRace() {
+        if (state.phase === "paused") { state.phase = state.resumePhase || "racing"; overlay.hidden = true; if (state.phase === "countdown") showCountdown(state.countLabel || "3"); syncPauseButton(); audio.resume(); return; }
+        if (state.phase === "countdown" || state.phase === "racing") return;
+        resetGrid();
+        for (const racer of racers) racer.speed = FORMATION_SPEED;
+        state.phase = "countdown"; state.resumePhase = "countdown"; state.countElapsed = 0; state.countLabel = "3"; state.speed = FORMATION_SPEED; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.smokeTimer = 0; state.goBanner = 0; state.wasBoosting = false; state.slip = 0;
+        smokePuffs.forEach((puff) => { puff.visible = false; });
+        syncPlayer();
+        overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; $("minimap").hidden = false;
+        showCountdown("3"); updateHud(); syncPauseButton(); positionWatch.reset(orderIds(racers));
+        audio.resume(); audio.blip(523);
+      }
+      function pauseRace() {
+        if (state.phase !== "racing" && state.phase !== "countdown") return;
+        clearAllTouches("pause"); state.resumePhase = state.phase; state.phase = "paused"; hideCountdown(); audio.silence(); setOverlay("paused"); syncPauseButton();
+      }
+      function finishRace() {
+        syncPlayer(); state.phase = "finished"; state.finishPosition = standings(racers).findIndex((racer) => racer.player) + 1; state.speed = 0; state.drift = 0; state.slip = 0; hideCountdown(); $("minimap").hidden = true; $("draft").hidden = true; audio.silence(); setOverlay("finished"); syncPauseButton();
+      }
+      function currentPosition() { syncPlayer(); return standings(racers).findIndex((racer) => racer.player) + 1; }
+      function layoutMinimap() { minimapFrame = outlineFrame(activeTrack); $("minimap-path").setAttribute("d", minimapFrame.path); }
+      function updateMinimap() {
+        if (!minimapFrame) return;
+        for (const racer of racers) {
+          const [x, z] = activeTrack.point((racer.progress % 1) * TAU, racer.lane);
+          const [px, py] = projectPoint(minimapFrame, x, z);
+          const dot = minimapDots.get(racer.id);
+          dot.setAttribute("cx", px.toFixed(2));
+          dot.setAttribute("cy", py.toFixed(2));
+        }
       }
       function updateHud() {
         lapEl.textContent = `${Math.min(state.lap + 1, totalLaps)} / ${totalLaps}`;
@@ -515,9 +712,11 @@
         speedEl.textContent = String(Math.round(state.speed)).padStart(3, "0");
         boostEl.style.width = `${state.boost}%`; boostPctEl.textContent = `${Math.round(state.boost)}%`;
         progressEl.style.width = `${((state.lap + state.progress) / totalLaps) * 100}%`;
+        $("draft").hidden = !(state.slip > 0.35);
+        updateMinimap();
       }
       function updateRacer(racer) {
-        const t = (racer.progress % 1) * Math.PI * 2;
+        const t = (racer.progress % 1) * TAU;
         const p = trackPoint(t, racer.lane, .18);
         const tangent = trackPoint(t + .001, racer.lane, .18).sub(trackPoint(t - .001, racer.lane, .18)).normalize();
         racer.car.position.copy(p);
@@ -536,22 +735,19 @@
         button.addEventListener("click", () => selectTrack(track.id));
         trackPicker.append(button);
       }
-      function resetGrid() {
-        player.progress = state.progress = .015; state.lane = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; racers[1].progress = .004; racers[2].progress = .992; racers[3].progress = .982;
-        racers.forEach((racer) => { if (!racer.player) racer.lane = racer.startLane; });
-        player.lane = 0;
-      }
       function applyTrack(id) {
         activeTrack = tracks.find((track) => track.id === normalizeTrackId(id, tracks));
         showTrackScene(activeTrack);
+        curvature = createCurvatureSampler(activeTrack);
+        layoutMinimap();
         try { localStorage.setItem(TRACK_KEY, activeTrack.id); } catch { /* private browsing */ }
         try { state.bestLap = Number(localStorage.getItem(activeTrack.bestKey) || 0); } catch { state.bestLap = 0; }
         for (const button of trackPicker.children) button.setAttribute("aria-checked", String(button.dataset.track === activeTrack.id));
       }
       function selectTrack(id) {
-        if (state.phase === "racing" || state.phase === "paused" || id === activeTrack.id) return;
+        if (state.phase === "racing" || state.phase === "paused" || state.phase === "countdown" || id === activeTrack.id) return;
         applyTrack(id);
-        state.phase = "ready"; hud.hidden = true; $("progress").hidden = true;
+        state.phase = "ready"; hud.hidden = true; $("progress").hidden = true; $("minimap").hidden = true; hideCountdown();
         resetGrid(); racers.forEach(updateRacer); snapCamera(); setOverlay("ready");
       }
       let savedTrack = null;
@@ -559,63 +755,118 @@
       applyTrack(savedTrack);
       racers.forEach(updateRacer);
       const clock = new THREE.Clock();
+      function readSteer() {
+        return (held.right || keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (held.left || keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
+      }
+      function readPedals() {
+        return {
+          accelerating: held.gas || keys.has("ArrowUp") || keys.has("KeyW"),
+          braking: held.brake || keys.has("ArrowDown") || keys.has("KeyS"),
+          boosting: (held.boost || keys.has("ShiftLeft") || keys.has("ShiftRight")) && state.boost > 0 && state.speed > 65,
+        };
+      }
+      function moveRacer(racer, speed, dt) {
+        const moved = advanceProgress(racer.progress, speed, dt, activeTrack.lapScale);
+        racer.progress = moved.progress;
+        racer.speed = speed;
+        return moved.lapsGained;
+      }
+      function presentCars(dt) {
+        racers.forEach(updateRacer);
+        for (const racer of racers) for (const wheel of racer.car.userData.rollingWheels) wheel.rotation.x += racer.speed * dt * .13;
+        if (performance.now() - state.lastHud > 75) { updateHud(); state.lastHud = performance.now(); }
+      }
+      function stepCountdown(dt) {
+        state.countElapsed += dt;
+        const cue = countdownDone(state.countElapsed) ? "GO" : countdownCue(state.countElapsed);
+        if (cue !== state.countLabel) { state.countLabel = cue; showCountdown(cue); audio.blip(cue === "GO" ? 784 : 523); }
+        const steer = readSteer();
+        state.steer = steer; state.braking = false;
+        state.drift = Math.max(0, state.drift - 4.4 * dt);
+        state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * 8.2, -playerLaneLimit, playerLaneLimit);
+        state.speed = FORMATION_SPEED;
+        for (const racer of racers) racer.speed = FORMATION_SPEED;
+        player.lane = state.lane; syncPlayer();
+        audio.engine(state.speed, true);
+        presentCars(dt);
+        if (!countdownDone(state.countElapsed)) return;
+        state.phase = "racing"; state.elapsed = 0; state.lapElapsed = 0; state.goBanner = 0.7; state.resumePhase = "racing";
+        positionWatch.reset(orderIds(racers)); syncPauseButton();
+      }
+      function stepRace(dt) {
+        state.elapsed += dt * 1000; state.lapElapsed += dt * 1000;
+        if (state.goBanner > 0) { state.goBanner -= dt; if (state.goBanner <= 0) hideCountdown(); }
+        const steer = readSteer();
+        const pedals = readPedals();
+        const drifting = steer !== 0 && state.speed > 95 && (keys.has("Space") || pedals.braking) && !state.offroadWarned;
+        state.steer = steer; state.braking = pedals.braking;
+        state.drift = THREE.MathUtils.clamp(state.drift + (drifting ? 3.2 : -4.4) * dt, 0, 1);
+        if (drifting) state.driftSide = steer;
+        state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * (state.speed > 200 ? 10.5 : 8.2) * (1 + state.drift * .42), -playerLaneLimit, playerLaneLimit);
+        const offroad = Math.abs(state.lane) > roadHalf - 1.2;
+        if (offroad && !state.offroadWarned) { showToast("OFF TRACK · BACK ON THE TARMAC"); state.offroadWarned = true; }
+        else if (!offroad) state.offroadWarned = false;
+        syncPlayer();
+        const slip = slipstreamAmount(player, rivals);
+        state.slip = slip;
+        state.speed = stepPlayerSpeed(state.speed, dt, { accelerating: pedals.accelerating, braking: pedals.braking, boosting: pedals.boosting, drifting, offroad, slip });
+        if (pedals.boosting) state.boost = Math.max(0, state.boost - 30 * dt);
+        else state.boost = Math.min(100, state.boost + (5.6 + slip * 7) * dt);
+        if (pedals.boosting && !state.wasBoosting) audio.whoosh();
+        state.wasBoosting = pedals.boosting;
+        const gained = moveRacer(player, state.speed, dt);
+        state.progress = player.progress; player.lane = state.lane;
+        let lapToast = false;
+        if (gained > 0) {
+          state.lap += gained;
+          const improved = !state.bestLap || state.lapElapsed < state.bestLap;
+          if (improved) { state.bestLap = state.lapElapsed; try { localStorage.setItem(activeTrack.bestKey, String(Math.round(state.bestLap))); } catch { /* private browsing */ } }
+          const finished = state.lap >= totalLaps;
+          state.lapElapsed = 0;
+          if (finished) { if (improved) showToast("NEW PERSONAL BEST"); syncPlayer(); presentCars(dt); finishRace(); return; }
+          showToast(improved ? "NEW PERSONAL BEST" : `LAP ${state.lap + 1} / ${totalLaps}`);
+          lapToast = true;
+        }
+        player.laps = state.lap;
+        for (const rival of rivals) {
+          stepRival(rival, dt, { racing: true, player, others: rivals.filter((other) => other !== rival), elapsed: state.elapsed, laneMax, curvature });
+          rival.laps = (rival.laps || 0) + moveRacer(rival, rival.speed, dt);
+          const separation = Math.min(Math.abs(rival.progress - state.progress), 1 - Math.abs(rival.progress - state.progress));
+          if (separation < .008 && Math.abs(rival.lane - state.lane) < 2.5 && state.collision <= 0) {
+            state.speed = Math.max(70, state.speed - 54);
+            state.lane = THREE.MathUtils.clamp(state.lane + (state.lane >= rival.lane ? 1 : -1) * 1.4, -playerLaneLimit, playerLaneLimit);
+            rival.lane = THREE.MathUtils.clamp(rival.lane + (rival.lane >= state.lane ? .6 : -.6), -(laneMax - .6), laneMax - .6);
+            rival.speed = Math.max(80, rival.speed - 18);
+            player.lane = state.lane; player.speed = state.speed;
+            state.collision = 1.25;
+            document.body.classList.remove("contact"); void document.body.offsetWidth; document.body.classList.add("contact");
+            setTimeout(() => document.body.classList.remove("contact"), 240);
+            showToast("CONTACT · HOLD YOUR LINE");
+            audio.thud();
+          }
+        }
+        syncPlayer();
+        const pass = positionWatch.update(orderIds(racers), dt);
+        if (pass && !lapToast && state.collision <= 0) {
+          const other = racers.find((racer) => racer.id === pass.other);
+          const name = other ? other.name : "CAR";
+          showToast(pass.type === "gain" ? `P${pass.place} · PASSED ${name}` : `P${pass.place} · ${name} AHEAD`);
+        }
+        state.collision = Math.max(0, state.collision - dt);
+        audio.engine(state.speed, pedals.accelerating || pedals.boosting);
+        presentCars(dt);
+      }
       function tick() {
         requestAnimationFrame(tick);
         const dt = Math.min(clock.getDelta(), .04);
-        if (state.phase === "racing") {
-          state.elapsed += dt * 1000; state.lapElapsed += dt * 1000;
-          const steer = (held.right || keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (held.left || keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
-          const boostNow = (held.boost || keys.has("ShiftLeft") || keys.has("ShiftRight")) && state.boost > 0 && state.speed > 65;
-          const accelerating = held.gas || keys.has("ArrowUp") || keys.has("KeyW");
-          const braking = held.brake || keys.has("ArrowDown") || keys.has("KeyS");
-          const drifting = steer !== 0 && state.speed > 95 && (keys.has("Space") || braking) && !state.offroadWarned;
-          state.steer = steer; state.braking = braking;
-          state.drift = THREE.MathUtils.clamp(state.drift + (drifting ? 3.2 : -4.4) * dt, 0, 1);
-          if (drifting) state.driftSide = steer;
-          if (accelerating) state.speed += (boostNow ? 112 : 70) * dt;
-          else state.speed -= 17 * dt;
-          if (braking) state.speed -= (drifting ? 58 : 145) * dt;
-          if (drifting) state.speed -= 14 * dt;
-          if (boostNow) { state.speed = Math.min(state.speed, 292); state.boost = Math.max(0, state.boost - 30 * dt); }
-          else state.boost = Math.min(100, state.boost + 5.6 * dt);
-          state.speed = THREE.MathUtils.clamp(state.speed, 42, boostNow ? 292 : 238);
-          state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * (state.speed > 200 ? 10.5 : 8.2) * (1 + state.drift * .42), -playerLaneLimit, playerLaneLimit);
-          if (Math.abs(state.lane) > roadHalf - 1.2) {
-            state.speed = Math.max(42, state.speed - 48 * dt);
-            if (!state.offroadWarned) { showToast("OFF TRACK · BACK ON THE TARMAC"); state.offroadWarned = true; }
-          } else state.offroadWarned = false;
-          const old = state.progress;
-          state.progress = (state.progress + state.speed * dt / (5000 * activeTrack.lapScale)) % 1;
-          player.progress = state.progress; player.lane = state.lane; player.speed = state.speed;
-          if (state.progress < old) {
-            state.lap++;
-            if (state.lapElapsed < state.bestLap || !state.bestLap) { state.bestLap = state.lapElapsed; localStorage.setItem(activeTrack.bestKey, String(Math.round(state.bestLap))); showToast("NEW PERSONAL BEST"); }
-            state.lapElapsed = 0;
-            if (state.lap >= totalLaps) finishRace();
-            else showToast(`LAP ${state.lap + 1} / ${totalLaps}`);
-          }
-          for (let i = 1; i < racers.length; i++) {
-            const rival = racers[i];
-            const oldProgress = rival.progress;
-            rival.progress = (rival.progress + rival.speed * dt / (5000 * activeTrack.lapScale)) % 1;
-            rival.laps = (rival.laps || 0) + (rival.progress < oldProgress ? 1 : 0);
-            rival.speed += (rival.target - rival.speed) * dt * .16;
-            rival.lane += Math.sin(state.elapsed / 1500 + i * 2.3) * dt * .42;
-            if (rival.lane > laneMax - .6 || rival.lane < -laneMax + .6) rival.lane *= .99;
-            const separation = Math.min(Math.abs(rival.progress - state.progress), 1 - Math.abs(rival.progress - state.progress));
-            if (separation < .008 && Math.abs(rival.lane - state.lane) < 2.5 && state.collision <= 0) {
-              state.speed = Math.max(70, state.speed - 54); state.lane = THREE.MathUtils.clamp(state.lane + (state.lane >= rival.lane ? 1 : -1) * 1.4, -playerLaneLimit, playerLaneLimit); state.collision = 1.25; document.body.classList.remove("contact"); void document.body.offsetWidth; document.body.classList.add("contact"); setTimeout(() => document.body.classList.remove("contact"), 240); showToast("CONTACT · HOLD YOUR LINE");
-            }
-          }
-          state.collision = Math.max(0, state.collision - dt);
-          racers.forEach(updateRacer);
-          for (const racer of racers) for (const wheel of racer.car.userData.rollingWheels) wheel.rotation.x += racer.speed * dt * .13;
-          if (performance.now() - state.lastHud > 75) { updateHud(); state.lastHud = performance.now(); }
-        }
+        if (state.phase === "countdown") stepCountdown(dt);
+        else if (state.phase === "racing") stepRace(dt);
+        else audio.silence();
         updateSmoke(dt);
         aimCamera(1 - Math.exp(-dt * 3.8));
         renderer.render(scene, camera);
       }
+
       function aimCamera(blend) {
         const angle = state.progress * Math.PI * 2;
         const carPos = trackPoint(angle, state.lane, .4);
@@ -645,7 +896,13 @@
         }
         syncTouchButtons();
       }
-      function syncPauseButton() { $("pause-race").hidden = state.phase !== "racing"; }
+      function syncPauseButton() { $("pause-race").hidden = state.phase !== "racing" && state.phase !== "countdown"; }
+      function syncMuteButton() {
+        const button = $("mute");
+        button.textContent = audio.muted ? "Muted" : "Sound";
+        button.setAttribute("aria-pressed", String(audio.muted));
+        button.setAttribute("aria-label", audio.muted ? "Unmute sound" : "Mute sound");
+      }
       function applyControlMode(mode) {
         controlMode = normalizeControlMode(mode);
         const show = touchControlsVisible(controlMode, touchCapable);
@@ -721,18 +978,20 @@
       $("start-race").addEventListener("click", startRace);
       $("pause-from-overlay").addEventListener("click", startRace);
       $("pause-race").addEventListener("click", pauseRace);
-      $("help-button").addEventListener("click", () => showToast("STEER + SPACE OR BRAKE TO DRIFT · SHIFT NITRO"));
+      $("help-button").addEventListener("click", () => showToast("DRAFT BEHIND A CAR · SPACE OR BRAKE TO DRIFT · SHIFT NITRO"));
+      $("mute").addEventListener("click", () => { audio.toggle(); syncMuteButton(); if (!audio.muted) audio.resume(); });
       window.addEventListener("keydown", (event) => {
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
         keys.add(event.code);
+        const live = state.phase === "racing" || state.phase === "countdown";
         if (event.code === "Escape" && viewportFill) setViewportFill(false);
-        if ((event.code === "Escape" || event.code === "KeyP") && state.phase === "racing") pauseRace();
-        else if (event.code === "Enter" && state.phase !== "racing") startRace();
+        if ((event.code === "Escape" || event.code === "KeyP") && live) pauseRace();
+        else if (event.code === "Enter" && !live) startRace();
       });
       window.addEventListener("keyup", (event) => keys.delete(event.code));
-      window.addEventListener("blur", () => { keys.clear(); clearAllTouches("blur"); if (state.phase === "racing") pauseRace(); });
+      window.addEventListener("blur", () => { keys.clear(); clearAllTouches("blur"); if (state.phase === "racing" || state.phase === "countdown") pauseRace(); });
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") { clearAllTouches("visibilityhidden"); if (state.phase === "racing") pauseRace(); }
+        if (document.visibilityState === "hidden") { clearAllTouches("visibilityhidden"); if (state.phase === "racing" || state.phase === "countdown") pauseRace(); }
       });
       window.addEventListener("pagehide", () => clearAllTouches("pagehide"));
       for (const button of controlButtons) {
@@ -763,6 +1022,7 @@
       $("fullscreen").addEventListener("click", () => { toggleFullscreen(); });
       applyControlMode(controlMode);
       updateFullscreenButton();
+      syncMuteButton();
       syncPauseButton();
       setOverlay("ready");
       document.documentElement.dataset.neonApex = "ready";
