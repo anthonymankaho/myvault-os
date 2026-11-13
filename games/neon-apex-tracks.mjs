@@ -16,7 +16,7 @@ export const TRACK_DEFS = [
     place: "Hong Kong",
     eyebrow: "NIGHT CIRCUIT · HONG KONG",
     title: "Own the<br />apex.",
-    lede: "Three laps from the back of the grid. Draft the car ahead, then pull out, and save boost for the long straight.",
+    lede: "Three laps from the back of the grid. Brake for the tight end of the oval — the tires only turn as hard as your speed allows.",
     bestKey: "myvault_neon_apex_best",
     uniform: true,
     center: (t) => [104 * Math.cos(t), 72 * Math.sin(t)],

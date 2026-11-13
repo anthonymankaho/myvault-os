@@ -171,7 +171,7 @@
     <div class="minimap" id="minimap" hidden><svg id="minimap-svg" viewBox="0 0 64 64" aria-hidden="true"><path id="minimap-path" /></svg></div>
     <p class="countdown" id="countdown" hidden role="status" aria-live="assertive"></p>
     <section class="overlay" id="start-screen">
-      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps from the back of the grid. Draft the car ahead, then pull out, and save boost for the long straight.</p><ol class="results" id="results" hidden></ol><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div><div class="key"><kbd>SPACE</kbd> Drift while steering</div><div class="key">Tuck in behind a car to draft</div></div><p class="touch-hint">Hold BRAKE and steer above 95 km/h to drift.</p><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
+      <div class="overlay-card"><p class="eyebrow" id="overlay-eyebrow">NIGHT CIRCUIT · HONG KONG</p><h1 id="overlay-title">Own the<br />apex.</h1><p class="lede" id="overlay-copy">Three laps from the back of the grid. Brake for the tight end of the oval — the tires only turn as hard as your speed allows.</p><ol class="results" id="results" hidden></ol><div class="track-picker" id="track-picker" role="radiogroup" aria-label="Race map"></div><div class="keys"><div class="key"><kbd>←</kbd><kbd>→</kbd> Steer</div><div class="key"><kbd>↑</kbd> Accelerate</div><div class="key"><kbd>↓</kbd> Brake</div><div class="key"><kbd>⇧</kbd> Nitro boost</div><div class="key"><kbd>SPACE</kbd> Drift while steering</div><div class="key">Tuck in behind a car to draft</div></div><p class="touch-hint">Hold BRAKE and steer above 95 km/h to drift.</p><button class="primary" id="start-race" type="button">Start race</button><p class="best" id="best-time">Best lap · --:--.---</p><div class="overlay-actions"><button class="icon-button" id="help-button" type="button">CONTROLS</button><button class="icon-button" id="pause-from-overlay" type="button" hidden>RESUME</button></div></div>
     </section>
     <div class="touch-controls" id="touch-controls" hidden aria-label="Touch race controls">
       <div class="touch-group touch-steer">
@@ -198,6 +198,7 @@
         touchControlsVisible,
       } from "./neon-apex-input.mjs";
       import { ROAD_HALF, TAU, TRACK_KEY, createTracks, normalizeTrackId, outlineFrame, outlinePath, projectPoint } from "./neon-apex-tracks.mjs";
+      import { cornerSpeedKmh, metersPerUnit, stepDrive, trackBend, trackHeading } from "./neon-apex-drive.mjs";
       import {
         FORMATION_SPEED,
         advanceProgress,
@@ -210,7 +211,6 @@
         resultRows,
         slipstreamAmount,
         standings,
-        stepPlayerSpeed,
         stepRival,
       } from "./neon-apex-race.mjs";
 
@@ -248,6 +248,7 @@
         ridge: { sky: 0x2a1a26, fog: .0038, ground: 0x3a2419, groundRough: 1, groundMetal: 0, infield: 0x4a2d1e, hemi: [0xffc6a3, 0x2a1810, 1.9], moon: [0xffb38a, 2.6], trackLight: 0xffc07a, warmLight: 0xff7a55, kerb: [0x8b5a3b, 0x3a170b], posts: [[0x6fe0c8, 0x14403a], [0xffb15e, 0x5a2a0c]], stars: .3, scenery: "canyon" },
       };
       const tracks = createTracks();
+      const unitScale = metersPerUnit(tracks[0].length);
       let activeTrack = tracks[0];
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(1100, 900), new THREE.MeshStandardMaterial({ color: 0x18251f, roughness: 1 }));
       ground.rotation.x = -Math.PI / 2; ground.position.y = -0.65; ground.receiveShadow = true; scene.add(ground);
@@ -509,7 +510,7 @@
       let minimapFrame = null;
       let curvature = () => 0;
       const positionWatch = createPositionWatch();
-      const state = { phase: "ready", speed: 0, lane: player.lane, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, steer: 0, braking: false, drift: 0, driftSide: 0, smokeTimer: 0, lastStamp: 0, lastHud: 0, toastTimer: 0, slip: 0, countElapsed: 0, countLabel: "", resumePhase: "racing", goBanner: 0, wasBoosting: false };
+      const state = { phase: "ready", speed: 0, lane: player.lane, progress: player.progress, lap: 0, boost: 100, elapsed: 0, lapElapsed: 0, bestLap: 0, collision: 0, offroadWarned: false, steer: 0, braking: false, drift: 0, driftSide: 0, yaw: 0, wheel: 0, smokeTimer: 0, lastStamp: 0, lastHud: 0, toastTimer: 0, slip: 0, countElapsed: 0, countLabel: "", resumePhase: "racing", goBanner: 0, wasBoosting: false };
       let audio;
       const smokeGeometry = new THREE.SphereGeometry(.38, 6, 4);
       const smokePuffs = Array.from({ length: 24 }, () => {
@@ -672,14 +673,14 @@
         const field = freshField();
         placeRacer(player, field.player);
         rivals.forEach((rival, index) => placeRacer(rival, field.rivals[index]));
-        state.progress = player.progress; state.lane = player.lane; state.lap = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.driftSide = 0; state.slip = 0;
+        state.progress = player.progress; state.lane = player.lane; state.lap = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.driftSide = 0; state.yaw = 0; state.wheel = 0; state.slip = 0;
       }
       function startRace() {
         if (state.phase === "paused") { state.phase = state.resumePhase || "racing"; overlay.hidden = true; if (state.phase === "countdown") showCountdown(state.countLabel || "3"); syncPauseButton(); audio.resume(); return; }
         if (state.phase === "countdown" || state.phase === "racing") return;
         resetGrid();
         for (const racer of racers) racer.speed = FORMATION_SPEED;
-        state.phase = "countdown"; state.resumePhase = "countdown"; state.countElapsed = 0; state.countLabel = "3"; state.speed = FORMATION_SPEED; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.smokeTimer = 0; state.goBanner = 0; state.wasBoosting = false; state.slip = 0;
+        state.phase = "countdown"; state.resumePhase = "countdown"; state.countElapsed = 0; state.countLabel = "3"; state.speed = FORMATION_SPEED; state.boost = 100; state.elapsed = 0; state.lapElapsed = 0; state.collision = 0; state.offroadWarned = false; state.steer = 0; state.drift = 0; state.yaw = 0; state.wheel = 0; state.smokeTimer = 0; state.goBanner = 0; state.wasBoosting = false; state.slip = 0;
         smokePuffs.forEach((puff) => { puff.visible = false; });
         syncPlayer();
         overlay.hidden = true; hud.hidden = false; $("progress").hidden = false; $("minimap").hidden = false;
@@ -718,12 +719,11 @@
       function updateRacer(racer) {
         const t = (racer.progress % 1) * TAU;
         const p = trackPoint(t, racer.lane, .18);
-        const tangent = trackPoint(t + .001, racer.lane, .18).sub(trackPoint(t - .001, racer.lane, .18)).normalize();
         racer.car.position.copy(p);
-        racer.car.rotation.y = Math.atan2(-tangent.x, -tangent.z) + (racer.player ? state.driftSide * state.drift * .26 : 0);
+        racer.car.rotation.y = trackHeading(activeTrack, racer.progress) + (racer.player ? state.yaw : 0);
         if (racer.player) {
-          racer.car.rotation.z = -state.steer * .035 - state.driftSide * state.drift * .035;
-          for (const wheel of racer.car.userData.steeringWheels) wheel.rotation.y = -state.steer * .22 + state.driftSide * state.drift * .12;
+          racer.car.rotation.z = -state.yaw * .18;
+          for (const wheel of racer.car.userData.steeringWheels) wheel.rotation.y = -state.wheel;
           racer.car.userData.taillight.emissiveIntensity = state.braking ? 3 : 1.5;
         }
       }
@@ -791,6 +791,7 @@
         presentCars(dt);
         if (!countdownDone(state.countElapsed)) return;
         state.phase = "racing"; state.elapsed = 0; state.lapElapsed = 0; state.goBanner = 0.7; state.resumePhase = "racing";
+        state.yaw = 0; state.wheel = 0;
         positionWatch.reset(orderIds(racers)); syncPauseButton();
       }
       function stepRace(dt) {
@@ -798,24 +799,37 @@
         if (state.goBanner > 0) { state.goBanner -= dt; if (state.goBanner <= 0) hideCountdown(); }
         const steer = readSteer();
         const pedals = readPedals();
-        const drifting = steer !== 0 && state.speed > 95 && (keys.has("Space") || pedals.braking) && !state.offroadWarned;
+        const handbrake = keys.has("Space") || (held.brake && !keys.has("ArrowDown") && !keys.has("KeyS"));
+        const drifting = handbrake && steer !== 0;
         state.steer = steer; state.braking = pedals.braking;
-        state.drift = THREE.MathUtils.clamp(state.drift + (drifting ? 3.2 : -4.4) * dt, 0, 1);
-        if (drifting) state.driftSide = steer;
-        state.lane = THREE.MathUtils.clamp(state.lane + steer * dt * (state.speed > 200 ? 10.5 : 8.2) * (1 + state.drift * .42), -playerLaneLimit, playerLaneLimit);
-        const offroad = Math.abs(state.lane) > roadHalf - 1.2;
-        if (offroad && !state.offroadWarned) { showToast("OFF TRACK · BACK ON THE TARMAC"); state.offroadWarned = true; }
-        else if (!offroad) state.offroadWarned = false;
         syncPlayer();
         const slip = slipstreamAmount(player, rivals);
         state.slip = slip;
-        state.speed = stepPlayerSpeed(state.speed, dt, { accelerating: pedals.accelerating, braking: pedals.braking, boosting: pedals.boosting, drifting, offroad, slip });
+        const drove = stepDrive(state, {
+          steer,
+          accelerating: pedals.accelerating,
+          braking: pedals.braking,
+          boosting: pedals.boosting,
+          drifting,
+          slip,
+        }, {
+          curvature: trackBend(activeTrack, state.progress),
+          metersPerUnit: unitScale,
+          lapScale: activeTrack.lapScale,
+          roadHalf,
+          laneLimit: playerLaneLimit,
+        }, dt);
+        state.drift = Math.min(1, Math.abs(state.yaw) / 0.42);
+        if (state.yaw) state.driftSide = Math.sign(state.yaw);
+        if (drove.offroad && !state.offroadWarned) { showToast("OFF TRACK · BACK ON THE TARMAC"); state.offroadWarned = true; }
+        else if (!drove.offroad) state.offroadWarned = false;
         if (pedals.boosting) state.boost = Math.max(0, state.boost - 30 * dt);
         else state.boost = Math.min(100, state.boost + (5.6 + slip * 7) * dt);
         if (pedals.boosting && !state.wasBoosting) audio.whoosh();
         state.wasBoosting = pedals.boosting;
-        const gained = moveRacer(player, state.speed, dt);
-        state.progress = player.progress; player.lane = state.lane;
+        let gained = drove.lapsGained;
+        if (gained < 0 && state.lap + gained < 0) { state.progress = 0; gained = 0; }
+        player.progress = state.progress; player.lane = state.lane; player.speed = state.speed;
         let lapToast = false;
         if (gained > 0) {
           state.lap += gained;
@@ -829,11 +843,12 @@
         }
         player.laps = state.lap;
         for (const rival of rivals) {
-          stepRival(rival, dt, { racing: true, player, others: rivals.filter((other) => other !== rival), elapsed: state.elapsed, laneMax, curvature });
+          stepRival(rival, dt, { racing: true, player, others: rivals.filter((other) => other !== rival), elapsed: state.elapsed, laneMax, curvature, cornerKmh: cornerSpeedKmh(trackBend(activeTrack, rival.progress), unitScale) });
           rival.laps = (rival.laps || 0) + moveRacer(rival, rival.speed, dt);
           const separation = Math.min(Math.abs(rival.progress - state.progress), 1 - Math.abs(rival.progress - state.progress));
           if (separation < .008 && Math.abs(rival.lane - state.lane) < 2.5 && state.collision <= 0) {
             state.speed = Math.max(70, state.speed - 54);
+            state.yaw = THREE.MathUtils.clamp(state.yaw + (state.lane >= rival.lane ? -0.35 : 0.35), -0.8, 0.8);
             state.lane = THREE.MathUtils.clamp(state.lane + (state.lane >= rival.lane ? 1 : -1) * 1.4, -playerLaneLimit, playerLaneLimit);
             rival.lane = THREE.MathUtils.clamp(rival.lane + (rival.lane >= state.lane ? .6 : -.6), -(laneMax - .6), laneMax - .6);
             rival.speed = Math.max(80, rival.speed - 18);
@@ -978,7 +993,7 @@
       $("start-race").addEventListener("click", startRace);
       $("pause-from-overlay").addEventListener("click", startRace);
       $("pause-race").addEventListener("click", pauseRace);
-      $("help-button").addEventListener("click", () => showToast("DRAFT BEHIND A CAR · SPACE OR BRAKE TO DRIFT · SHIFT NITRO"));
+      $("help-button").addEventListener("click", () => showToast("BRAKE FOR THE CORNER · SPACE TO DRIFT · SHIFT NITRO"));
       $("mute").addEventListener("click", () => { audio.toggle(); syncMuteButton(); if (!audio.muted) audio.resume(); });
       window.addEventListener("keydown", (event) => {
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();

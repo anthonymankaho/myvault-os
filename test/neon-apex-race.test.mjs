@@ -17,7 +17,6 @@ import {
   resultRows,
   slipstreamAmount,
   standings,
-  stepPlayerSpeed,
   stepRival,
 } from "../games/neon-apex-race.mjs";
 import { outlineFrame, outlinePath, projectPoint, createTracks } from "../games/neon-apex-tracks.mjs";
@@ -95,18 +94,7 @@ test("drafting only counts when a rival is just ahead in the same lane", () => {
   assert.equal(slipstreamAmount(player, [{ laps: 0, progress: 0.503, lane: 0 }]), 0);
 });
 
-test("draft raises the speed cap and a corner slows a rival below their pace", () => {
-  const open = stepPlayerSpeed(220, 1, { accelerating: true, slip: 0 });
-  const draft = stepPlayerSpeed(220, 1, { accelerating: true, slip: 1 });
-  const boosted = stepPlayerSpeed(280, 1, { accelerating: true, boosting: true, slip: 1 });
-  const dirt = stepPlayerSpeed(238, 1, { accelerating: true, offroad: true });
-  assert.equal(open, 238);
-  assert.ok(draft > open);
-  assert.ok(draft <= 256);
-  assert.equal(boosted, 292);
-  assert.ok(dirt < 238);
-  assert.ok(dirt > 42);
-
+test("a corner slows a rival below their pace, and a grip limit slows them further", () => {
   const field = freshField();
   const flat = { ...field.rivals[0], speed: field.rivals[0].pace };
   const bent = { ...field.rivals[0], speed: field.rivals[0].pace };
@@ -119,6 +107,11 @@ test("draft raises the speed cap and a corner slows a rival below their pace", (
   assert.ok(Math.abs(flat.speed - flat.pace) < 1);
   assert.ok(bent.speed < flat.speed - 8);
   assert.ok(bent.speed <= RIVAL_SPEED_CAP);
+
+  const limited = { ...field.rivals[0], speed: field.rivals[0].pace };
+  for (let i = 0; i < 80; i++) stepRival(limited, 0.05, { ...world, curvature: () => 0, cornerKmh: 100 });
+  assert.ok(limited.speed < 110, `limited speed ${limited.speed}`);
+  assert.ok(limited.speed >= 99);
 });
 
 test("a rival defends by moving toward a close follower and stays on the road", () => {
@@ -209,15 +202,17 @@ test("the page, library, and offline cache pick up the race", () => {
   const sw = readFileSync(new URL("../games/sw.js", import.meta.url), "utf8");
   const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
   assert.match(html, /neon-apex-race\.mjs/);
+  assert.match(html, /neon-apex-drive\.mjs/);
   assert.match(html, /slipstreamAmount/);
-  assert.match(html, /stepPlayerSpeed/);
+  assert.match(html, /stepDrive/);
   assert.match(html, /id="minimap"/);
   assert.match(html, /id="countdown"/);
   assert.match(html, /id="results"/);
   assert.match(html, /id="mute"/);
   assert.match(html, /id="draft"/);
   assert.match(html, /Tuck in behind a car to draft/);
-  assert.match(sw, /neon-apex-offline-v2/);
+  assert.match(sw, /neon-apex-offline-v3/);
   assert.match(sw, /neon-apex-race\.mjs/);
-  assert.match(app, /neon-apex\.html\?v=race-2/);
+  assert.match(sw, /neon-apex-drive\.mjs/);
+  assert.match(app, /neon-apex\.html\?v=drive-3/);
 });
