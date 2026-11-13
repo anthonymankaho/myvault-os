@@ -792,13 +792,14 @@ const ACCOUNTING_COMPANIES = [
 ];
 
 function renderAccounting() {
+  const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
   const cards = ACCOUNTING_COMPANIES.map(
     (company) => `
     <article class="accounting-card accounting-tone-${company.key}">
       <div class="accounting-card-art" aria-hidden="true">
         <span class="accounting-ledger-lines"></span>
         <span class="accounting-code">${company.code}</span>
-        <span class="accounting-card-tag">PRIVATE REPO · GITHUB ACCESS</span>
+        <span class="accounting-card-tag">${signedIn ? "SIGNED IN · DIRECT ACCESS" : "PRIVATE REPO · GITHUB ACCESS"}</span>
       </div>
       <div class="accounting-card-copy">
         <h2>${escapeHtml(company.name)}</h2>
@@ -806,12 +807,14 @@ function renderAccounting() {
         <div class="accounting-chips">${company.chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>
         <div class="accounting-actions">
           <button class="button button-primary" type="button" data-open-system="${company.key}">Open system <span aria-hidden="true">↗</span></button>
-          <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">Standalone ↗</a>
+          <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">New tab ↗</a>
         </div>
       </div>
     </article>`,
   ).join("");
-  const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
+  const ownerStrip = signedIn
+    ? `<p class="accounting-owner-strip" data-state="direct"><span class="accounting-owner-mark" aria-hidden="true">✓</span>GitHub session detected — each system opens directly with your repository access. No access code needed. <span lang="zh-Hant">已偵測 GitHub 登入——每個系統按你的儲存庫權限直接開啟，無需存取碼。</span></p>`
+    : `<p class="accounting-owner-strip" data-state="guest"><span class="accounting-owner-mark" aria-hidden="true">→</span>Sign in with GitHub (top right) and the books open directly — no access code needed. <span lang="zh-Hant">請先以 GitHub 登入（右上角），帳簿即直接開啟——無需存取碼。</span></p>`;
   const auditorLink = `
     <a class="accounting-auditor-link" href="https://anthonymankaho.github.io/auditor-portal/" target="_blank" rel="noopener noreferrer">
       <svg viewBox="0 0 64 64" aria-hidden="true" fill="none">
@@ -830,7 +833,7 @@ function renderAccounting() {
       <div class="accounting-admin-head">
         <p class="eyebrow">OWNER CONSOLE · 管理員</p>
         <h2>Auditor access codes <span lang="zh-Hant">審計員存取碼</span></h2>
-        <p>This is the code the auditor enters at the portal — and on each system's standalone "Unlock" screen. Set or replace it here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">這就是審計員於入口及每個系統獨立「Unlock」畫面輸入的代碼。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
+        <p>This is the code the auditor enters at the Auditor Access Portal — the only place a code is needed. Set or replace it here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">這就是審計員於 Auditor Access Portal（審計員入口）輸入的代碼——只有該入口需要代碼。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
       </div>
       <div class="accounting-admin-rows">
         ${ACCOUNTING_COMPANIES.map(
@@ -850,12 +853,22 @@ function renderAccounting() {
       </div>
     </section>`
     : "";
+  const auditorSection = `
+    <section class="accounting-auditor" aria-label="Auditor access">
+      <div class="accounting-auditor-head">
+        <p class="eyebrow">AUDITOR ACCESS · 審計員入口</p>
+        <h2>Third-party review <span lang="zh-Hant">第三方審計</span></h2>
+        <p>Auditors unlock each system at the independent portal with a per-company code — read-only sessions, zero MyVault content, and no link back. You manage the codes below; the owner and team never need one. <span lang="zh-Hant">審計員以各公司代碼於獨立入口開啟系統——唯讀工作階段、不含任何 MyVault 內容、不會反向連結。代碼由你在此管理；管理員與團隊無需代碼。</span></p>
+      </div>
+      ${auditorLink}
+      ${codeConsole}
+      ${signedIn ? "" : `<p class="accounting-auditor-note">Sign in as the owner to set or retrieve auditor codes. <span lang="zh-Hant">管理員登入後可在此設定或查閱審計員代碼。</span></p>`}
+    </section>`;
   viewContainer.innerHTML = `
     ${pageHeading("Accounting System", "The three company books, online under one roof — each system loads live from its private GitHub repository.")}
     <section class="accounting-library" aria-label="Company accounting systems">
-      ${auditorLink}
+      ${ownerStrip}
       <div class="accounting-grid">${cards}</div>
-      ${codeConsole}
       <div class="accounting-play-area" id="accounting-play-area" hidden>
         <div class="game-play-heading">
           <div><p class="eyebrow">NOW OPEN</p><h2 id="accounting-play-title">Accounting system</h2></div>
@@ -866,7 +879,8 @@ function renderAccounting() {
         </div>
         <iframe class="accounting-frame" id="accounting-frame" title="Company accounting system" loading="lazy" referrerpolicy="no-referrer"></iframe>
       </div>
-      <p class="game-library-note">Sign in with GitHub first — each system checks that your account can read its private repository before it loads. Company data never sits in this public site, and nothing here changes your synced vault records.</p>
+      ${auditorSection}
+      <p class="game-library-note">Owner &amp; team: sign in with GitHub — each system checks that your account can read its private repository, then loads directly. Auditors: use the Auditor Access Portal above with the code set in the Owner Console. Company data never sits in this public site, and nothing here changes your synced vault records. <span lang="zh-Hant">管理員與團隊：以 GitHub 登入後直接開啟。審計員：使用上方 Auditor Access Portal（審計員入口）及管理員設定的代碼。公司數據從不存放於此公開網站，此頁亦不會改動已同步的 vault 記錄。</span></p>
     </section>`;
   const area = viewContainer.querySelector("#accounting-play-area");
   const frame = viewContainer.querySelector("#accounting-frame");
@@ -886,7 +900,7 @@ function renderAccounting() {
       if (!company) return;
       title.textContent = company.name;
       frame.title = `${company.name} accounting system`;
-      frame.src = `systems/${company.file}?v=accounting-1`;
+      frame.src = `systems/${company.file}?v=accounting-2`;
       area.hidden = false;
       syncFillButton();
       area.scrollIntoView({ behavior: "smooth", block: "start" });

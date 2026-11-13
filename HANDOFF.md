@@ -3,6 +3,8 @@
 **From:** Qwen on `Anthony-Surface-book` · **Date:** 2026-11-14 · **Repo HEAD:** `1e40802`
 **Purpose:** consolidated context for the office-PC Qwen session to continue this work without re-deriving it. Read this together with the dated `Processing status · 處理狀態` entries in `README.md`.
 
+> **2026-11-13 update (office Qwen):** the standalone access-code gate was **removed from the MyVault shells** — they are GitHub-only and the signed-in owner opens each system directly. Auditor codes are now **portal-only**; §1.D below is superseded. See README → Processing status (2026-11-13, office Qwen — owner direct access).
+
 ---
 
 ## 1. What was built (all live & verified)
