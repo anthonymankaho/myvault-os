@@ -794,6 +794,8 @@ const ACCOUNTING_COMPANIES = [
     code: "GPL",
     name: "Gold Plume Limited",
     file: "GPL_System.html",
+    repo: "anthonymankaho/GPL",
+    repoPath: "GPL-System/GPL_System.html",
     description:
       "The GPL accounting and investment workspace — close, journals, trial balance and performance, with the Qwen assistant on call.",
     chips: ["Accounting & investments", "Qwen assistant", "Performance"],
@@ -803,6 +805,8 @@ const ACCOUNTING_COMPANIES = [
     code: "EIC",
     name: "EIC Company",
     file: "EIC_System.html",
+    repo: "anthonymankaho/EIC",
+    repoPath: "EIC-System/EIC_System.html",
     description:
       "Month-end close, journals, investments and the group suite — the same books, protected by the same GitHub access.",
     chips: ["Close & journals", "Investments", "Qwen assistant"],
@@ -812,11 +816,58 @@ const ACCOUNTING_COMPANIES = [
     code: "MPL",
     name: "Meyer Properties Limited",
     file: "MPL_System.html",
+    repo: "anthonymankaho/MPL",
+    repoPath: "MPL_System.html",
     description:
       "Property accounting — receipts, deposits, impairment and the monthly performance pack, all in one launcher.",
     chips: ["Property accounting", "Qwen assistant", "Performance"],
   },
 ];
+
+const GITHUB_API = "https://api.github.com";
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(2)} MB`;
+}
+
+async function fileToBase64(file) {
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buffer.length; i += chunk) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function ghRequest(path, { method = "GET", token, body } = {}) {
+  const response = await fetch(GITHUB_API + path, {
+    method,
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    const error = new Error(data?.message || `GitHub request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
 
 function renderAccounting() {
   const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
@@ -891,6 +942,32 @@ function renderAccounting() {
       ${codeConsole}
       ${signedIn ? "" : `<p class="accounting-auditor-note">Sign in as the owner to set or retrieve auditor codes. <span lang="zh-Hant">管理員登入後可在此設定或查閱審計員代碼。</span></p>`}
     </section>`;
+  const uploadPanel = signedIn
+    ? `
+    <section class="accounting-upload" aria-label="Upload local company systems">
+      <div class="accounting-upload-head">
+        <p class="eyebrow">OWNER · SYSTEM FILES 管理員・系統檔案</p>
+        <h2>Upload local system <span lang="zh-Hant">上傳本機系統</span></h2>
+        <p>Publish the latest local HTML file for each company straight to its private GitHub repository — the website serves that version, so this updates what the owner, team and auditor see. Every upload is a git commit, reversible in GitHub history; GitHub verifies your write access. <span lang="zh-Hant">將每個公司最新的本機 HTML 檔案直接發佈到其私人 GitHub 儲存庫——網站提供該版本，因此這會更新管理員、團隊及審計員看到的內容。每次上傳都是一個 git commit，可於 GitHub 歷史還原；GitHub 會驗證你的寫入權限。</span></p>
+      </div>
+      <div class="accounting-upload-rows">
+        ${ACCOUNTING_COMPANIES.map(
+          (company) => `
+        <div class="accounting-upload-row" data-upload-system="${company.key}">
+          <span class="accounting-upload-company"><b>${company.code}</b> ${escapeHtml(company.name)}</span>
+          <span class="accounting-upload-remote" data-upload-remote data-state="loading">Checking GitHub… 檢查中</span>
+          <span class="accounting-upload-form">
+            <input type="file" accept=".html,.htm" data-upload-file hidden aria-label="Choose ${company.code} system HTML file">
+            <button class="button button-quiet" type="button" data-upload-pick>Choose file… <span lang="zh-Hant">選擇檔案</span></button>
+            <span class="accounting-upload-chosen" data-upload-chosen></span>
+            <button class="button button-primary" type="button" data-upload-submit disabled>Upload <span lang="zh-Hant">上傳</span></button>
+          </span>
+          <span class="accounting-upload-msg" data-upload-msg role="status"></span>
+        </div>`,
+        ).join("")}
+      </div>
+    </section>`
+    : "";
   viewContainer.innerHTML = `
     ${pageHeading("Accounting System", "The three company books, online under one roof — each system loads live from its private GitHub repository.")}
     <section class="accounting-library" aria-label="Company accounting systems">
@@ -906,6 +983,7 @@ function renderAccounting() {
         </div>
         <iframe class="accounting-frame" id="accounting-frame" title="Company accounting system" loading="lazy" referrerpolicy="no-referrer"></iframe>
       </div>
+      ${uploadPanel}
       ${auditorSection}
       <p class="game-library-note">Owner &amp; team: sign in with GitHub — each system checks that your account can read its private repository, then loads directly. Auditors: use the Auditor Access Portal above with the code set in the Owner Console. Company data never sits in this public site, and nothing here changes your synced vault records. <span lang="zh-Hant">管理員與團隊：以 GitHub 登入後直接開啟。審計員：使用上方 Auditor Access Portal（審計員入口）及管理員設定的代碼。公司數據從不存放於此公開網站，此頁亦不會改動已同步的 vault 記錄。</span></p>
     </section>`;
@@ -1038,6 +1116,157 @@ function renderAccounting() {
         } catch {
           msg.textContent = "Copy unavailable — select the code manually. · 無法自動複製——請手動選取代碼。";
           delete msg.dataset.kind;
+        }
+      });
+    });
+  }
+
+  const uploadRows = viewContainer.querySelectorAll("[data-upload-system]");
+  if (uploadRows.length) {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const uploadState = {};
+    const refreshRemote = async (row, company) => {
+      const chip = row.querySelector("[data-upload-remote]");
+      chip.dataset.state = "loading";
+      chip.textContent = "Checking GitHub… 檢查中";
+      try {
+        const tree = await ghRequest(`/repos/${company.repo}/git/trees/main?recursive=1`, { token });
+        const entry = (tree.tree || []).find(
+          (node) => node.path === company.repoPath && node.type === "blob",
+        );
+        if (!entry) throw new Error("The system file was not found in the repository.");
+        uploadState[company.key] = {
+          ...(uploadState[company.key] || {}),
+          remote: { sha: entry.sha, size: entry.size },
+        };
+        let dateText = "";
+        try {
+          const commits = await ghRequest(
+            `/repos/${company.repo}/commits?path=${encodeURIComponent(company.repoPath)}&per_page=1`,
+            { token },
+          );
+          const date = commits?.[0]?.commit?.committer?.date;
+          if (date) dateText = ` · ${formatTime(date)}`;
+        } catch {}
+        chip.textContent = `On GitHub 目前：${formatBytes(entry.size)}${dateText}`;
+        chip.dataset.state = "ready";
+      } catch (error) {
+        uploadState[company.key] = { ...(uploadState[company.key] || {}), remote: null };
+        chip.textContent =
+          error.status === 401
+            ? "Sign in again to check GitHub · 請重新登入"
+            : "GitHub status unavailable · 無法取得狀態";
+        chip.dataset.state = "error";
+      }
+    };
+    uploadRows.forEach((row) => {
+      const company = ACCOUNTING_COMPANIES.find(
+        (entry) => entry.key === row.dataset.uploadSystem,
+      );
+      if (!company) return;
+      const fileInput = row.querySelector("[data-upload-file]");
+      const pick = row.querySelector("[data-upload-pick]");
+      const chosen = row.querySelector("[data-upload-chosen]");
+      const submit = row.querySelector("[data-upload-submit]");
+      const msg = row.querySelector("[data-upload-msg]");
+      refreshRemote(row, company);
+      pick.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files?.[0] || null;
+        uploadState[company.key] = { ...(uploadState[company.key] || {}), file };
+        msg.textContent = "";
+        delete msg.dataset.kind;
+        if (!file) {
+          chosen.textContent = "";
+          chosen.removeAttribute("data-warn");
+          submit.disabled = true;
+          return;
+        }
+        const remote = uploadState[company.key]?.remote;
+        let note = `${file.name} · ${formatBytes(file.size)}`;
+        let warn = false;
+        if (remote?.size) {
+          const delta = file.size - remote.size;
+          note += ` (${delta >= 0 ? "+" : "−"}${formatBytes(Math.abs(delta))} vs GitHub)`;
+          warn = file.size < remote.size * 0.5;
+          if (warn) note += " ⚠ much smaller 明顯較小";
+        }
+        chosen.textContent = note;
+        if (warn) chosen.setAttribute("data-warn", "1");
+        else chosen.removeAttribute("data-warn");
+        submit.disabled = false;
+      });
+      submit.addEventListener("click", async () => {
+        const file = uploadState[company.key]?.file;
+        if (!file) return;
+        if (!/\.html?$/i.test(file.name)) {
+          msg.textContent = "Choose an .html system file. · 請選擇 .html 系統檔案。";
+          msg.dataset.kind = "error";
+          return;
+        }
+        if (file.size === 0) {
+          msg.textContent = "That file is empty. · 該檔案是空的。";
+          msg.dataset.kind = "error";
+          return;
+        }
+        if (file.size > 100 * 1048576) {
+          msg.textContent = "File exceeds GitHub's 100 MB limit. · 檔案超過 GitHub 100 MB 上限。";
+          msg.dataset.kind = "error";
+          return;
+        }
+        const remote = uploadState[company.key]?.remote;
+        const shrink = Boolean(remote?.size && file.size < remote.size * 0.5);
+        const confirmText =
+          `Upload "${file.name}" (${formatBytes(file.size)}) to ${company.repo}/${company.repoPath}?` +
+          (remote?.size ? `\n\nCurrent GitHub version 目前版本：${formatBytes(remote.size)}.` : "") +
+          (shrink
+            ? "\n\n⚠ WARNING 警告：the new file is much smaller than the current GitHub version — make sure it is the full system, not an empty shell. 新檔案明顯較小——請確定是完整系統而非空殼。"
+            : "") +
+          "\n\nThis replaces the live version everyone sees. 這會取代所有人看到的線上版本。";
+        if (!window.confirm(confirmText)) return;
+        submit.disabled = true;
+        pick.disabled = true;
+        msg.textContent = "Uploading… 上傳中";
+        delete msg.dataset.kind;
+        try {
+          const content = await fileToBase64(file);
+          const result = await ghRequest(`/repos/${company.repo}/contents/${company.repoPath}`, {
+            method: "PUT",
+            token,
+            body: {
+              message: `Update ${company.code} system via MyVault OS local upload`,
+              content,
+              branch: "main",
+              ...(remote?.sha ? { sha: remote.sha } : {}),
+            },
+          });
+          const commitSha = String(result?.commit?.sha || "").slice(0, 7);
+          uploadState[company.key] = {
+            file: null,
+            remote: { sha: result?.content?.sha, size: result?.content?.size ?? file.size },
+          };
+          fileInput.value = "";
+          chosen.textContent = "";
+          chosen.removeAttribute("data-warn");
+          msg.textContent = `Uploaded — live now${commitSha ? ` (commit ${commitSha})` : ""}. · 已上傳，即時生效。`;
+          msg.dataset.kind = "success";
+          refreshRemote(row, company);
+        } catch (error) {
+          if (error.status === 409 || error.status === 422) {
+            msg.textContent =
+              "The GitHub version changed since you loaded it — refresh and retry. · GitHub 版本已變更——請重新整理後再試。";
+          } else if (error.status === 401) {
+            msg.textContent = "Your GitHub sign-in expired — sign in again. · GitHub 登入已過期——請重新登入。";
+          } else if (error.status === 403 || error.status === 404) {
+            msg.textContent = "GitHub denied write access to this repository. · GitHub 拒絕寫入此儲存庫。";
+          } else {
+            msg.textContent = error.message || "Upload failed. · 上傳失敗。";
+          }
+          msg.dataset.kind = "error";
+          refreshRemote(row, company);
+        } finally {
+          submit.disabled = !uploadState[company.key]?.file;
+          pick.disabled = false;
         }
       });
     });
