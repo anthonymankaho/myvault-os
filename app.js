@@ -767,6 +767,7 @@ const ACCOUNTING_COMPANIES = [
     code: "GPL",
     name: "Gold Plume Limited",
     file: "GPL_System.html",
+    branch: "MEYER",
     description:
       "The GPL accounting and investment workspace — close, journals, trial balance and performance, with the Qwen assistant on call.",
     chips: ["Accounting & investments", "Qwen assistant", "Performance"],
@@ -776,6 +777,7 @@ const ACCOUNTING_COMPANIES = [
     code: "EIC",
     name: "EIC Company",
     file: "EIC_System.html",
+    branch: "MEYER",
     description:
       "Month-end close, journals, investments and the group suite — the same books, protected by the same GitHub access.",
     chips: ["Close & journals", "Investments", "Qwen assistant"],
@@ -785,33 +787,76 @@ const ACCOUNTING_COMPANIES = [
     code: "MPL",
     name: "Meyer Properties Limited",
     file: "MPL_System.html",
+    branch: "MEYER",
     description:
       "Property accounting — receipts, deposits, impairment and the monthly performance pack, all in one launcher.",
     chips: ["Property accounting", "Qwen assistant", "Performance"],
+  },
+  {
+    key: "sal",
+    code: "SAL",
+    name: "Strategic Alliance Limited 卓域聯盟有限公司",
+    file: "SAL_System.html",
+    branch: "SAL",
+    external: true,
+    description:
+      "Independent company books (different owner) — FY2024–FY2027 accounting rebuilt from bank statements and cheque evidence, plus SOP and request documents. Opens as a standalone site with its own access code; no link back to this workspace.",
+    chips: ["Independent owner 獨立業主", "Access code 存取碼", "Accounting + Documents"],
+  },
+];
+
+const ACCOUNTING_BRANCHES = [
+  {
+    key: "MEYER",
+    title: "MEYER",
+    subtitle: "Group companies 集團公司 — MPL · GPL · EIC",
+    note: "Owner & team open these directly with GitHub access. 管理員與團隊以 GitHub 權限直接開啟。",
+  },
+  {
+    key: "SAL",
+    title: "SAL",
+    subtitle: "Strategic Alliance Limited 卓域聯盟有限公司 — independent owner 獨立業主",
+    note: "Opens in a new tab as a standalone website with its own access code — SAL users never see this workspace. 以新分頁開啟獨立網站，使用其專屬存取碼——SAL 用戶不會看到此工作區。",
   },
 ];
 
 function renderAccounting() {
   const signedIn = Boolean(localStorage.getItem(TOKEN_KEY));
-  const cards = ACCOUNTING_COMPANIES.map(
-    (company) => `
+  const renderCard = (company) => `
     <article class="accounting-card accounting-tone-${company.key}">
       <div class="accounting-card-art" aria-hidden="true">
         <span class="accounting-ledger-lines"></span>
         <span class="accounting-code">${company.code}</span>
-        <span class="accounting-card-tag">${signedIn ? "SIGNED IN · DIRECT ACCESS" : "PRIVATE REPO · GITHUB ACCESS"}</span>
+        <span class="accounting-card-tag">${company.external ? "INDEPENDENT · ACCESS CODE 獨立·存取碼" : signedIn ? "SIGNED IN · DIRECT ACCESS" : "PRIVATE REPO · GITHUB ACCESS"}</span>
       </div>
       <div class="accounting-card-copy">
         <h2>${escapeHtml(company.name)}</h2>
         <p>${escapeHtml(company.description)}</p>
         <div class="accounting-chips">${company.chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>
         <div class="accounting-actions">
-          <button class="button button-primary" type="button" data-open-system="${company.key}">Open system <span aria-hidden="true">↗</span></button>
-          <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">New tab ↗</a>
+          ${company.external
+            ? `<a class="button button-primary" href="systems/${company.file}" target="_blank" rel="noopener noreferrer">Open SAL website 開啟獨立網站 <span aria-hidden="true">↗</span></a>`
+            : `<button class="button button-primary" type="button" data-open-system="${company.key}">Open system <span aria-hidden="true">↗</span></button>
+          <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">New tab ↗</a>`}
         </div>
       </div>
-    </article>`,
-  ).join("");
+    </article>`;
+  const cards = ACCOUNTING_BRANCHES.map((branch) => {
+    const members = ACCOUNTING_COMPANIES.filter((company) => company.branch === branch.key);
+    if (!members.length) return "";
+    return `
+    <section class="accounting-branch accounting-branch-${branch.key.toLowerCase()}" aria-label="${branch.title} branch">
+      <div class="accounting-branch-head">
+        <span class="accounting-branch-mark" aria-hidden="true">${branch.title}</span>
+        <div>
+          <h2>${branch.title} <span lang="zh-Hant">分支</span></h2>
+          <p>${escapeHtml(branch.subtitle)}</p>
+        </div>
+      </div>
+      <p class="accounting-branch-note">${escapeHtml(branch.note)}</p>
+      <div class="accounting-grid">${members.map(renderCard).join("")}</div>
+    </section>`;
+  }).join("");
   const ownerStrip = signedIn
     ? `<p class="accounting-owner-strip" data-state="direct"><span class="accounting-owner-mark" aria-hidden="true">✓</span>GitHub session detected — each system opens directly with your repository access. No access code needed. <span lang="zh-Hant">已偵測 GitHub 登入——每個系統按你的儲存庫權限直接開啟，無需存取碼。</span></p>`
     : `<p class="accounting-owner-strip" data-state="guest"><span class="accounting-owner-mark" aria-hidden="true">→</span>Sign in with GitHub (top right) and the books open directly — no access code needed. <span lang="zh-Hant">請先以 GitHub 登入（右上角），帳簿即直接開啟——無需存取碼。</span></p>`;
@@ -832,8 +877,8 @@ function renderAccounting() {
     <section class="accounting-admin" aria-label="Auditor access codes">
       <div class="accounting-admin-head">
         <p class="eyebrow">OWNER CONSOLE · 管理員</p>
-        <h2>Auditor access codes <span lang="zh-Hant">審計員存取碼</span></h2>
-        <p>This is the code the auditor enters at the Auditor Access Portal — the only place a code is needed. Set or replace it here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">這就是審計員於 Auditor Access Portal（審計員入口）輸入的代碼——只有該入口需要代碼。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
+        <h2>Access codes 存取碼</h2>
+        <p>Per-company codes for the Auditor Access Portal (MPL · GPL · EIC) and for the standalone SAL website (SAL users — different owner, no MyVault access). Set or replace a code here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">各公司代碼：MPL／GPL／EIC 用於 Auditor Access Portal（審計員入口）；SAL 用於獨立網站（SAL 用戶——獨立業主，無 MyVault 權限）。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
       </div>
       <div class="accounting-admin-rows">
         ${ACCOUNTING_COMPANIES.map(
@@ -865,10 +910,10 @@ function renderAccounting() {
       ${signedIn ? "" : `<p class="accounting-auditor-note">Sign in as the owner to set or retrieve auditor codes. <span lang="zh-Hant">管理員登入後可在此設定或查閱審計員代碼。</span></p>`}
     </section>`;
   viewContainer.innerHTML = `
-    ${pageHeading("Accounting System", "The three company books, online under one roof — each system loads live from its private GitHub repository.")}
+    ${pageHeading("Accounting System", "Two branches under one roof — MEYER group companies (MPL · GPL · EIC) and the independent SAL company, each loading live from its own private GitHub repository.")}
     <section class="accounting-library" aria-label="Company accounting systems">
       ${ownerStrip}
-      <div class="accounting-grid">${cards}</div>
+      ${cards}
       <div class="accounting-play-area" id="accounting-play-area" hidden>
         <div class="game-play-heading">
           <div><p class="eyebrow">NOW OPEN</p><h2 id="accounting-play-title">Accounting system</h2></div>

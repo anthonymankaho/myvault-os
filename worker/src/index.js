@@ -20,6 +20,12 @@ const ACCOUNTING_SYSTEMS = {
     contentsUrl:
       "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main",
     standaloneSecret: "MPL_STANDALONE_CODE"
+  },
+  sal: {
+    label: "SAL",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/SAL/contents/SAL-System/SAL_System.html?ref=main",
+    standaloneSecret: "SAL_STANDALONE_CODE"
   }
 };
 
