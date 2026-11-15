@@ -59,15 +59,16 @@ https://anthonymankaho.github.io/myvault-os
 
 ## Accounting System
 
-The **Accounting System** view is a first-class workspace section alongside Documents and Chats. It launches the three company accounting systems — **GPL** (Gold Plume Limited), **EIC**, and **MPL** (Meyer Properties Limited) — online, either embedded in the workspace (with a full-screen mode) or in a new tab. A status strip shows whether a GitHub session is detected: signed in, each system opens **directly** with your repository access (the owner never enters an access code); signed out, it points to the GitHub sign-in. Below the systems, a dedicated **Auditor Access · 審計員入口** section groups the one-way portal link and the owner-only code console.
+The **Accounting System** view is a first-class workspace section alongside Documents and Chats. Since 2026-11-15 it is organised in **two branches**: **MEYER** — the group companies **GPL** (Gold Plume Limited), **EIC**, and **MPL** (Meyer Properties Limited) — and **SAL** — **Strategic Alliance Limited 卓域聯盟有限公司**, an independent company with a different owner. MEYER systems open embedded in the workspace (with a full-screen mode) or in a new tab; a status strip shows whether a GitHub session is detected: signed in, each system opens **directly** with your repository access (the owner never enters an access code); signed out, it points to the GitHub sign-in. The **SAL card opens the standalone SAL website in a new tab** — SAL users enter an access code there and never see this workspace. Below the systems, a dedicated **Auditor Access · 審計員入口** section groups the one-way portal link and the owner-only code console (now covering SAL as well).
 
-Each public `systems/<Company>_System.html` URL is a **GitHub-only sign-in shell**, not the application source. It reads the existing MyVault GitHub OAuth session and asks the Cloudflare Worker (`accounting-system` action with `payload.system` = `gpl` / `eic` / `mpl`; the legacy `gpl-system` action still works) to load the system from its private repository. A signed-in session with repository access loads the system automatically — there is no access-code field on the shell. Visitors without a session see the sign-in gate plus a bilingual **External auditor? 外聘審計員？** hint pointing to the Auditor Access Portal:
+Each public `systems/<Company>_System.html` URL is a **shell**, not the application source. The MEYER shells read the existing MyVault GitHub OAuth session and ask the Cloudflare Worker (`accounting-system` action with `payload.system` = `gpl` / `eic` / `mpl`; the legacy `gpl-system` action still works) to load the system from its private repository. A signed-in session with repository access loads the system automatically — there is no access-code field on those shells. Visitors without a session see the sign-in gate plus a bilingual **External auditor? 外聘審計員？** hint pointing to the Auditor Access Portal. The **SAL shell is different**: it is fully standalone (no MyVault chrome, no back link, no GitHub sign-in) and asks for an access code, which the Worker verifies before streaming the system from the private SAL repo:
 
-| System | Private source |
-| --- | --- |
-| GPL | `anthonymankaho/GPL` → `GPL-System/GPL_System.html` |
-| EIC | `anthonymankaho/EIC` → `EIC-System/EIC_System.html` |
-| MPL | `anthonymankaho/MPL` → `MPL_System.html` |
+| System | Private source | Shell access |
+| --- | --- | --- |
+| GPL | `anthonymankaho/GPL` → `GPL-System/GPL_System.html` | GitHub session (auditors: portal code) |
+| EIC | `anthonymankaho/EIC` → `EIC-System/EIC_System.html` | GitHub session (auditors: portal code) |
+| MPL | `anthonymankaho/MPL` → `MPL_System.html` | GitHub session (auditors: portal code) |
+| SAL | `anthonymankaho/SAL` → `SAL-System/SAL_System.html` | Access code only (independent users) |
 
 Access is granted only when GitHub authorizes that signed-in account to read the private file. The Worker returns the HTML with caching disabled; the full systems and their embedded workbook data are not stored in this public repository's current files. When a shell is embedded in the Accounting view it hides its standalone back link — the workspace provides **Back to Accounting**, **Full screen**, and Escape-to-exit.
 
@@ -80,6 +81,15 @@ Access codes are entered **only at the Auditor Access Portal** — the MyVault O
 ### Auditor Access Portal (one-way link)
 
 The Accounting view's **Auditor Access** section carries a banner link to the independent **Auditor Access Portal** at <https://anthonymankaho.github.io/auditor-portal/> (repo `anthonymankaho/auditor-portal`). The link is one-way: the portal shows only the three companies and never links back to MyVault or exposes any vault content. The portal is the **only** place an access code is entered; the MyVault shells point auditors there instead of accepting codes. Auditors enter the per-company code at the portal; it then opens each system in a full-screen viewer and provisions a dedicated read-only `auditor` session through the system's own account machinery (MPL in review mode, external FINSYS tile hidden), so no second username/password login is needed. An existing session in the same browser (e.g. the owner's master account) is never replaced.
+
+### Processing status · 處理狀態 (2026-11-15, SAL branch + standalone website)
+
+- **Two branches** in the Accounting view: MEYER (GPL · EIC · MPL, unchanged behaviour) and SAL (Strategic Alliance Limited 卓域聯盟有限公司 — independent owner). `ACCOUNTING_COMPANIES` gained a `branch` field + `ACCOUNTING_BRANCHES`; the SAL card is external and opens `systems/SAL_System.html` in a **new tab**.
+- **`systems/SAL_System.html`**: standalone teal shell — access-code gate (bilingual), loading panel, sign-out & lock; **zero links back to MyVault** (verified live: 0 anchors). Streams `SAL-System/SAL_System.html` from the private `anthonymankaho/SAL` repo via the Worker `accounting-system` action with `payload.system = "sal"` + `payload.code`. No company data sits in this public repo.
+- **Worker**: `sal` added to `ACCOUNTING_SYSTEMS` (`SAL_STANDALONE_CODE` env fallback, KV `auditor-code:sal`). Deployed version `5abf9b3c`; live-probed: no code → 401, wrong code → 503 "not configured" (fail-closed until the owner sets a code).
+- **Owner console**: SAL row added automatically (iterates `ACCOUNTING_COMPANIES`); heading now "Access codes 存取碼" covering auditor portal codes (MEYER) and the standalone SAL code.
+- **OWNER ACTION 待業主**: sign in → Accounting → OWNER CONSOLE → **SAL row → Save code**, then share the code with SAL users. Until then the standalone site shows "Access is not configured yet 尚未設定存取碼".
+- Verified live (headless Chrome against github.io): two branches render (MEYER: GPL·EIC·MPL; SAL: SAL), SAL card `target=_blank`, shell gate visible, no MyVault links. SAL system itself: 34/34 template tests + smoke + real-data + docs checks PASS (see `anthonymankaho/SAL` STATUS.md).
 
 ### Processing status · 處理狀態 (2026-11-13, office Qwen — owner direct access)
 
