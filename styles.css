@@ -120,14 +120,14 @@ html { scrollbar-color: #33454a #111719; scrollbar-width: thin; }
 .accounting-tone-mpl .accounting-code { color: #d3b8ff; text-shadow: 0 0 26px #a78bfa55; }
 .accounting-tone-mpl .accounting-card-tag { color: #cdb6ec; }
 .accounting-tone-mpl:hover { border-color: #5d3a96; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #5d3a9633, 0 0 34px #a78bfa1f; }
-.accounting-tone-ideal .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #5c1a33 0, #3d1226 45%, #230b16 100%); }
-.accounting-tone-ideal .accounting-code { color: #ffb3c8; text-shadow: 0 0 26px #f43f5e55; }
-.accounting-tone-ideal .accounting-card-tag { color: #e7b6c4; }
-.accounting-tone-ideal:hover { border-color: #8a2c4d; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #8a2c4d33, 0 0 34px #f43f5e1f; }
-.accounting-tone-mcl .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #0c3a5c 0, #0a2940 45%, #081826 100%); }
-.accounting-tone-mcl .accounting-code { color: #8fd6ff; text-shadow: 0 0 26px #0ea5e955; }
-.accounting-tone-mcl .accounting-card-tag { color: #a9cfe8; }
-.accounting-tone-mcl:hover { border-color: #1d5c8a; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #1d5c8a33, 0 0 34px #0ea5e91f; }
+.accounting-tone-ideal .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #5c1a1a 0, #3d1212 45%, #230b0b 100%); }
+.accounting-tone-ideal .accounting-code { color: #ffb3b3; text-shadow: 0 0 26px #ef444455; }
+.accounting-tone-ideal .accounting-card-tag { color: #e7b6b6; }
+.accounting-tone-ideal:hover { border-color: #8a2c2c; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #8a2c2c33, 0 0 34px #ef44441f; }
+.accounting-tone-mcl .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #57501c 0, #3a3513 45%, #211e0c 100%); }
+.accounting-tone-mcl .accounting-code { color: #fff3b0; text-shadow: 0 0 26px #facc1555; }
+.accounting-tone-mcl .accounting-card-tag { color: #e9e2b8; }
+.accounting-tone-mcl:hover { border-color: #87802e; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #87802e33, 0 0 34px #facc151f; }
 .accounting-tone-sal .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #0c4a44 0, #0a3632 45%, #081f1d 100%); }
 .accounting-tone-sal .accounting-code { color: #7ff0e0; text-shadow: 0 0 26px #14b8a655; }
 .accounting-tone-sal .accounting-card-tag { color: #a8ded6; }
