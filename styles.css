@@ -120,6 +120,30 @@ html { scrollbar-color: #33454a #111719; scrollbar-width: thin; }
 .accounting-tone-mpl .accounting-code { color: #d3b8ff; text-shadow: 0 0 26px #a78bfa55; }
 .accounting-tone-mpl .accounting-card-tag { color: #cdb6ec; }
 .accounting-tone-mpl:hover { border-color: #5d3a96; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #5d3a9633, 0 0 34px #a78bfa1f; }
+.accounting-tone-sal .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #0c4a44 0, #0a3632 45%, #081f1d 100%); }
+.accounting-tone-sal .accounting-code { color: #7ff0e0; text-shadow: 0 0 26px #14b8a655; }
+.accounting-tone-sal .accounting-card-tag { color: #a8ded6; }
+.accounting-tone-sal:hover { border-color: #1f6f63; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #1f6f6333, 0 0 34px #14b8a61f; }
+.accounting-tone-mings .accounting-card-art { background: radial-gradient(ellipse at 30% 20%, #65451b 0, #392a18 45%, #21180f 100%); }
+.accounting-tone-mings .accounting-code { color: #f5cc82; text-shadow: 0 0 26px #d89b3f55; }
+.accounting-tone-mings .accounting-card-tag { color: #efd5a9; }
+.accounting-tone-mings:hover { border-color: #8b6429; box-shadow: 0 22px 60px #05090a66, 0 0 0 1px #8b642933, 0 0 34px #d89b3f1f; }
+.accounting-branch { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: #ffffff04; }
+.accounting-branch + .accounting-branch { margin-top: 18px; }
+.accounting-branch-head { display: flex; align-items: center; gap: 14px; }
+.accounting-branch-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 74px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); font: 400 19px/1 Georgia, "Times New Roman", serif; letter-spacing: .02em; background: #ffffff08; color: #cfd9d8; }
+.accounting-branch-head h2 { margin: 0; font: 400 20px/1.25 Georgia, "Times New Roman", serif; }
+.accounting-branch-head h2 span { font-size: .72em; color: var(--muted); margin-left: 6px; }
+.accounting-branch-head p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.accounting-branch-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.accounting-branch-meyer .accounting-branch-mark { border-color: #4a6a72; color: #d7e2e1; }
+.accounting-branch-sal { border-color: #1f6f6355; background: #14b8a608; }
+.accounting-branch-sal .accounting-branch-mark { border-color: #1f6f63; color: #7ff0e0; background: #14b8a612; text-shadow: 0 0 18px #14b8a644; }
+.accounting-branch-sal .accounting-branch-head h2 { color: #c9f5ee; }
+.accounting-branch-mings { border-color: #8b642955; background: #d89b3f08; }
+.accounting-branch-mings .accounting-branch-mark { border-color: #8b6429; color: #f5cc82; background: #d89b3f12; text-shadow: 0 0 18px #d89b3f44; }
+.accounting-branch-mings .accounting-branch-head h2 { color: #f6e2bd; }
+@media (max-width: 900px) { .accounting-grid { grid-template-columns: 1fr; } .accounting-branch { padding: 14px; } }
 .accounting-auditor-link { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border: 1px solid #6b5a2e; border-radius: 14px; background: linear-gradient(120deg, #241f10 0%, #1c1a10 55%, #17181a 100%); color: #ecd9a8; text-decoration: none; box-shadow: 0 14px 40px #05090a45; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .accounting-auditor-link:hover { transform: translateY(-2px); border-color: #d4a53c; box-shadow: 0 18px 50px #05090a66, 0 0 30px #d4a53c22; }
 .accounting-auditor-link:focus-visible { outline: 2px solid #d4a53c; outline-offset: 2px; }

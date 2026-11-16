@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>MEL System · MINGS' EDUCATION COMPANY LIMITED 明詩教育有限公司</title>
+  <style>
+    :root { color-scheme: light; font: 15px/1.5 "Segoe UI", Arial, sans-serif; color: #1c2733; background: #eef2f6; --teal: #0f766e; --teal-dark: #115e59; --teal-lt: #f0fdfa; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+    header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 20px; background: linear-gradient(120deg, #0f766e 0%, #115e59 60%, #134e4a 100%); color: #fff; }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand .mark { width: 36px; height: 36px; border-radius: 9px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12.5px; letter-spacing: .03em; flex: 0 0 auto; }
+    .brand strong { font-size: 16px; display: block; line-height: 1.2; }
+    .brand small { font-size: 11.5px; opacity: .85; font-weight: 400; }
+    button, .button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--teal); color: #fff; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; transition: filter .15s, background .15s; }
+    button:hover, .button:hover { filter: brightness(.94); }
+    button.secondary { color: #26364e; background: #edf1f6; }
+    header button.secondary { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+    #lock[hidden], #gate[hidden], #system[hidden], #loading[hidden] { display: none; }
+    #gate { width: min(620px, calc(100% - 32px)); margin: 7vh auto; padding: 32px 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; }
+    #gate .eyebrow { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--teal); text-transform: uppercase; }
+    #gate h1 { margin: 0 0 8px; font-size: 23px; color: #134e4a; }
+    #gate p { color: #59677a; margin: 8px 0 18px; }
+    .code-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .code-field { position: relative; flex: 1; min-width: 220px; }
+    .code-field input { width: 100%; min-height: 42px; padding: 9px 44px 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; letter-spacing: .04em; }
+    .code-field input:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: var(--teal); }
+    .code-field .peek { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 30px; padding: 4px 9px; font-size: 12px; background: #edf1f6; color: #26364e; border-radius: 6px; }
+    #message { min-height: 24px; margin-top: 12px; font-size: 13.5px; color: #59677a; }
+    #message.error { color: #b91c1c; }
+    #message.ok { color: var(--teal-dark); }
+    .note { margin-top: 18px !important; font-size: 12.5px; border-top: 1px solid #e6ebf2; padding-top: 14px; }
+    #loading { flex: 1; min-height: 0; }
+    .loading-card { width: min(620px, calc(100% - 32px)); margin: 7vh auto; padding: 36px 30px; background: #fff; border: 1px solid #dce2ea; border-radius: 14px; box-shadow: 0 12px 40px #18263a12; text-align: center; }
+    .spinner { display: inline-block; width: 34px; height: 34px; border-radius: 50%; border: 3px solid #dce2ea; border-top-color: var(--teal); animation: shell-spin .9s linear infinite; }
+    @keyframes shell-spin { to { transform: rotate(360deg); } }
+    .loading-card h1 { margin: 16px 0 8px; font-size: 21px; color: #134e4a; }
+    .loading-card h1 span { font-size: .78em; color: #59677a; margin-left: 6px; }
+    .loading-card p { margin: 0; color: #59677a; font-size: 13px; line-height: 1.65; }
+    #system { flex: 1; min-height: 0; }
+    #system iframe { display: block; width: 100%; height: calc(100vh - 58px); border: 0; background: #fff; }
+    footer { padding: 8px 20px; font-size: 11.5px; color: #5b6b7b; background: #fff; border-top: 1px solid #dce2ea; text-align: center; }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+    @media (max-width: 520px) { header { padding: 9px 12px; } .brand strong { font-size: 14px; } #gate { padding: 24px 20px; } .loading-card { padding: 28px 20px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="mark" aria-hidden="true">MINGS</span>
+      <div>
+        <strong>MEL System</strong>
+        <small>MINGS' EDUCATION COMPANY LIMITED 明詩教育有限公司</small>
+      </div>
+    </div>
+    <button id="lock" class="secondary" type="button" hidden>Sign out &amp; lock 登出</button>
+  </header>
+
+  <main id="gate">
+    <p class="eyebrow">Independent company system · 獨立公司系統</p>
+    <h1>Enter your access code 輸入存取碼</h1>
+    <p>This is the private accounting system of MINGS' EDUCATION COMPANY LIMITED. Enter the access code provided by the administrator to open the books. <span lang="zh-Hant">此為明詩教育有限公司的私人會計系統。請輸入管理員提供的存取碼以開啟帳簿。</span></p>
+    <div class="code-row">
+      <div class="code-field">
+        <input id="code" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Access code · 存取碼" aria-label="Access code 存取碼">
+        <button id="peek" class="peek" type="button" aria-pressed="false">Show 顯示</button>
+      </div>
+      <button id="unlock" type="button">Unlock 開啟</button>
+    </div>
+    <p id="message" role="status"></p>
+    <p class="note">Internal use only — do not share the code or the system outside the company. The code is managed by the administrator; contact them if you need access. <span lang="zh-Hant">只限內部使用——切勿將存取碼或系統分享予公司以外人士。存取碼由管理員管理；如需權限請聯絡管理員。</span></p>
+  </main>
+
+  <section id="loading" hidden aria-live="polite">
+    <div class="loading-card">
+      <span class="spinner" aria-hidden="true"></span>
+      <h1>Opening MEL System <span lang="zh-Hant">開啟中</span></h1>
+      <p>Verifying your access code and loading the books from the private repository… <span lang="zh-Hant">正在驗證存取碼，從私人儲存庫載入帳簿……</span></p>
+    </div>
+  </section>
+
+  <section id="system" hidden aria-label="MINGS accounting system"></section>
+
+  <footer>MINGS' EDUCATION COMPANY LIMITED 明詩教育有限公司 · internal system 內部系統 · HKD accounting system 港幣會計系統</footer>
+
+  <script>
+    const API = "https://myvault-api.anthonym-354.workers.dev";
+    const CODE_KEY = "mings_shell_code";
+    const gate = document.querySelector("#gate");
+    const message = document.querySelector("#message");
+    const loadingPanel = document.querySelector("#loading");
+    const system = document.querySelector("#system");
+    const lockButton = document.querySelector("#lock");
+    const codeInput = document.querySelector("#code");
+    const unlockButton = document.querySelector("#unlock");
+    const peekButton = document.querySelector("#peek");
+    let loading = false;
+
+    function showGate(text, kind) {
+      system.replaceChildren();
+      system.hidden = true;
+      loadingPanel.hidden = true;
+      gate.hidden = false;
+      lockButton.hidden = true;
+      message.textContent = text || "";
+      message.className = kind || "";
+    }
+
+    function renderSystem(html) {
+      const frame = document.createElement("iframe");
+      frame.title = "MEL System";
+      frame.referrerPolicy = "no-referrer";
+      frame.srcdoc = html;
+      system.replaceChildren(frame);
+      loadingPanel.hidden = true;
+      gate.hidden = true;
+      system.hidden = false;
+      lockButton.hidden = false;
+    }
+
+    async function loadSystem(code) {
+      if (!code) {
+        showGate("Enter the access code provided by the administrator. 請輸入管理員提供的存取碼。");
+        codeInput.focus();
+        return;
+      }
+      if (loading) return;
+      loading = true;
+      gate.hidden = true;
+      loadingPanel.hidden = false;
+      try {
+        const response = await fetch(API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({ action: "accounting-system", payload: { system: "mings", code } })
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          sessionStorage.removeItem(CODE_KEY);
+          if (response.status === 403) {
+            showGate(result.error || "Incorrect access code. 存取碼錯誤。", "error");
+          } else if (response.status === 503) {
+            showGate("Access is not configured yet — ask the administrator to set the MINGS access code. 尚未設定存取碼——請聯絡管理員設定 MINGS 存取碼。", "error");
+          } else {
+            showGate(result.error || "MINGS could not be loaded. Please try again. 無法載入，請重試。", "error");
+          }
+          return;
+        }
+        const html = await response.text();
+        if (!html.trim()) {
+          showGate("The private MINGS system returned an empty file. Please contact the administrator. 系統回傳空白檔案，請聯絡管理員。", "error");
+          return;
+        }
+        sessionStorage.setItem(CODE_KEY, code);
+        renderSystem(html);
+      } catch {
+        showGate("Could not reach the MINGS access service. Check your connection and try again. 無法連線，請檢查網絡後重試。", "error");
+      } finally {
+        loading = false;
+      }
+    }
+
+    unlockButton.addEventListener("click", () => loadSystem(codeInput.value.trim()));
+    codeInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); loadSystem(codeInput.value.trim()); }
+    });
+    peekButton.addEventListener("click", () => {
+      const shown = codeInput.type === "text";
+      codeInput.type = shown ? "password" : "text";
+      peekButton.textContent = shown ? "Show 顯示" : "Hide 隱藏";
+      peekButton.setAttribute("aria-pressed", String(!shown));
+    });
+    lockButton.addEventListener("click", () => {
+      sessionStorage.removeItem(CODE_KEY);
+      codeInput.value = "";
+      showGate("Signed out. Enter your access code to reopen MINGS. 已登出。請輸入存取碼重新開啟。", "ok");
+    });
+
+    const saved = sessionStorage.getItem(CODE_KEY);
+    if (saved) loadSystem(saved);
+    else codeInput.focus();
+  </script>
+</body>
+</html>

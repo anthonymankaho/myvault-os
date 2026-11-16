@@ -16,7 +16,7 @@ export const TRACK_DEFS = [
     place: "Hong Kong",
     eyebrow: "NIGHT CIRCUIT · HONG KONG",
     title: "Own the<br />apex.",
-    lede: "Three laps. Three rivals. One clean line through the city lights. Keep your speed up and save boost for the long straight.",
+    lede: "Three laps from the back of the grid. Draft the car ahead, then pull out, and save boost for the long straight.",
     bestKey: "myvault_neon_apex_best",
     uniform: true,
     center: (t) => [104 * Math.cos(t), 72 * Math.sin(t)],
@@ -28,7 +28,7 @@ export const TRACK_DEFS = [
     place: "Victoria Harbour",
     eyebrow: "HARBOUR LIGHTS · VICTORIA HARBOUR",
     title: "Thread the<br />skyline.",
-    lede: "Two long waterfront straights joined by tight hairpins. Brake late, keep it tidy, and boost out of the turns.",
+    lede: "Two long waterfront straights joined by tight hairpins. Draft into the hairpins, brake late, and boost on the way out.",
     bestKey: "myvault_neon_apex_best_harbour",
     center: harbour.center,
   },
@@ -38,7 +38,7 @@ export const TRACK_DEFS = [
     place: "Lantau",
     eyebrow: "DUSK RIDGE · LANTAU",
     title: "Chase the<br />sunset.",
-    lede: "A rolling canyon road with uneven sweepers. Carry speed through the long bends and save nitro for the exits.",
+    lede: "A rolling canyon from the back of the grid. Carry speed through the sweepers, draft the car ahead, and save nitro for the exits.",
     bestKey: "myvault_neon_apex_best_ridge",
     center: ridge.center,
   },
@@ -116,12 +116,21 @@ export function normalizeTrackId(id, tracks = TRACK_DEFS) {
   return tracks.some((track) => track.id === id) ? id : tracks[0].id;
 }
 
-export function outlinePath(track, size = 64, pad = 6) {
+export function outlineFrame(track, size = 64, pad = 6) {
   const xs = track.outline.map((p) => p[0]), zs = track.outline.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const scale = (size - pad * 2) / Math.max(maxX - minX, maxZ - minZ);
   const ox = (size - (maxX - minX) * scale) / 2, oz = (size - (maxZ - minZ) * scale) / 2;
-  return track.outline
+  const path = track.outline
     .map(([x, z], i) => `${i ? "L" : "M"}${(ox + (x - minX) * scale).toFixed(1)} ${(oz + (z - minZ) * scale).toFixed(1)}`)
     .join(" ") + " Z";
+  return { minX, minZ, maxX, maxZ, scale, ox, oz, size, path };
+}
+
+export function projectPoint(frame, x, z) {
+  return [frame.ox + (x - frame.minX) * frame.scale, frame.oz + (z - frame.minZ) * frame.scale];
+}
+
+export function outlinePath(track, size = 64, pad = 6) {
+  return outlineFrame(track, size, pad).path;
 }
