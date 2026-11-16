@@ -826,6 +826,26 @@ const ACCOUNTING_COMPANIES = [
     chips: ["Property accounting", "Qwen assistant", "Performance"],
   },
   {
+    key: "ideal",
+    code: "IDEAL",
+    name: "IDEAL UNIVERSAL LIMITED",
+    file: "IDEAL_System.html",
+    branch: "MEYER",
+    description:
+      "MEYER group investment holding books — month-end close, journals, trial balance, investment holdings and fair value review, debit/credit notes, with the Qwen assistant on call.",
+    chips: ["Close & journals", "Investments", "Qwen assistant"],
+  },
+  {
+    key: "mcl",
+    code: "MCL",
+    name: "MEYER (CHINA) INVESTMENTS LIMITED",
+    file: "MCL_System.html",
+    branch: "MEYER",
+    description:
+      "MEYER group China investment holding books — month-end close, journals, trial balance, investment holdings and fair value review, debit/credit notes, with the Qwen assistant on call.",
+    chips: ["Close & journals", "Investments", "Qwen assistant"],
+  },
+  {
     key: "sal",
     code: "SAL",
     name: "Strategic Alliance Limited 卓域聯盟有限公司",
@@ -855,7 +875,7 @@ const ACCOUNTING_BRANCHES = [
   {
     key: "MEYER",
     title: "MEYER",
-    subtitle: "Group companies 集團公司 — MPL · GPL · EIC",
+    subtitle: "Group companies 集團公司 — MPL · GPL · EIC · IDEAL · MCL",
     note: "Owner & team open these directly with GitHub access. 管理員與團隊以 GitHub 權限直接開啟。",
   },
   {
@@ -975,7 +995,7 @@ function renderAccounting() {
       <div class="accounting-admin-head">
         <p class="eyebrow">OWNER CONSOLE · 管理員</p>
         <h2>Access codes 存取碼</h2>
-        <p>Per-company codes for the Auditor Access Portal (MPL · GPL · EIC) and the standalone SAL and MINGS websites (each a different owner, with no MyVault access). Set or replace a code here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">各公司代碼：MPL／GPL／EIC 用於 Auditor Access Portal（審計員入口）；SAL 與 MINGS 均使用獨立存取碼，業主不需 MyVault 權限。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
+        <p>Per-company codes for the Auditor Access Portal (MPL · GPL · EIC · IDEAL · MCL) and the standalone SAL and MINGS websites (each a different owner, with no MyVault access). Set or replace a code here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">各公司代碼：MPL／GPL／EIC／IDEAL／MCL 用於 Auditor Access Portal（審計員入口）；SAL 與 MINGS 均使用獨立存取碼，業主不需 MyVault 權限。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
       </div>
       <div class="accounting-admin-rows">
         ${ACCOUNTING_COMPANIES.map(
@@ -1033,7 +1053,7 @@ function renderAccounting() {
     </section>`
     : "";
   viewContainer.innerHTML = `
-    ${pageHeading("Accounting System", "Three owner-separated branches: MEYER group companies (MPL · GPL · EIC), independent SAL, and independent MINGS education company.")}
+    ${pageHeading("Accounting System", "Three owner-separated branches: MEYER group companies (MPL · GPL · EIC · IDEAL · MCL), independent SAL, and independent MINGS education company.")}
     <section class="accounting-library" aria-label="Company accounting systems">
       ${ownerStrip}
       ${cards}

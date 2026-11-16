@@ -21,6 +21,18 @@ const ACCOUNTING_SYSTEMS = {
       "https://api.github.com/repos/anthonymankaho/MPL/contents/MPL_System.html?ref=main",
     standaloneSecret: "MPL_STANDALONE_CODE"
   },
+  ideal: {
+    label: "IDEAL",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/IDEAL/contents/IDEAL-System/IDEAL_System.html?ref=main",
+    standaloneSecret: "IDEAL_STANDALONE_CODE"
+  },
+  mcl: {
+    label: "MCL",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/MCL/contents/MCL-System/MCL_System.html?ref=main",
+    standaloneSecret: "MCL_STANDALONE_CODE"
+  },
   sal: {
     label: "SAL",
     contentsUrl:
