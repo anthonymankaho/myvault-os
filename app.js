@@ -803,6 +803,19 @@ const ACCOUNTING_COMPANIES = [
       "Independent company books (different owner) — FY2024–FY2027 accounting rebuilt from bank statements and cheque evidence, plus SOP and request documents. Opens as a standalone site with its own access code; no link back to this workspace.",
     chips: ["Independent owner 獨立業主", "Access code 存取碼", "Accounting + Documents"],
   },
+  {
+    key: "mings",
+    code: "MEL",
+    name: "MINGS' EDUCATION COMPANY LIMITED 明詩教育有限公司",
+    file: "MINGS_System.html",
+    repo: "anthonymankaho/MEL",
+    repoPath: "MEL_System.html",
+    branch: "MINGS",
+    external: true,
+    description:
+      "Independent-owner education accounting system. Opens separately with its own access code; company books are read from the private MEL repository.",
+    chips: ["Independent owner 獨立業主", "Access code 存取碼", "Education accounting 教育業會計"],
+  },
 ];
 
 const ACCOUNTING_BRANCHES = [
@@ -817,6 +830,12 @@ const ACCOUNTING_BRANCHES = [
     title: "SAL",
     subtitle: "Strategic Alliance Limited 卓域聯盟有限公司 — independent owner 獨立業主",
     note: "Opens in a new tab as a standalone website with its own access code — SAL users never see this workspace. 以新分頁開啟獨立網站，使用其專屬存取碼——SAL 用戶不會看到此工作區。",
+  },
+  {
+    key: "MINGS",
+    title: "MINGS",
+    subtitle: "MINGS' EDUCATION COMPANY LIMITED 明詩教育有限公司 · independent owner 獨立業主",
+    note: "Opens in a new tab as a separate company website with its own access code. MINGS visitors do not enter the MEYER or SAL workspace. 於新分頁開啟獨立公司網站，使用專屬存取碼。MINGS 訪客不會進入 MEYER 或 SAL 工作區。",
   },
 ];
 
@@ -835,7 +854,7 @@ function renderAccounting() {
         <div class="accounting-chips">${company.chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>
         <div class="accounting-actions">
           ${company.external
-            ? `<a class="button button-primary" href="systems/${company.file}" target="_blank" rel="noopener noreferrer">Open SAL website 開啟獨立網站 <span aria-hidden="true">↗</span></a>`
+            ? `<a class="button button-primary" href="systems/${company.file}" target="_blank" rel="noopener noreferrer">Open separate company website 開啟獨立公司網站 <span aria-hidden="true">↗</span></a>`
             : `<button class="button button-primary" type="button" data-open-system="${company.key}">Open system <span aria-hidden="true">↗</span></button>
           <a class="button button-quiet" href="systems/${company.file}" target="_blank" rel="noopener">New tab ↗</a>`}
         </div>
@@ -858,8 +877,8 @@ function renderAccounting() {
     </section>`;
   }).join("");
   const ownerStrip = signedIn
-    ? `<p class="accounting-owner-strip" data-state="direct"><span class="accounting-owner-mark" aria-hidden="true">✓</span>GitHub session detected — each system opens directly with your repository access. No access code needed. <span lang="zh-Hant">已偵測 GitHub 登入——每個系統按你的儲存庫權限直接開啟，無需存取碼。</span></p>`
-    : `<p class="accounting-owner-strip" data-state="guest"><span class="accounting-owner-mark" aria-hidden="true">→</span>Sign in with GitHub (top right) and the books open directly — no access code needed. <span lang="zh-Hant">請先以 GitHub 登入（右上角），帳簿即直接開啟——無需存取碼。</span></p>`;
+    ? `<p class="accounting-owner-strip" data-state="direct"><span class="accounting-owner-mark" aria-hidden="true">✓</span>MEYER systems open with GitHub access; SAL and MINGS use separate owner-managed access codes. <span lang="zh-Hant">MEYER 系統以 GitHub 權限開啟；SAL 與 MINGS 使用各自業主管理的存取碼。</span></p>`
+    : `<p class="accounting-owner-strip" data-state="guest"><span class="accounting-owner-mark" aria-hidden="true">→</span>MEYER requires GitHub access. SAL and MINGS open separately with their own codes. <span lang="zh-Hant">MEYER 需要 GitHub 權限；SAL 與 MINGS 以各自的存取碼獨立開啟。</span></p>`;
   const auditorLink = `
     <a class="accounting-auditor-link" href="https://anthonymankaho.github.io/auditor-portal/" target="_blank" rel="noopener noreferrer">
       <svg viewBox="0 0 64 64" aria-hidden="true" fill="none">
@@ -878,7 +897,7 @@ function renderAccounting() {
       <div class="accounting-admin-head">
         <p class="eyebrow">OWNER CONSOLE · 管理員</p>
         <h2>Access codes 存取碼</h2>
-        <p>Per-company codes for the Auditor Access Portal (MPL · GPL · EIC) and for the standalone SAL website (SAL users — different owner, no MyVault access). Set or replace a code here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">各公司代碼：MPL／GPL／EIC 用於 Auditor Access Portal（審計員入口）；SAL 用於獨立網站（SAL 用戶——獨立業主，無 MyVault 權限）。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
+        <p>Per-company codes for the Auditor Access Portal (MPL · GPL · EIC) and the standalone SAL and MINGS websites (each a different owner, with no MyVault access). Set or replace a code here; press <strong>Show code</strong> to see the current one (owner only). <span lang="zh-Hant">各公司代碼：MPL／GPL／EIC 用於 Auditor Access Portal（審計員入口）；SAL 與 MINGS 均使用獨立存取碼，業主不需 MyVault 權限。在此設定或取代；按「Show code 顯示」查看目前代碼（只限管理員）。</span></p>
       </div>
       <div class="accounting-admin-rows">
         ${ACCOUNTING_COMPANIES.map(
@@ -910,7 +929,7 @@ function renderAccounting() {
       ${signedIn ? "" : `<p class="accounting-auditor-note">Sign in as the owner to set or retrieve auditor codes. <span lang="zh-Hant">管理員登入後可在此設定或查閱審計員代碼。</span></p>`}
     </section>`;
   viewContainer.innerHTML = `
-    ${pageHeading("Accounting System", "Two branches under one roof — MEYER group companies (MPL · GPL · EIC) and the independent SAL company, each loading live from its own private GitHub repository.")}
+    ${pageHeading("Accounting System", "Three owner-separated branches: MEYER group companies (MPL · GPL · EIC), independent SAL, and independent MINGS education company.")}
     <section class="accounting-library" aria-label="Company accounting systems">
       ${ownerStrip}
       ${cards}

@@ -26,6 +26,12 @@ const ACCOUNTING_SYSTEMS = {
     contentsUrl:
       "https://api.github.com/repos/anthonymankaho/SAL/contents/SAL-System/SAL_System.html?ref=main",
     standaloneSecret: "SAL_STANDALONE_CODE"
+  },
+  mings: {
+    label: "MINGS Education (MEL)",
+    contentsUrl:
+      "https://api.github.com/repos/anthonymankaho/MEL/contents/MEL_System.html?ref=main",
+    standaloneSecret: "MEL_STANDALONE_CODE"
   }
 };
 
