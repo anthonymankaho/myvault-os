@@ -2869,6 +2869,9 @@ document.querySelector("#workspace-date").textContent =
     day: "numeric",
   });
 document.querySelector("#global-search").addEventListener("input", (event) => {
+  // Ignore phantom input events (browser autofill / programmatic changes) when the
+  // box is not focused — they were bouncing users back to #search after nav clicks.
+  if (document.activeElement !== event.target) return;
   ui.globalQuery = event.target.value;
   navigate(ui.globalQuery.trim() ? "search" : "home");
 });
