@@ -106,6 +106,7 @@ const VIEWS = {
   ),
   tasks: { title: "Monthly Task" },
   accounting: { title: "Accounting System" },
+  study: { title: "Study source" },
   games: { title: "Games" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
@@ -562,6 +563,9 @@ function render() {
     case "accounting":
       renderAccounting();
       break;
+    case "study":
+      renderStudy();
+      break;
     default:
       renderCollection(state.view);
   }
@@ -611,6 +615,8 @@ const ICON_PATHS = {
     '<path d="M21 11a8 8 0 0 1-8 8H8l-5 3V7a4 4 0 0 1 4-4h6a8 8 0 0 1 8 8Z"/><path d="M7 9h10M7 13h7"/>',
   accounting:
     '<path d="M5 3h14v18H5z"/><path d="M9 3v18"/><path d="M12 7h4M12 10h4M12 13h4M12 16h2"/>',
+  study:
+    '<path d="M12 6c-2-1.6-4.6-2.2-8-2.2v14.4c3.4 0 6 .6 8 2.2 2-1.6 4.6-2.2 8-2.2V3.8c-3.4 0-6 .6-8 2.2Z"/><path d="M12 6v14.4"/>',
   reports:
     '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5"/><path d="M9 17v-3m3 3v-5m3 5v-2"/>',
   games:
@@ -935,6 +941,57 @@ async function ghRequest(path, { method = "GET", token, body } = {}) {
     throw error;
   }
   return data;
+}
+
+const STUDY_SOURCES = [
+  {
+    key: "hktax",
+    code: "HK",
+    name: "HK Tax StudyHub",
+    description:
+      "Hong Kong tax study hub: tax notes, IRD updates, ACCA TX-HKG question banks and the Ask Qwen study assistant.",
+    descriptionZh:
+      "香港稅務溫習中心：稅務筆記、稅務局最新消息、ACCA TX-HKG 題庫及 Ask Qwen 溫習助手。",
+    url: "https://anthonymanhk.github.io/hktax-studyhub/",
+    repo: "https://github.com/anthonymankaho/hktax-studyhub",
+    chips: ["Profits Tax 利得稅", "Salaries Tax 薪俸稅", "Stamp Duty 印花稅", "ACCA TX-HKG"],
+    links: [
+      {
+        label: "Profits Tax — Illustrations 利得稅例題",
+        url: "https://anthonymanhk.github.io/hktax-studyhub/#profits-tax-illustrations",
+      },
+    ],
+  },
+];
+
+function renderStudy() {
+  const cards = STUDY_SOURCES.map(
+    (source) => `
+    <article class="study-card study-tone-${source.key}">
+      <div class="study-card-art" aria-hidden="true">
+        <span class="study-ledger-lines"></span>
+        <span class="study-code">${escapeHtml(source.code)}</span>
+        <span class="study-card-tag">STUDY SOURCE · 學習資源</span>
+      </div>
+      <div class="study-card-copy">
+        <h2>${escapeHtml(source.name)}</h2>
+        <p>${escapeHtml(source.description)} <span lang="zh-Hant">${escapeHtml(source.descriptionZh)}</span></p>
+        <div class="accounting-chips">${source.chips.map((chip) => `<span>${escapeHtml(chip)}</span>`).join("")}</div>
+        <div class="study-links">
+          ${source.links.map((link) => `<a href="${link.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)} <span aria-hidden="true">↗</span></a>`).join("")}
+        </div>
+        <div class="accounting-actions">
+          <a class="button button-primary" href="${source.url}" target="_blank" rel="noopener noreferrer">Open website 開啟網站 <span aria-hidden="true">↗</span></a>
+          <a class="button button-quiet" href="${source.repo}" target="_blank" rel="noopener noreferrer">GitHub repo <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </article>`,
+  ).join("");
+  viewContainer.innerHTML = `
+    ${pageHeading("Study source", "External study platforms linked from this workspace — each opens in a new tab. 外部學習平台連結——全部於新分頁開啟。")}
+    <section class="study-library" aria-label="Study sources">
+      <div class="study-grid">${cards}</div>
+    </section>`;
 }
 
 function renderAccounting() {

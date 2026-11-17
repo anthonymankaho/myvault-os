@@ -339,3 +339,23 @@ test("reports filter by company while projects/skills filters are unchanged", ()
     '["X"]',
   );
 });
+
+test("study source view is wired and links to HK Tax StudyHub", () => {
+  const w = workspace();
+  assert.equal(w.run("VIEWS.study.title"), "Study source");
+  assert.equal(w.run("typeof renderStudy"), "function");
+  assert.equal(w.run("STUDY_SOURCES.length >= 1"), true);
+  w.run("renderStudy()");
+  const html = w.elements.get("#view").innerHTML;
+  assert.match(html, /HK Tax StudyHub/);
+  assert.match(html, /href="https:\/\/anthonymanhk\.github\.io\/hktax-studyhub\/"/);
+  assert.match(html, /href="https:\/\/github\.com\/anthonymankaho\/hktax-studyhub"/);
+  assert.match(html, /#profits-tax-illustrations/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+  const index = fs.readFileSync(
+    require("node:path").join(__dirname, "../index.html"),
+    "utf8",
+  );
+  assert.match(index, /data-view="study"/);
+  assert.match(index, /data-icon="study"/);
+});
