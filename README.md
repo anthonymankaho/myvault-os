@@ -215,12 +215,12 @@ The phone and iPad Grok bot reaches MyVault through a separate MCP endpoint:
 
 The connector uses a bearer token stored as the Worker secret `MYVAULT_MCP_TOKEN`. The token is not in this repository. Tools are `list_monthly_tasks`, `complete_monthly_task`, and `reopen_monthly_task`. A completion requires `completed_at` at the Hong Kong time you stated. The Worker writes `vault.json` with `MYVAULT_DATA_TOKEN` and does not return chat notes.
 
-In the Grok account that owns MOMO, open [grok.com/connectors](https://grok.com/connectors), choose **New Connector**, then **Custom**, and enter that URL. Put the bearer token in the connector authentication field.
+The Grok bot form asks for OAuth. Use client ID `momo-grok-bot`, leave the client secret empty, and keep token authentication on **none (PKCE)**. Authorization endpoint: `https://myvault-api.anthonym-354.workers.dev/oauth/authorize`. Token endpoint: `https://myvault-api.anthonym-354.workers.dev/oauth/token`. Scope: `tasks`. The browser page then asks for the connector password in `worker/.mcp-connector.txt`. Do not paste that password into the token endpoint.
 
 ### Processing status · 處理狀態 (2026-11-18)
 
-- Local only. The live GitHub Pages site and the Worker do not have MOMO until `XAI_API_KEY` is set and both the Worker and this frontend are deployed.
-- Verified: `node --test test/app.test.cjs test/qwen.test.mjs test/momo.test.mjs` (55 passed) and `npx vitest run test/momo.spec.js test/qwen.spec.js` (37 passed). A local browser check opened Ask MOMO, saved Weekly Exchange Report with completion time 16 Nov 09:16 HKT, reopened the edit dialog with that time intact, and checked the panel at 390px width. No page errors. The live Grok call was not run.
+- Ask MOMO on the website is deployed. It still needs the Worker secret `XAI_API_KEY` before it can call Grok. The phone connector does not use that key.
+- The phone connector uses OAuth on the Worker. The connector password stays in `worker/.mcp-connector.txt` and is not committed.
 
 ## Monthly Task
 
