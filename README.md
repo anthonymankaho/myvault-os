@@ -191,9 +191,40 @@ npx wrangler kv namespace create QWEN_USAGE --preview   # optional
 
 Paste the preview ID as `preview_id` next to the production `id` if you create one. Without any binding the Worker skips accounting and enforcement, so the assistant keeps working (and tests need no KV).
 
+## MOMO assistant
+
+Use **Ask MOMO** in the utility bar after signing in with GitHub. MOMO is the Monthly Task assistant. She calls Grok (`grok-4.7` on `https://api.x.ai/v1`) through the Worker. The browser never receives `XAI_API_KEY`. She sees Monthly Tasks only: description, company, planning month, scheduled date, status, result notes, and completion time. Chats, documents, projects, and skills are not sent.
+
+She can list tasks due today and tasks that are overtime, and she can propose creates and updates. A completion must include `completedAt` at the Hong Kong time you name, such as yesterday 09:16. She cannot delete tasks or change the monthly-recurring flag. Proposals stay unapplied until you tick the confirmation and press **Apply selected**. GitHub still updates only when you press **Save changes**, using the GitHub sign-in already in this page. **Discard** changes nothing. **Undo last MOMO apply** is available until a newer vault edit.
+
+Set the Worker secret and deploy before the live site can answer:
+
+```
+cd worker
+npx wrangler secret put XAI_API_KEY
+npx wrangler deploy
+```
+
+The monthly cap is **1,000,000 tokens** (`XAI_MONTHLY_TOKEN_QUOTA`), stored in the existing `QWEN_USAGE` KV under `momo-usage:{login}:{YYYY-MM}`, separate from the Qwen counter.
+
+## Grok bot MCP
+
+The phone and iPad Grok bot reaches MyVault through a separate MCP endpoint:
+
+`https://myvault-api.anthonym-354.workers.dev/mcp`
+
+The connector uses a bearer token stored as the Worker secret `MYVAULT_MCP_TOKEN`. The token is not in this repository. Tools are `list_monthly_tasks`, `complete_monthly_task`, and `reopen_monthly_task`. A completion requires `completed_at` at the Hong Kong time you stated. The Worker writes `vault.json` with `MYVAULT_DATA_TOKEN` and does not return chat notes.
+
+In the Grok account that owns MOMO, open [grok.com/connectors](https://grok.com/connectors), choose **New Connector**, then **Custom**, and enter that URL. Put the bearer token in the connector authentication field.
+
+### Processing status · 處理狀態 (2026-11-18)
+
+- Local only. The live GitHub Pages site and the Worker do not have MOMO until `XAI_API_KEY` is set and both the Worker and this frontend are deployed.
+- Verified: `node --test test/app.test.cjs test/qwen.test.mjs test/momo.test.mjs` (55 passed) and `npx vitest run test/momo.spec.js test/qwen.spec.js` (37 passed). A local browser check opened Ask MOMO, saved Weekly Exchange Report with completion time 16 Nov 09:16 HKT, reopened the edit dialog with that time intact, and checked the panel at 390px width. No page errors. The live Grok call was not run.
+
 ## Monthly Task
 
-The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.
+The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; a completion time in Hong Kong that can be an earlier morning; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.
 
 The browser parses Excel locally with SheetJS; workbook contents are not sent to the parser service. Reminders are in-app only (there are no closed-tab push notifications).
 

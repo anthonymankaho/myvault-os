@@ -85,27 +85,33 @@ body:has(.qwen-panel[open]) {
   font-size: 13px;
   line-height: 1.7;
 }
-#qwen-feedback {
+#qwen-feedback,
+#momo-feedback {
   font-size: 12px;
   line-height: 1.7;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-#qwen-feedback[data-kind="error"] {
+#qwen-feedback[data-kind="error"],
+#momo-feedback[data-kind="error"] {
   color: var(--danger);
 }
-#qwen-quota {
+#qwen-quota,
+#momo-quota {
   font-size: 11px;
   color: var(--muted);
   margin-top: 10px;
 }
-#qwen-quota p {
+#qwen-quota p,
+#momo-quota p {
   margin: 0;
 }
-#qwen-quota [data-warn] {
+#qwen-quota [data-warn],
+#momo-quota [data-warn] {
   color: #d8b26a;
 }
-#qwen-proposals h3 {
+#qwen-proposals h3,
+#momo-proposals h3 {
   font-size: 15px;
   font-weight: 550;
   margin: 22px 0 8px;

@@ -1715,6 +1715,34 @@ function hkDateKey(value = new Date()) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+function hkDateTimeLocal(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+function hkLocalInputToIso(value) {
+  const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2})?$/);
+  if (!match) return "";
+  const date = new Date(`${match[1]}:00+08:00`);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function hkCompletedLabel(value) {
+  const local = hkDateTimeLocal(value);
+  return local ? `${local.replace("T", " ")} HKT` : hkDateKey(value);
+}
+
 function shiftMonth(month, delta) {
   const [year, value] = String(month).split("-").map(Number);
   const date = new Date(Date.UTC(year || 2000, (value || 1) - 1 + delta, 1));
@@ -1816,7 +1844,7 @@ function taskRowHtml(task, today) {
   const action = task.status === "Completed"
     ? `<button class="button button-quiet" type="button" data-task-reopen="${escapeHtml(task.id)}">Reopen / 重開</button>`
     : `<button class="button button-primary" type="button" data-task-complete="${escapeHtml(task.id)}">Complete / 完成</button>`;
-  return `<article class="item task-row ${overdue ? "is-overdue" : ""} ${task.status === "Completed" ? "is-completed" : ""}"><div class="item-top"><div><p class="task-company">${escapeHtml(task.company)} · ${escapeHtml(task.planningMonth)}${task.recurring ? ' <span class="badge task-recurring-badge" title="Monthly recurring / 每月重複">↻ monthly</span>' : ""}</p><h2 class="item-name">${escapeHtml(task.description)}</h2></div><div class="item-actions"><span class="badge task-date-badge">${overdue ? "Overdue / 逾期 · " : ""}${escapeHtml(task.scheduledDate)}</span><button class="button button-quiet" type="button" data-task-edit="${escapeHtml(task.id)}">Edit / 編輯</button></div></div><p class="task-status-text"><span class="task-status-dot ${overdue ? "is-overdue" : ""}"></span>${escapeHtml(task.status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始")}${task.completedAt ? ` · ${escapeHtml(hkDateKey(task.completedAt))}` : ""}</p>${task.docResult ? `<p class="item-notes"><strong>Doc / Result:</strong><br>${escapeHtml(task.docResult).replaceAll("\n", "<br>")}</p>` : ""}<div class="task-row-actions">${action}<button class="button button-danger" type="button" data-task-delete="${escapeHtml(task.id)}">Delete / 刪除</button></div></article>`;
+  return `<article class="item task-row ${overdue ? "is-overdue" : ""} ${task.status === "Completed" ? "is-completed" : ""}"><div class="item-top"><div><p class="task-company">${escapeHtml(task.company)} · ${escapeHtml(task.planningMonth)}${task.recurring ? ' <span class="badge task-recurring-badge" title="Monthly recurring / 每月重複">↻ monthly</span>' : ""}</p><h2 class="item-name">${escapeHtml(task.description)}</h2></div><div class="item-actions"><span class="badge task-date-badge">${overdue ? "Overdue / 逾期 · " : ""}${escapeHtml(task.scheduledDate)}</span><button class="button button-quiet" type="button" data-task-edit="${escapeHtml(task.id)}">Edit / 編輯</button></div></div><p class="task-status-text"><span class="task-status-dot ${overdue ? "is-overdue" : ""}"></span>${escapeHtml(task.status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始")}${task.completedAt ? ` · ${escapeHtml(hkCompletedLabel(task.completedAt))}` : ""}</p>${task.docResult ? `<p class="item-notes"><strong>Doc / Result:</strong><br>${escapeHtml(task.docResult).replaceAll("\n", "<br>")}</p>` : ""}<div class="task-row-actions">${action}<button class="button button-danger" type="button" data-task-delete="${escapeHtml(task.id)}">Delete / 刪除</button></div></article>`;
 }
 
 function renderTasks() {
@@ -1852,8 +1880,20 @@ function openTaskDialog(index = null, defaults = {}) {
   const task = editing || { planningMonth: ui.taskMonth, scheduledDate: hkDateKey(), company: "OTHER", status: "Not Started", recurring: false, ...defaults };
   const dialog = document.querySelector("#item-dialog");
   const content = document.querySelector("#dialog-content");
-  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY TASK / 工作任務</p><h2 id="dialog-title">${editing ? "Edit task / 編輯任務" : "Add task / 新增任務"}</h2><p>Dates are date-only and calculated in Asia/Hong_Kong.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form task-form"><div class="form-row"><div class="field"><label for="task-planning-month">Planning month / 計劃月份 *</label><input id="task-planning-month" name="planningMonth" type="month" value="${escapeHtml(task.planningMonth)}" required></div><div class="field"><label for="task-company-field">Company / 公司 *</label><input id="task-company-field" name="company" value="${escapeHtml(task.company)}" required></div><div class="field"><label for="task-date-field">Scheduled date / 排程日期 *</label><input id="task-date-field" name="scheduledDate" type="date" value="${escapeHtml(task.scheduledDate)}" required></div><div class="field"><label for="task-status-field">Status / 狀態</label><select id="task-status-field" name="status">${TASK_STATUS.map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></div><div class="field field-wide"><label for="task-description-field">Description / 任務描述 *</label><textarea id="task-description-field" name="description" required>${escapeHtml(task.description)}</textarea></div><div class="field field-wide"><label for="task-result-field">Doc / Result / 文件或結果</label><textarea id="task-result-field" name="docResult" placeholder="Files, references, amounts, notes, or results…">${escapeHtml(task.docResult)}</textarea></div><div class="field field-wide"><label class="task-recurring-label" for="task-recurring-field"><input id="task-recurring-field" name="recurring" type="checkbox" value="yes" ${task.recurring ? "checked" : ""}> Monthly recurring / 每月重複 — auto-create next month at month-end (title month and date update automatically)</label></div></div><p class="form-help" id="task-form-feedback">Completion does not require an attachment.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="submit">${editing ? "Save changes / 儲存" : "Create task / 建立"}</button></div></form>`;
+  content.innerHTML = `<div class="dialog-heading"><div><p class="eyebrow">MONTHLY TASK / 工作任務</p><h2 id="dialog-title">${editing ? "Edit task / 編輯任務" : "Add task / 新增任務"}</h2><p>Scheduled dates are date-only in Asia/Hong_Kong. Completion time can be the morning you finished.</p></div><button class="dialog-close" type="button" aria-label="Close dialog">×</button></div><form class="item-form task-form"><div class="form-row"><div class="field"><label for="task-planning-month">Planning month / 計劃月份 *</label><input id="task-planning-month" name="planningMonth" type="month" value="${escapeHtml(task.planningMonth)}" required></div><div class="field"><label for="task-company-field">Company / 公司 *</label><input id="task-company-field" name="company" value="${escapeHtml(task.company)}" required></div><div class="field"><label for="task-date-field">Scheduled date / 排程日期 *</label><input id="task-date-field" name="scheduledDate" type="date" value="${escapeHtml(task.scheduledDate)}" required></div><div class="field"><label for="task-status-field">Status / 狀態</label><select id="task-status-field" name="status">${TASK_STATUS.map((status) => `<option value="${status}" ${task.status === status ? "selected" : ""}>${status === "Completed" ? "Completed / 已完成" : "Not Started / 未開始"}</option>`).join("")}</select></div><div class="field field-wide" id="task-completed-wrap"${task.status === "Completed" ? "" : " hidden"}><label for="task-completed-field">Completed at / 完成時間 (Hong Kong)</label><input id="task-completed-field" name="completedAt" type="datetime-local" value="${task.completedAt ? escapeHtml(hkDateTimeLocal(task.completedAt)) : ""}"${task.status === "Completed" ? "" : " disabled"}><p class="form-help">Use the Hong Kong time the work was finished, including an earlier morning.</p></div><div class="field field-wide"><label for="task-description-field">Description / 任務描述 *</label><textarea id="task-description-field" name="description" required>${escapeHtml(task.description)}</textarea></div><div class="field field-wide"><label for="task-result-field">Doc / Result / 文件或結果</label><textarea id="task-result-field" name="docResult" placeholder="Files, references, amounts, notes, or results…">${escapeHtml(task.docResult)}</textarea></div><div class="field field-wide"><label class="task-recurring-label" for="task-recurring-field"><input id="task-recurring-field" name="recurring" type="checkbox" value="yes" ${task.recurring ? "checked" : ""}> Monthly recurring / 每月重複 — auto-create next month at month-end (title month and date update automatically)</label></div></div><p class="form-help" id="task-form-feedback">Completion does not require an attachment.</p><div class="form-footer"><button class="button button-quiet" type="button" id="cancel-edit">Cancel / 取消</button><button class="button button-primary" type="submit">${editing ? "Save changes / 儲存" : "Create task / 建立"}</button></div></form>`;
   const form = content.querySelector("form");
+  const completedField = content.querySelector("#task-completed-field");
+  const completedWrap = content.querySelector("#task-completed-wrap");
+  const statusField = content.querySelector("#task-status-field");
+  const syncCompletedField = () => {
+    const completed = statusField.value === "Completed";
+    completedWrap.hidden = !completed;
+    completedField.disabled = !completed;
+    completedField.required = completed;
+    if (completed && !completedField.value) completedField.value = hkDateTimeLocal();
+    if (!completed) completedField.value = "";
+  };
+  statusField.addEventListener("change", syncCompletedField);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form));
@@ -1866,12 +1906,22 @@ function openTaskDialog(index = null, defaults = {}) {
       feedback.dataset.kind = "error";
       return;
     }
+    let completedAt = null;
+    if (data.status === "Completed") {
+      completedAt = hkLocalInputToIso(data.completedAt);
+      if (!completedAt || Date.parse(completedAt) > Date.now() + 26 * 60 * 60 * 1000) {
+        feedback.textContent = completedAt
+          ? "Completion time cannot be more than a day in the future."
+          : "Enter the Hong Kong time the work was finished.";
+        feedback.dataset.kind = "error";
+        return;
+      }
+    }
     const now = new Date().toISOString();
     if (editing) {
-      Object.assign(editing, data, { updatedAt: now });
-      editing.completedAt = data.status === "Completed" ? editing.completedAt || now : null;
+      Object.assign(editing, data, { updatedAt: now, completedAt });
     } else {
-      state.vault.tasks.push(normalizeTask({ ...data, id: uid(), createdAt: now, updatedAt: now, completedAt: data.status === "Completed" ? now : null }));
+      state.vault.tasks.push(normalizeTask({ ...data, id: uid(), createdAt: now, updatedAt: now, completedAt }));
     }
     markDirty();
     dialog.close();
