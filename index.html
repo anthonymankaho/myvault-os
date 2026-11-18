@@ -19,7 +19,7 @@
     <link rel="icon" href="icon-180.png" type="image/png" />
     <link rel="apple-touch-icon" href="icon-180.png" />
     <link rel="stylesheet" href="styles.css?v=study-1" />
-    <link rel="stylesheet" href="qwen.css?v=1" />
+    <link rel="stylesheet" href="qwen.css?v=momo-1" />
     <link rel="stylesheet" href="constellation.css?v=5" />
     <script type="importmap">
       {
@@ -131,6 +131,15 @@
           <div class="utility-actions">
             <button
               class="button button-quiet"
+              id="ask-momo"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="momo-panel"
+            >
+              Ask MOMO
+            </button>
+            <button
+              class="button button-quiet"
               id="ask-qwen"
               type="button"
               aria-haspopup="dialog"
@@ -183,7 +192,8 @@
       <div id="dialog-content"></div>
     </dialog>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="app.js?v=study-1"></script>
+    <script src="app.js?v=momo-1"></script>
     <script type="module" src="qwen.mjs?v=1"></script>
+    <script type="module" src="momo.mjs?v=1"></script>
   </body>
 </html>

@@ -11,8 +11,14 @@
     "QWEN_BASE_URL": "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1",
     "QWEN_MODEL": "qwen3.8-flash",
     "QWEN_ALLOWED_GITHUB_USER": "anthonymankaho",
-    "QWEN_MONTHLY_TOKEN_QUOTA": "5000000"
+    "QWEN_MONTHLY_TOKEN_QUOTA": "5000000",
+    "XAI_BASE_URL": "https://api.x.ai/v1",
+    "XAI_MODEL": "grok-4.7",
+    "XAI_MONTHLY_TOKEN_QUOTA": "1000000"
   },
+  // XAI_API_KEY is a Worker secret (npx wrangler secret put XAI_API_KEY).
+  // Never put it in this file. MOMO token counts use the QWEN_USAGE KV
+  // under the key prefix momo-usage:, separate from the Qwen counter.
   // Monthly token quota accounting (QWEN_USAGE KV, production ID wired below;
   // add a preview_id for wrangler dev with:
   //   npx wrangler kv namespace create QWEN_USAGE --preview
