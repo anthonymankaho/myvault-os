@@ -578,17 +578,24 @@ export const TROOP_TYPES = {
   chariot: { id: "chariot", name: "車兵", en: "Chariot", attack: 1.25, defense: 0.9, gold: 240, food: 700, terrain: { plain: 1.35, mountain: 0.5, pass: 0.6, river: 0.5, forest: 0.5 }, desc: "春秋車戰主力，平原沖擊強，山地大減。" },
   navy: { id: "navy", name: "水軍", en: "Navy", attack: 1.0, defense: 1.05, gold: 190, food: 600, terrain: { plain: 0.7, mountain: 0.5, pass: 0.6, river: 1.4, forest: 0.8 }, desc: "吳越水師，水鄉加成，陸戰減效。" },
   elite: { id: "elite", name: "銳士", en: "Elite", attack: 1.35, defense: 1.25, gold: 320, food: 850, terrain: { plain: 1.1, mountain: 1.0, pass: 1.1, river: 0.9, forest: 1.0 }, desc: "精銳武卒（魏武卒、秦銳士、齊技擊），攻守俱強，價昂。" },
+  // State-specific special troops (特殊兵種). `rating` = designer/user strength
+  // grade; `states` restricts who may recruit them; mp/range feed the hex layer.
+  guard: { id: "guard", name: "近", en: "Royal Guards", rating: 9, states: ["zhou"], attack: 1.32, defense: 1.24, gold: 340, food: 900, mp: 3, range: 1, terrain: { plain: 1.1, mountain: 1.0, pass: 1.15, river: 0.9, forest: 1.0 }, desc: "周王室近衛（虎賁）。評級9，精銳護衛。" },
+  hu: { id: "hu", name: "胡", en: "Hu Cavalry", rating: 6, states: ["qin", "zhao"], attack: 1.22, defense: 0.85, gold: 220, food: 700, mp: 5, range: 1, terrain: { plain: 1.3, mountain: 0.7, pass: 0.75, river: 0.7, forest: 0.75 }, desc: "胡騎／胡服騎射。評級6，機動沖擊，平原強。" },
+  archer: { id: "archer", name: "射", en: "Archers", rating: 7, states: ["qin"], attack: 1.18, defense: 1.0, gold: 200, food: 600, mp: 2, range: 2, terrain: { plain: 1.0, mountain: 1.1, pass: 1.2, river: 1.0, forest: 0.9 }, desc: "秦射士。評級7，遠射（射程2）。" },
+  ge: { id: "ge", name: "戈", en: "Halberdiers", rating: 5, states: ["han", "wei", "qi"], attack: 1.0, defense: 1.12, gold: 150, food: 550, mp: 3, range: 1, terrain: { plain: 1.05, mountain: 1.0, pass: 1.1, river: 0.9, forest: 1.0 }, desc: "戈／戟兵。評級5，克騎守陣。" },
+  chu: { id: "chu", name: "卒", en: "Chu Levy", rating: 6, states: ["chu"], attack: 1.1, defense: 1.05, gold: 140, food: 520, mp: 3, range: 1, terrain: { plain: 1.0, mountain: 1.05, pass: 1.0, river: 1.15, forest: 1.1 }, desc: "楚卒／徒卒。評級6，水林善戰。" },
 };
 
 // Default troop composition per state (fractions, renormalized at build time).
 export const STATE_TROOP_MIX = {
-  qin: { infantry: 0.5, crossbow: 0.25, cavalry: 0.15, elite: 0.1 },
-  zhao: { infantry: 0.35, cavalry: 0.4, crossbow: 0.15, elite: 0.1 },
-  qi: { infantry: 0.45, crossbow: 0.2, elite: 0.2, cavalry: 0.15 },
-  chu: { infantry: 0.55, navy: 0.2, crossbow: 0.15, cavalry: 0.1 },
+  qin: { infantry: 0.4, crossbow: 0.2, cavalry: 0.1, elite: 0.1, hu: 0.1, archer: 0.1 },
+  zhao: { infantry: 0.3, cavalry: 0.3, crossbow: 0.1, elite: 0.1, hu: 0.2 },
+  qi: { infantry: 0.35, crossbow: 0.15, elite: 0.15, cavalry: 0.1, ge: 0.25 },
+  chu: { infantry: 0.4, navy: 0.15, crossbow: 0.1, cavalry: 0.05, chu: 0.3 },
   yan: { infantry: 0.5, cavalry: 0.3, crossbow: 0.2 },
-  wei: { infantry: 0.4, elite: 0.3, crossbow: 0.2, cavalry: 0.1 },
-  han: { infantry: 0.4, crossbow: 0.4, elite: 0.1, cavalry: 0.1 },
+  wei: { infantry: 0.3, elite: 0.2, crossbow: 0.15, cavalry: 0.1, ge: 0.25 },
+  han: { infantry: 0.3, crossbow: 0.3, elite: 0.1, cavalry: 0.05, ge: 0.25 },
   wu: { infantry: 0.45, navy: 0.35, crossbow: 0.2 },
   yue: { infantry: 0.45, navy: 0.4, crossbow: 0.15 },
   jin: { infantry: 0.4, chariot: 0.4, crossbow: 0.1, cavalry: 0.1 },
@@ -599,6 +606,6 @@ export const STATE_TROOP_MIX = {
   chen: { infantry: 0.65, chariot: 0.2, crossbow: 0.15 },
   cai: { infantry: 0.65, chariot: 0.2, crossbow: 0.15 },
   zhongshan: { infantry: 0.5, cavalry: 0.3, chariot: 0.2 },
-  zhou: { infantry: 0.6, chariot: 0.3, crossbow: 0.1 },
+  zhou: { infantry: 0.4, chariot: 0.2, crossbow: 0.1, guard: 0.3 },
 };
 export const DEFAULT_TROOP_MIX = { infantry: 0.7, crossbow: 0.15, cavalry: 0.1, chariot: 0.05 };

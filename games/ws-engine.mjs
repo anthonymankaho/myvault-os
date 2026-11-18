@@ -219,7 +219,8 @@ export function buildComp(total, stateKey, era = "late") {
   else if (era === "early") { mix.chariot = (mix.chariot || 0) + 0.12; mix.cavalry = (mix.cavalry || 0) * 0.7; }
   else { mix.chariot = (mix.chariot || 0) * 0.3; mix.cavalry = (mix.cavalry || 0) + 0.08; }
   let sum = 0; for (const k in mix) sum += mix[k];
-  const comp = {}; let assigned = 0; const keys = Object.keys(mix);
+  const comp = {}; let assigned = 0;
+  const keys = Object.keys(mix).filter((k) => mix[k] > 0);
   keys.forEach((k, i) => {
     if (i === keys.length - 1) comp[k] = Math.max(0, total - assigned);
     else { const v = round(total * mix[k] / sum); comp[k] = v; assigned += v; }
@@ -274,6 +275,7 @@ export function develop(state, cityId, type, officerId, troopType = "infantry") 
 
   if (type === "recruit") {
     const tt = TROOP_TYPES[troopType] ?? TROOP_TYPES.infantry;
+    if (tt.states && !tt.states.includes(city.state)) return { ok: false, reason: `${tt.name}為特殊兵種，只限${tt.states.map((s) => STATES[s].name).join("／")}徵募。` };
     const cap = troopCap(city);
     const room = cap - city.troops;
     const desired = round((1500 + cha * 28 + pol * 8) * emperor);

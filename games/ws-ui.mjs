@@ -11,7 +11,8 @@ import {
   DIFFICULTIES, TAX_RATES, isPlayer, compTotal, compAttack, compDefense,
 } from "./ws-engine.mjs";
 import { DIPLOMACY_ACTIONS } from "./ws-diplomacy.mjs";
-import { battleRound, autoTactic, finalizeBattle, ATTACK_TACTICS, DEFEND_TACTICS } from "./ws-battle.mjs";
+import { battleRound, autoTactic, finalizeBattle, ATTACK_TACTICS, DEFEND_TACTICS, autoResolveBattle } from "./ws-battle.mjs";
+import { createHexBattle, hexReachable, hexAttackTargets, hexMove, hexAttack, hexEndPlayerPhase, hexPixel, HEX_COLS, HEX_ROWS, HEX_SIZE, TERRAIN_HEX_LABEL, checkConclusion } from "./ws-hexbattle.mjs";
 import { checkBattleEvents } from "./ws-events.mjs";
 import { SaveManager, localStorageAdapter } from "./ws-save.mjs";
 import { formatNumber, yearLabel, MONTH_LABELS, SEASON_OF_MONTH, SEASON_LABELS, clamp } from "./ws-util.mjs";
@@ -22,7 +23,7 @@ const ui = {
   screen: "title", state: null, selectedCity: null, tab: "city",
   scenario: "changping", playerState: "qin", difficulty: "normal",
   officerSort: { key: "lead", dir: -1 }, modal: null, battle: null,
-  fullscreen: false,
+  fullscreen: false, hex: null,
 };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -501,7 +502,7 @@ function openDomestic(cityId, preset) {
       <div class="opt-grid">${Object.entries(DOMESTIC).map(([k, d]) => `<button class="opt ${k === action ? "sel" : ""}" data-act="${k}"><div class="t">${d.name}</div><div class="d">${d.desc}${d.gold ? " ・" + d.gold + "金" : ""}${d.food ? " ・" + d.food + "糧" : ""}</div></button>`).join("")}</div>
     </div>
     <div class="field"><label>執行武將 Officer</label><select id="dom-officer">${officers.map((o) => `<option value="${o.id}" ${o.id === officerId ? "selected" : ""}>${esc(o.name)}（政${o.stats.pol} 魅${o.stats.cha} 統${o.stats.lead}）</option>`).join("")}</select></div>
-    ${action === "recruit" ? `<div class="field"><label>兵種 Troop Type（徵兵上限＝人口20%＝${fmt(troopCap(c))}，現駐兵${fmt(c.troops)}）</label><div class="opt-grid">${Object.values(TROOP_TYPES).map((t) => `<button class="opt ${t.id === troopType ? "sel" : ""}" data-tt="${t.id}"><div class="t">${t.name}</div><div class="d">攻×${t.attack} 防×${t.defense}・${t.gold}金/${t.food}糧（每千）</div></button>`).join("")}</div></div>` : ""}
+    ${action === "recruit" ? `<div class="field"><label>兵種 Troop Type（徵兵上限＝人口20%＝${fmt(troopCap(c))}，現駐兵${fmt(c.troops)}；特殊兵種只限本國）</label><div class="opt-grid">${Object.values(TROOP_TYPES).filter((t) => !t.states || t.states.includes(ui.state.playerState)).map((t) => `<button class="opt ${t.id === troopType ? "sel" : ""}" data-tt="${t.id}"><div class="t">${t.name}${t.rating ? ` <span class="pill">評${t.rating}</span>` : ""}</div><div class="d">攻×${t.attack} 防×${t.defense}・${t.gold}金/${t.food}糧（每千）</div></button>`).join("")}</div></div>` : ""}
     <div id="dom-result">${lastResult}</div>`;
   const wire = (el) => {
     el.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => { action = b.dataset.act; refresh(); }));
@@ -805,8 +806,8 @@ function openHelp() {
       <b style="color:var(--bronze2)">遊戲目標</b>：統一天下（佔領所有城市）。失去所有城市則敗亡。<br>
       <b style="color:var(--bronze2)">回合</b>：每回合＝一月。你行動後按「結束回合」，AI 諸侯行動、事件觸發、收支結算，然後行軍抵達／戰鬥。<br>
       <b style="color:var(--bronze2)">內政</b>：每將每回合行動一次。開墾／商業／城防／治安／訓練／徵兵／賑濟，真正影響 Game State。<b>徵兵上限＝人口×20%</b>（只限新增徵兵；駐兵可高於此，如歷史常備軍、增援、俘虜併入）。<br>
-      <b style="color:var(--bronze2)">兵種</b>：步兵／騎兵／弩兵／車兵／水軍／銳士，各有攻擊力、防備力、成本與地形加成。徵兵時選兵種；戰鬥傷害按全軍兵種組成加權計算（騎兵平原強、弩兵守關強、車兵春秋平原強、水軍水鄉強）。<br>
-      <b style="color:var(--bronze2)">軍事</b>：出陣攻相鄰敵城，行軍一回合抵達後進入戰鬥。戰鬥為回合制戰術：強攻／突擊／計略／火攻／堅守／撤退，受兵力、統率、士氣、地形、補給、訓練、天氣、城防影響——計算結果＋可控隨機，非純隨機。<br>
+      <b style="color:var(--bronze2)">兵種</b>：步兵／騎兵／弩兵／車兵／水軍／銳士，各有攻擊力、防備力、成本與地形加成。徵兵時選兵種；戰鬥傷害按全軍兵種組成加權計算（騎兵平原強、弩兵守關強、車兵春秋平原強、水軍水鄉強）。<b>特殊兵種（只限該國徵募）</b>：周「近」評9（近衛）、秦「胡」評6（胡騎）／「射」評7（射士）、趙「胡」評6、韓魏齊「戈」評5（戈戟）、楚「卒」評6（楚卒）。<br>
+      <b style="color:var(--bronze2)">軍事／戰鬥</b>：出陣攻相鄰敵城，行軍一回合抵達後進入<b>hex 戰棋戰場</b>（三國志式戰棋、原创 UI）：部隊按兵種分成棋子，點己子→點綠格移動／點紅圈攻擊；弩兵射程2；ZOC 貼敵只能移1格；地形格（平原／山地／關隘／水／林）影響移動與攻防；城壘（城防）破後攻軍入城即克城。士氣、補給、單挑、天氣入計算——計算結果＋可控隨機，非純隨機。亦可「快速結算」自動打完。AI 對 AI 自動結算。<br>
       <b style="color:var(--bronze2)">外交</b>：贈禮／同盟／互不侵犯／通商／威脅／說服／合縱／破盟／求援／勸降。受國力、軍力、關係、武將能力、性格影響。<br>
       <b style="color:var(--bronze2)">計略</b>：流言／破壞／離間，智力較量。<br>
       <b style="color:var(--bronze2)">存檔</b>：3 手動存檔位＋自動存檔，可匯出／匯入 JSON。<br><br>
@@ -822,9 +823,105 @@ function openHelp() {
   renderModal();
 }
 
+// ---- Hex war-chess battle modal (戰棋) ----
+const TYPE_GLYPH = { infantry: "步", cavalry: "騎", crossbow: "弩", chariot: "車", navy: "水", elite: "銳", guard: "近", hu: "胡", archer: "射", ge: "戈", chu: "卒" };
+const HEX_FILL = { plain: "#1c2620", mountain: "#2a2a22", pass: "#33291d", river: "#173039", forest: "#1b2a1b" };
+
+function hexPoints(cx, cy, s) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i + 30);
+    pts.push(`${(cx + s * Math.cos(a)).toFixed(1)},${(cy + s * Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(" ");
+}
+
+function renderHexModal() {
+  document.querySelector(".modal-backdrop")?.remove();
+  const hb = ui.hex, b = hb.battle, s = ui.state;
+  const city = s.cities[b.cityId];
+  const playerSide = hb.playerSide;
+  const el = document.createElement("div");
+  el.className = "modal-backdrop";
+  const W = HEX_SIZE * Math.sqrt(3) * (HEX_COLS + 1) + 20, H = HEX_SIZE * 1.5 * (HEX_ROWS - 1) + HEX_SIZE * 2 + 20;
+  let hexes = "";
+  for (let r = 0; r < HEX_ROWS; r++) for (let c = 0; c < HEX_COLS; c++) {
+    const { x, y } = hexPixel(c, r);
+    const t = hb.grid[r][c];
+    const reach = hb.reachable.some(([rc, rr]) => rc === c && rr === r);
+    const isFort = c === hb.fort.c && r === hb.fort.r;
+    hexes += `<polygon points="${hexPoints(x, y, HEX_SIZE * 0.96)}" fill="${HEX_FILL[t]}" stroke="${reach ? "#2dd4bf" : "#2c3a33"}" stroke-width="${reach ? 2 : 1}" ${reach ? 'stroke-dasharray="4,3"' : ""} data-hex="${c},${r}" class="hex-cell"/>`;
+    if (isFort) hexes += `<text x="${x}" y="${y + 4}" text-anchor="middle" font-size="15" fill="#e6c65a" pointer-events="none">⛫</text><text x="${x}" y="${y + 16}" text-anchor="middle" font-size="8" fill="#e6c65a" pointer-events="none">防${hb.fort.defense}</text>`;
+  }
+  let tokens = "";
+  for (const u of hb.units) {
+    if (u.troops <= 0) continue;
+    const { x, y } = hexPixel(u.c, u.r);
+    const color = u.side === "att" ? stateColor(b.attackerState) : stateColor(b.defenderState);
+    const sel = hb.selected === u;
+    const isTarget = hb.targets.some((t) => !t.fort && t.id === u.id);
+    const mine = u.side === playerSide && !u.acted && !hb.concluded;
+    tokens += `<g class="hex-unit" data-unit="${u.id}" style="cursor:${mine ? "pointer" : "default"}">
+      ${sel ? `<circle cx="${x}" cy="${y}" r="16" fill="none" stroke="#e6c65a" stroke-width="2.5"/>` : ""}
+      ${isTarget ? `<circle cx="${x}" cy="${y}" r="16" fill="none" stroke="#e05252" stroke-width="2.5" stroke-dasharray="3,2"/>` : ""}
+      <circle cx="${x}" cy="${y}" r="12" fill="${color}" stroke="#0c1210" stroke-width="2" opacity="${u.acted ? 0.55 : 1}"/>
+      <text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" fill="#0c1210" font-weight="700" pointer-events="none">${TYPE_GLYPH[u.type] ?? "兵"}</text>
+      <text x="${x}" y="${y - 15}" text-anchor="middle" font-size="8.5" fill="${color}" pointer-events="none">${u.isCmd ? "★" : ""}${Math.round(u.troops / 1000)}k</text>
+      <text x="${x}" y="${y + 22}" text-anchor="middle" font-size="7.5" fill="#9aa79c" pointer-events="none">士${u.morale}</text>
+    </g>`;
+  }
+  const fortTarget = hb.targets.some((t) => t.fort);
+  const att = hb.units.filter((u) => u.side === "att").reduce((a, u) => a + u.troops, 0);
+  const def = hb.units.filter((u) => u.side === "def").reduce((a, u) => a + u.troops, 0);
+  el.innerHTML = `<div class="modal wide">
+    <div class="modal-head"><h3>戰棋・${esc(city.name)} <span class="weather-tag">${b.weather.name}・第${hb.round}回合・${hb.concluded ? "戰畢" : "你的回合"}</span></h3></div>
+    <div class="modal-body">
+      <div class="cmd-row" style="margin:0 0 8px">
+        <span class="pill" style="color:${stateColor(b.attackerState)}">攻 ${fmt(att)}</span>
+        <span class="pill" style="color:${stateColor(b.defenderState)}">守 ${fmt(def)}</span>
+        <span class="pill" style="color:#e6c65a">城防 ${hb.fort.defense}</span>
+        <span class="pill">糧 ${fmt(b.army.food)}</span>
+        <span class="hint">點己方棋子→點綠格移動／點紅圈攻擊。弩兵射程2。ZOC：貼敵只能移1格。破城防後攻軍可入城壘。</span>
+      </div>
+      <svg viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" style="width:100%;background:#0c1210;border:1px solid var(--line);border-radius:10px">${hexes}${tokens}${fortTarget ? `<circle cx="${hexPixel(hb.fort.c, hb.fort.r).x}" cy="${hexPixel(hb.fort.c, hb.fort.r).y}" r="17" fill="none" stroke="#e05252" stroke-width="2.5" stroke-dasharray="3,2" data-hex="${hb.fort.c},${hb.fort.r}" class="hex-cell"/>` : ""}</svg>
+      <div class="tactic-row">
+        ${hb.concluded ? `<button class="btn btn-primary" id="hex-done">繼續 ▶</button>` : `<button class="btn btn-primary" id="hex-end">結束回合 ▶</button><button class="btn btn-danger" id="hex-retreat">撤退</button><button class="btn" id="hex-auto">快速結算</button>`}
+      </div>
+      ${hb.concluded ? `<div class="result-msg ${hb.result === "attacker" ? (playerSide === "att" ? "ok" : "no") : (playerSide === "att" ? "no" : "ok")}">戰畢：${hb.result === "attacker" ? city.name + "陷落" : hb.result === "defender" ? "攻軍潰敗" : "攻軍撤退"}。</div>` : ""}
+      <div class="battle-log" id="hex-log">${hb.log.slice(-40).map((l) => `<div>${esc(l)}</div>`).join("")}</div>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+  const logEl = el.querySelector("#hex-log"); logEl.scrollTop = logEl.scrollHeight;
+  const after = () => {
+    if (hb.concluded && !b.finalized) { finalizeBattle(s, b); checkBattleEvents(s, b); }
+    renderHexModal();
+  };
+  el.querySelectorAll(".hex-unit").forEach((g) => g.addEventListener("click", () => {
+    const u = hb.units.find((x) => x.id === g.dataset.unit);
+    if (!u || hb.concluded) return;
+    if (u.side === playerSide && !u.acted) {
+      hb.selected = u; hb.reachable = hexReachable(s, hb, u); hb.targets = hexAttackTargets(s, hb, u);
+      renderHexModal(); return;
+    }
+    if (hb.selected && hb.targets.some((t) => !t.fort && t.id === u.id)) { hexAttack(s, hb, hb.selected, u); hb.selected = null; hb.reachable = []; hb.targets = []; after(); }
+  }));
+  el.querySelectorAll(".hex-cell").forEach((p) => p.addEventListener("click", () => {
+    if (hb.concluded || !hb.selected) return;
+    const [c, r] = p.dataset.hex.split(",").map(Number);
+    if (hb.targets.some((t) => t.fort && t.c === c && t.r === r)) { hexAttack(s, hb, hb.selected, { fort: true, c, r }); hb.selected = null; hb.reachable = []; hb.targets = []; after(); return; }
+    if (hb.reachable.some(([rc, rr]) => rc === c && rr === r)) { hexMove(s, hb, hb.selected, c, r); hb.selected = null; hb.reachable = []; hb.targets = []; after(); }
+  }));
+  el.querySelector("#hex-end")?.addEventListener("click", () => { hexEndPlayerPhase(s, hb); after(); });
+  el.querySelector("#hex-retreat")?.addEventListener("click", () => { hb.retreat = true; checkConclusion(s, hb); after(); });
+  el.querySelector("#hex-auto")?.addEventListener("click", () => { const rb = autoResolveBattle(s, b.army); b.concluded = true; b.result = rb.result; b.finalized = true; ui.hex = null; renderBattleModal(); });
+  el.querySelector("#hex-done")?.addEventListener("click", () => { ui.hex = null; ui.battle = null; advancePendingBattles(); });
+}
+
 // ---- Battle modal ----
 function renderBattleModal() {
   document.querySelector(".modal-backdrop")?.remove();
+  if (ui.hex) { renderHexModal(); return; }
   const b = ui.battle;
   const s = ui.state;
   const city = s.cities[b.cityId];
@@ -878,7 +975,7 @@ function renderBattleModal() {
     renderBattleModal();
   }));
   el.querySelector("#battle-done")?.addEventListener("click", () => {
-    ui.battle = null;
+    ui.battle = null; ui.hex = null;
     advancePendingBattles();
   });
 }
@@ -887,6 +984,7 @@ function advancePendingBattles() {
   const s = ui.state;
   if (s.pendingBattles.length) {
     ui.battle = s.pendingBattles.shift();
+    ui.hex = createHexBattle(s, ui.battle);
     renderBattleModal();
     return;
   }
@@ -904,6 +1002,7 @@ function doEndTurn() {
   ui.lastReport = { ...report, before };
   if (s.pendingBattles.length) {
     ui.battle = s.pendingBattles.shift();
+    ui.hex = createHexBattle(s, ui.battle);
     renderBattleModal();
   } else {
     startPlayerPhase(s);

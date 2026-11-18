@@ -80,3 +80,44 @@ test("composition stays consistent with troops through a full battle", () => {
   assert.equal(compTotal(city.comp), city.troops);
   assert.equal(compTotal(army.comp), army.troops);
 });
+
+test("special troops carry the user-specified ratings and state restrictions", () => {
+  const expect = { guard: ["zhou", 9], hu: ["qin", 6], archer: ["qin", 7], ge: ["han", 5], chu: ["chu", 6] };
+  for (const [id, [st, rating]] of Object.entries(expect)) {
+    const t = TROOP_TYPES[id];
+    assert.ok(t, id);
+    assert.equal(t.rating, rating, `${id} rating`);
+    assert.ok(t.states.includes(st), `${id} allows ${st}`);
+  }
+  assert.ok(TROOP_TYPES.hu.states.includes("zhao"));
+  assert.ok(TROOP_TYPES.ge.states.includes("wei") && TROOP_TYPES.ge.states.includes("qi"));
+});
+
+test("special-troop recruitment is restricted to its states", () => {
+  const state = createGame("changping", "qin", "normal", 5);
+  const city = state.cities.xianyang;
+  city.gold = 100000; city.food = 200000;
+  const off = officersOf(state, "qin").find((o) => o.location === "xianyang");
+  const reset = () => { city.troops = 10000; city.comp = buildComp(10000, "qin", "late"); city.population = 300000; off.acted = false; };
+  reset();
+  assert.ok(develop(state, "xianyang", "recruit", off.id, "hu").ok, "qin may recruit hu");
+  reset();
+  assert.ok(develop(state, "xianyang", "recruit", off.id, "archer").ok, "qin may recruit archer");
+  reset();
+  const denied = develop(state, "xianyang", "recruit", off.id, "ge");
+  assert.equal(denied.ok, false, "qin may NOT recruit ge");
+  assert.match(denied.reason, /特殊兵種/);
+});
+
+test("state starting composition includes its special troops", () => {
+  const qin = buildComp(20000, "qin", "late");
+  assert.ok((qin.hu || 0) > 0 && (qin.archer || 0) > 0);
+  const zhao = buildComp(20000, "zhao", "late");
+  assert.ok((zhao.hu || 0) > 0);
+  const zhou = buildComp(20000, "zhou", "late");
+  assert.ok((zhou.guard || 0) > 0);
+  const chu = buildComp(20000, "chu", "late");
+  assert.ok((chu.chu || 0) > 0);
+  const qi = buildComp(20000, "qi", "late");
+  assert.ok((qi.ge || 0) > 0);
+});
