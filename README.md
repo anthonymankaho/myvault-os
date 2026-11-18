@@ -222,6 +222,21 @@ The Grok bot form asks for OAuth. Use client ID `momo-grok-bot`, leave the clien
 - Ask MOMO on the website is deployed. It still needs the Worker secret `XAI_API_KEY` before it can call Grok. The phone connector does not use that key.
 - The phone connector uses OAuth on the Worker. The connector password stays in `worker/.mcp-connector.txt` and is not committed.
 
+## AI Group
+
+Open **AI Group** in the sidebar. Type one question, tick the models you want, and press **Ask selected**. Grok, Qwen, DeepSeek, and NVIDIA answer in the same box. A provider that is not configured, or that fails, leaves the other answers in place. Nothing is written to the vault.
+
+The page does not accept or store API keys. Set them on the Worker, from `worker/`, without pasting them into chat:
+
+```
+npx wrangler secret put XAI_API_KEY
+npx wrangler secret put DASHSCOPE_API_KEY
+npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put NVIDIA_API_KEY
+```
+
+Model menus are fixed: `grok-4.7`, `qwen3.8-flash`, `qwen3.8-max`, `deepseek-flash`, `deepseek-v4-pro`, `nvidia/nemotron-3.5-lightning-30b-a3b`, and `nvidia/nemotron-3-ultra-550b-a55b`. The monthly cap is 1,000,000 tokens in `QWEN_USAGE` under `ai-group-usage:{login}:{YYYY-MM}`, separate from Ask Qwen and Ask MOMO.
+
 ## Monthly Task
 
 The **Monthly Task / 工作任務** view keeps recurring work in a separate task collection. It supports Today, Overdue, Upcoming, Monthly, and Completed views; company/status/keyword filters; date-only Hong Kong scheduling; an in-app daily reminder; completion and reopen actions; a completion time in Hong Kong that can be an earlier morning; CSV export; JSON backup/restore; and a rollover preview for incomplete work. Use **Import Excel** to preview and confirm the `NOV2026` sheet from the monthly workbook. Rows 2–47 are mapped as tasks, while planning notes outside the task range are excluded. Exact duplicate imports are skipped, ambiguous status text is retained in Doc/Result, and imported source metadata stays local to the vault.

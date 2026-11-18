@@ -359,3 +359,26 @@ test("study source view is wired and links to HK Tax StudyHub", () => {
   assert.match(index, /data-view="study"/);
   assert.match(index, /data-icon="study"/);
 });
+
+test("AI Group view lists four providers and does not collect API keys", () => {
+  const w = workspace();
+  assert.equal(w.run('VIEWS["ai-group"].title'), "AI Group");
+  w.run("renderAiGroup()");
+  const html = w.elements.get("#view").innerHTML;
+  assert.match(html, /Grok/);
+  assert.match(html, /Qwen/);
+  assert.match(html, /DeepSeek/);
+  assert.match(html, /NVIDIA/);
+  assert.match(html, /grok-4\.7/);
+  assert.match(html, /qwen3\.8-max/);
+  assert.match(html, /deepseek-v4-pro/);
+  assert.match(html, /nemotron-3-ultra/);
+  assert.match(html, /API keys stay on the Worker/);
+  assert.doesNotMatch(html, /type="password"/);
+  assert.doesNotMatch(html, /sk-/);
+  const index = fs.readFileSync(
+    require("node:path").join(__dirname, "../index.html"),
+    "utf8",
+  );
+  assert.match(index, /data-view="ai-group"/);
+});

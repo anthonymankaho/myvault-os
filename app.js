@@ -107,6 +107,7 @@ const VIEWS = {
   tasks: { title: "Monthly Task" },
   accounting: { title: "Accounting System" },
   study: { title: "Study source" },
+  "ai-group": { title: "AI Group" },
   games: { title: "Games" },
   build: { title: "Build / Repair" },
   search: { title: "Search" },
@@ -119,6 +120,20 @@ const state = {
   savedAt: null,
   saving: false,
   revision: 0,
+};
+
+const AI_GROUP = [
+  { id: "grok", name: "Grok", models: ["grok-4.7"] },
+  { id: "qwen", name: "Qwen", models: ["qwen3.8-flash", "qwen3.8-max"] },
+  { id: "deepseek", name: "DeepSeek", models: ["deepseek-flash", "deepseek-v4-pro"] },
+  { id: "nvidia", name: "NVIDIA", models: ["nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia/nemotron-3-ultra-550b-a55b"] },
+];
+const aiGroup = {
+  message: "",
+  selected: { grok: true, qwen: true, deepseek: true, nvidia: true },
+  models: Object.fromEntries(AI_GROUP.map((provider) => [provider.id, provider.models[0]])),
+  results: {},
+  asking: false,
 };
 
 const ui = {
@@ -575,6 +590,9 @@ function render() {
     case "study":
       renderStudy();
       break;
+    case "ai-group":
+      renderAiGroup();
+      break;
     default:
       renderCollection(state.view);
   }
@@ -626,6 +644,8 @@ const ICON_PATHS = {
     '<path d="M5 3h14v18H5z"/><path d="M9 3v18"/><path d="M12 7h4M12 10h4M12 13h4M12 16h2"/>',
   study:
     '<path d="M12 6c-2-1.6-4.6-2.2-8-2.2v14.4c3.4 0 6 .6 8 2.2 2-1.6 4.6-2.2 8-2.2V3.8c-3.4 0-6 .6-8 2.2Z"/><path d="M12 6v14.4"/>',
+  "ai-group":
+    '<circle cx="5" cy="8" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="19" cy="8" r="2"/><circle cx="8.5" cy="16" r="2"/><circle cx="15.5" cy="16" r="2"/>',
   reports:
     '<path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5"/><path d="M9 17v-3m3 3v-5m3 5v-2"/>',
   games:
@@ -1033,6 +1053,91 @@ function renderStudy() {
     <section class="study-library" aria-label="Study sources">
       <div class="study-grid">${cards}</div>
     </section>`;
+}
+
+function renderAiGroup() {
+  const panes = AI_GROUP.map((provider) => {
+    const result = aiGroup.results[provider.id];
+    const body = aiGroup.asking && aiGroup.selected[provider.id]
+      ? "Asking…"
+      : result?.ok
+        ? result.text
+        : result?.error || "Waiting for a question.";
+    return `
+    <section class="ai-pane" data-provider="${provider.id}">
+      <header>
+        <label><input type="checkbox" data-ai-toggle="${provider.id}" ${aiGroup.selected[provider.id] ? "checked" : ""} ${aiGroup.asking ? "disabled" : ""}> ${escapeHtml(provider.name)}</label>
+        <select data-ai-model="${provider.id}" aria-label="${escapeHtml(provider.name)} model" ${aiGroup.asking ? "disabled" : ""}>
+          ${provider.models.map((model) => `<option value="${escapeHtml(model)}" ${aiGroup.models[provider.id] === model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
+        </select>
+      </header>
+      <p class="ai-answer">${escapeHtml(body)}</p>
+    </section>`;
+  }).join("");
+  viewContainer.innerHTML = `
+    ${pageHeading("AI Group", "One question, four models. Answers stay on this page. API keys stay on the Worker. 一個問題，四個模型。回答只留在這一頁。API key 留在 Worker。")}
+    <form class="ai-group" id="ai-group-form">
+      <label class="field" for="ai-group-question">Question 問題
+        <textarea id="ai-group-question" maxlength="4000" ${aiGroup.asking ? "disabled" : ""}>${escapeHtml(aiGroup.message)}</textarea>
+      </label>
+      <div class="ai-group-actions">
+        <button class="button button-primary" id="ai-group-ask" type="submit" ${aiGroup.asking ? "disabled" : ""}>Ask selected 詢問已選模型</button>
+      </div>
+      <div class="ai-group-board" aria-live="polite">${panes}</div>
+    </form>`;
+  if (typeof viewContainer.querySelector !== "function") return;
+  viewContainer.querySelector("#ai-group-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    askAiGroup();
+  });
+  viewContainer.querySelector("#ai-group-question")?.addEventListener("input", (event) => {
+    aiGroup.message = event.target.value;
+  });
+  viewContainer.querySelectorAll("[data-ai-toggle]").forEach((input) => {
+    input.addEventListener("change", () => {
+      aiGroup.selected[input.dataset.aiToggle] = input.checked;
+    });
+  });
+  viewContainer.querySelectorAll("[data-ai-model]").forEach((select) => {
+    select.addEventListener("change", () => {
+      aiGroup.models[select.dataset.aiModel] = select.value;
+    });
+  });
+}
+
+async function askAiGroup() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    setStatus("Sign in with GitHub to ask AI Group. 請先用 GitHub 登入。", "error");
+    return;
+  }
+  const message = aiGroup.message.trim();
+  const targets = AI_GROUP.filter((provider) => aiGroup.selected[provider.id]).map((provider) => ({
+    provider: provider.id,
+    model: aiGroup.models[provider.id],
+  }));
+  if (!message || !targets.length) {
+    setStatus("Type a question and choose at least one model. 請輸入問題，並至少選一個模型。", "error");
+    return;
+  }
+  aiGroup.asking = true;
+  renderAiGroup();
+  try {
+    const response = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "ai-group", payload: { message, targets } }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "AI Group is unavailable.");
+    aiGroup.results = Object.fromEntries((body.results || []).map((row) => [row.provider, row]));
+    setStatus("Answers are on this page only. Nothing was saved to the vault. 回答只在這一頁，沒有寫入 vault。", "success");
+  } catch (error) {
+    setStatus(error.message || "AI Group is unavailable.", "error");
+  } finally {
+    aiGroup.asking = false;
+    if (state.view === "ai-group") renderAiGroup();
+  }
 }
 
 function renderAccounting() {

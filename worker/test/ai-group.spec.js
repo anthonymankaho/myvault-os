@@ -1,0 +1,113 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import worker from '../src/index.js';
+
+const GROK = 'grok-secret-test-only';
+const QWEN = 'qwen-secret-test-only';
+const DEEP = 'deepseek-secret-test-only';
+const NVIDIA = 'nvidia-secret-test-only';
+const TOKEN = 'Bearer github-test-only-token';
+const ENV = {
+	XAI_API_KEY: GROK,
+	DASHSCOPE_API_KEY: QWEN,
+	DEEPSEEK_API_KEY: DEEP,
+	NVIDIA_API_KEY: NVIDIA,
+	QWEN_BASE_URL: 'https://token-plan.maas.qwencloudapi.com/compatible-mode/v1',
+	QWEN_ALLOWED_GITHUB_USER: 'anthonymankaho',
+};
+const targets = [
+	{ provider: 'grok', model: 'grok-4.7' },
+	{ provider: 'qwen', model: 'qwen3.8-max' },
+	{ provider: 'deepseek', model: 'deepseek-flash' },
+	{ provider: 'nvidia', model: 'nvidia/nemotron-3.5-lightning-30b-a3b' },
+];
+function request(payload, auth = TOKEN) {
+	return new Request('https://worker.test', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Origin: 'https://anthonymankaho.github.io', ...(auth ? { Authorization: auth } : {}) },
+		body: JSON.stringify({ action: 'ai-group', payload }),
+	});
+}
+function completion(text, usage = { prompt_tokens: 5, completion_tokens: 7 }) {
+	return Response.json({ choices: [{ message: { content: text } }], usage });
+}
+afterEach(() => vi.unstubAllGlobals());
+
+describe('AI Group', () => {
+	it('requires GitHub before any provider is called', async () => {
+		const mock = vi.fn();
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({ message: 'Hello', targets: targets.slice(0, 1) }, ''), ENV);
+		expect(response.status).toBe(401);
+		expect(mock).not.toHaveBeenCalled();
+	});
+
+	it('asks the selected models and hides every secret', async () => {
+		const mock = vi.fn(async (url) => {
+			if (String(url).includes('github.com')) return Response.json({ login: 'anthonymankaho' });
+			const name = String(url).includes('x.ai') ? 'grok' : String(url).includes('qwen') ? 'qwen' : String(url).includes('deepseek') ? 'deepseek' : 'nvidia';
+			return completion(`${name} says 2`);
+		});
+		vi.stubGlobal('fetch', mock);
+		const kv = { get: async () => '0', put: async (key, value) => { kv.saved = [key, value]; } };
+		const response = await worker.fetch(request({ message: 'What is 1+1?', targets }), { ...ENV, QWEN_USAGE: kv });
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		expect(body.results.map((row) => row.provider)).toEqual(['grok', 'qwen', 'deepseek', 'nvidia']);
+		expect(body.results.every((row) => row.ok)).toBe(true);
+		expect(body.quota.used).toBe(48);
+		expect(kv.saved[0]).toMatch(/^ai-group-usage:anthonymankaho:\d{4}-\d{2}$/);
+		const urls = mock.mock.calls.map((call) => String(call[0]));
+		expect(urls).toContain('https://api.x.ai/v1/chat/completions');
+		expect(urls).toContain('https://token-plan.maas.qwencloudapi.com/compatible-mode/v1/chat/completions');
+		expect(urls).toContain('https://api.deepseek.com/chat/completions');
+		expect(urls).toContain('https://integrate.api.nvidia.com/v1/chat/completions');
+		const qwen = mock.mock.calls.find((call) => String(call[0]).includes('qwen'));
+		expect(JSON.parse(qwen[1].body).model).toBe('qwen3.8-max');
+		expect(qwen[1].headers.Authorization).toBe(`Bearer ${QWEN}`);
+		expect(JSON.stringify(body).includes(GROK)).toBe(false);
+		expect(JSON.stringify(body).includes(QWEN)).toBe(false);
+	});
+
+	it('returns a column error when that provider has no secret', async () => {
+		const mock = vi.fn(async (url) => (String(url).includes('github.com') ? Response.json({ login: 'anthonymankaho' }) : completion('ok')));
+		vi.stubGlobal('fetch', mock);
+		const { DEEPSEEK_API_KEY, ...rest } = ENV;
+		const response = await worker.fetch(request({ message: 'Hello', targets: targets.slice(2, 4) }), rest);
+		const body = await response.json();
+		expect(body.results[0]).toMatchObject({ provider: 'deepseek', ok: false });
+		expect(body.results[1].ok).toBe(true);
+		expect(mock.mock.calls.some((call) => String(call[0]).includes('deepseek.com'))).toBe(false);
+	});
+
+	it('rejects a model that is not on the list', async () => {
+		const mock = vi.fn(async () => Response.json({ login: 'anthonymankaho' }));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({ message: 'Hello', targets: [{ provider: 'grok', model: 'grok-other' }] }), ENV);
+		expect(response.status).toBe(400);
+		expect(mock).not.toHaveBeenCalled();
+	});
+
+	it('keeps the other answers when one provider fails', async () => {
+		const mock = vi.fn(async (url) => {
+			if (String(url).includes('github.com')) return Response.json({ login: 'anthonymankaho' });
+			if (String(url).includes('x.ai')) return new Response('no', { status: 500 });
+			return completion('qwen ok');
+		});
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({ message: 'Hello', targets: targets.slice(0, 2) }), ENV);
+		const body = await response.json();
+		expect(body.results[0].ok).toBe(false);
+		expect(body.results[1]).toMatchObject({ ok: true, text: 'qwen ok' });
+	});
+
+	it('stops when the monthly quota is spent', async () => {
+		const mock = vi.fn(async () => Response.json({ login: 'anthonymankaho' }));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({ message: 'Hello', targets: targets.slice(0, 1) }), {
+			...ENV,
+			QWEN_USAGE: { get: async () => '1000000', put: async () => {} },
+		});
+		expect(response.status).toBe(429);
+		expect(mock).toHaveBeenCalledTimes(1);
+	});
+});
