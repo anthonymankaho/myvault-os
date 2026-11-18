@@ -146,6 +146,44 @@ describe('AI Group', () => {
 		expect(mock).not.toHaveBeenCalled();
 	});
 
+	it('lets Qwen read DeepSeek and NVIDIA read Qwen', async () => {
+		const mock = vi.fn(async (url) => (String(url).includes('github.com') ? Response.json({ login: 'anthonymankaho' }) : completion('ok')));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({
+			message: 'What did the others say?',
+			history: [
+				{ name: 'You', text: 'Hello group' },
+				{ name: 'DeepSeek', text: 'deepseek-said-this', fresh: true },
+				{ name: 'Qwen', text: 'qwen-said-this', fresh: true },
+				{ name: 'NVIDIA', text: 'nvidia-said-this', fresh: true },
+			],
+			targets: [
+				{ provider: 'qwen', model: 'qwen3.8-max' },
+				{ provider: 'nvidia', model: 'nvidia/nemotron-3.5-lightning-30b-a3b' },
+			],
+		}), ENV);
+		expect(response.status).toBe(200);
+		const bodyOf = (host) => JSON.parse(mock.mock.calls.find((call) => String(call[0]).includes(host))[1].body).messages[1].content;
+		const qwen = bodyOf('qwen');
+		const nvidia = bodyOf('nvidia');
+		expect(qwen).toContain('DeepSeek: deepseek-said-this');
+		expect(qwen).toContain('NVIDIA: nvidia-said-this');
+		expect(qwen).not.toContain('qwen-said-this');
+		expect(qwen).toContain('You: Hello group');
+		expect(nvidia).toContain('Qwen: qwen-said-this');
+		expect(nvidia).toContain('DeepSeek: deepseek-said-this');
+		expect(nvidia).not.toContain('nvidia-said-this');
+	});
+
+	it('rejects a group thread that is too long', async () => {
+		const mock = vi.fn();
+		vi.stubGlobal('fetch', mock);
+		const history = Array.from({ length: 25 }, () => ({ name: 'You', text: 'again' }));
+		const response = await worker.fetch(request({ message: 'Hello', history, targets: targets.slice(0, 1) }), ENV);
+		expect(response.status).toBe(400);
+		expect(mock).not.toHaveBeenCalled();
+	});
+
 	it('stops when the monthly quota is spent', async () => {
 		const mock = vi.fn(async () => Response.json({ login: 'anthonymankaho' }));
 		vi.stubGlobal('fetch', mock);
