@@ -160,7 +160,7 @@ function renderGame() {
         </div>
       </div>
       <div class="main">
-        <div class="map-wrap" id="map-wrap">${renderMap(s)}<div class="map-hint">點選城市以管理 · 示意戰略地圖，非精確歷史疆界</div></div>
+        <div class="map-wrap" id="map-wrap">${renderMap(s)}<div class="map-hint">點選城市以管理 · 原創近似歷史地理圖（春秋／戰國中國）</div></div>
         <div class="side">
           <div class="tabs">
             ${[["city", "城市"], ["officers", "武將"], ["military", "軍事"], ["diplomacy", "外交"], ["intel", "情報"], ["log", "事件"]].map(([k, label]) => `<button class="tab ${ui.tab === k ? "sel" : ""}" data-tab="${k}">${label}</button>`).join("")}
@@ -200,6 +200,59 @@ function convexHull(points) {
   return lower.slice(0, -1).concat(upper.slice(0, -1));
 }
 
+// Original antique-style geographic base map of Spring-&-Autumn / Warring-States
+// China (approximate real geography: lon 100-125E, lat 22-43N -> 920x700).
+// Hand-authored SVG; no copyrighted map assets. Classical river/lake/sea names.
+function renderBaseMap() {
+  const sea = "#12303f";
+  const river = "#3a6a8a";
+  const lake = "#2a5a6a";
+  const range = "#4a5a4a";
+  const lbl = "#5a8aaa";
+  const mlbl = "#6a7a6a";
+  const coast = "M880,0 L860,40 L846,66 L820,90 L790,110 L760,120 L740,140 L720,150 L700,160 L690,180 L700,190 L720,195 L760,200 L790,210 L800,225 L780,240 L750,250 L720,260 L700,280 L710,300 L720,320 L730,340 L740,360 L760,375 L780,385 L790,400 L770,410 L760,420 L780,433 L800,450 L810,480 L820,520 L830,560 L840,620 L850,700 L920,700 L920,0 Z";
+  const peaks = (x, y, n = 3) => {
+    let d = "";
+    for (let i = 0; i < n; i++) d += `M${x + i * 12},${y} l6,-11 l6,11 `;
+    return `<path d="${d}" fill="none" stroke="${range}" stroke-width="2" stroke-linejoin="round" opacity="0.8"/>`;
+  };
+  return `
+    <path d="${coast}" fill="${sea}" fill-opacity="0.55"/>
+    <path d="${coast}" fill="none" stroke="#4a7a9a" stroke-opacity="0.5" stroke-width="1.5"/>
+    <g fill="none" stroke="${river}" stroke-opacity="0.55" stroke-width="3" stroke-linecap="round">
+      <path d="M280,60 C330,66 350,90 356,130 C360,170 356,180 357,196 C360,230 368,252 396,260 C430,268 460,260 492,254 C530,247 552,240 588,234 C628,227 656,214 686,202 C706,193 714,172 720,152"/>
+      <path d="M240,290 C272,286 300,290 320,290 C345,288 356,280 360,268" stroke-width="2.5"/>
+      <path d="M460,177 C450,200 435,220 423,232 C415,240 410,246 405,252" stroke-width="2.5"/>
+      <path d="M440,270 C450,276 456,278 462,276 C475,272 485,266 492,258" stroke-width="2"/>
+      <path d="M520,262 C560,258 600,252 640,246 C670,240 690,230 706,222" stroke-width="2"/>
+      <path d="M470,340 C510,342 548,340 588,338 C628,336 668,336 700,336 C720,336 730,340 740,344" stroke-width="2.5"/>
+      <path d="M140,440 C200,436 260,430 320,428 C380,426 420,424 449,423 C490,420 520,412 560,404 C600,398 640,394 680,392 C720,390 740,390 758,390 C775,389 785,384 795,378" stroke-width="4"/>
+      <path d="M258,330 C300,340 340,352 380,368 C410,380 430,398 449,410 C455,416 452,420 449,423" stroke-width="2.5"/>
+      <path d="M478,493 C476,470 474,455 470,445" stroke-width="2"/>
+      <path d="M600,470 C600,455 600,445 600,436" stroke-width="2"/>
+    </g>
+    <g fill="${lake}" fill-opacity="0.5" stroke="#4a8a9a" stroke-opacity="0.4">
+      <ellipse cx="455" cy="440" rx="34" ry="16"/>
+      <ellipse cx="470" cy="470" rx="22" ry="14"/>
+      <ellipse cx="600" cy="430" rx="20" ry="26"/>
+      <ellipse cx="740" cy="398" rx="16" ry="12"/>
+      <ellipse cx="540" cy="196" rx="14" ry="8"/>
+      <ellipse cx="600" cy="262" rx="14" ry="8"/>
+    </g>
+    ${peaks(466, 150, 4)}${peaks(470, 190, 3)}
+    ${peaks(250, 318, 6)}${peaks(330, 316, 5)}
+    ${peaks(618, 236, 2)}${peaks(362, 282, 2)}${peaks(342, 420, 3)}${peaks(596, 80, 3)}
+    <g font-family="serif" fill="${lbl}" fill-opacity="0.75" font-size="12">
+      <text x="418" y="250">河水</text><text x="560" y="414">江水</text><text x="600" y="332">淮水</text>
+      <text x="292" y="282">渭水</text><text x="436" y="205">汾水</text><text x="344" y="352">漢水</text><text x="636" y="240">濟水</text>
+      <text x="735" y="140" font-size="14">渤海</text><text x="800" y="270" font-size="14">黃海</text><text x="830" y="430" font-size="14">東海</text>
+    </g>
+    <g font-family="serif" fill="${mlbl}" fill-opacity="0.8" font-size="11">
+      <text x="452" y="460">雲夢澤</text><text x="462" y="488">洞庭</text><text x="592" y="460">彭蠡澤</text><text x="732" y="414">具區</text>
+      <text x="492" y="176">太行</text><text x="300" y="332">秦嶺</text><text x="640" y="232">泰山</text><text x="372" y="296">華山</text><text x="330" y="436">巫山</text><text x="606" y="72">燕山</text>
+    </g>`;
+}
+
 function renderMap(s) {
   const active = Object.values(s.cities).filter((c) => c.active && c.state);
   const byState = {};
@@ -218,12 +271,6 @@ function renderMap(s) {
       for (const p of pts) territories += `<circle cx="${p.x}" cy="${p.y}" r="46" fill="${color}" fill-opacity="0.10" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5"/>`;
     }
   }
-  // rivers (decorative)
-  const rivers = `
-    <path d="M120,250 C260,210 300,300 380,290 C470,280 520,330 600,300 C680,270 760,250 850,270" fill="none" stroke="#3a6a8a" stroke-opacity="0.4" stroke-width="4"/>
-    <path d="M110,560 C240,540 320,520 420,540 C540,560 640,500 770,500" fill="none" stroke="#3a6a8a" stroke-opacity="0.35" stroke-width="5"/>
-    <text x="700" y="258" fill="#5a8aaa" fill-opacity="0.6" font-size="12" font-family="serif">河水</text>
-    <text x="620" y="524" fill="#5a8aaa" fill-opacity="0.6" font-size="12" font-family="serif">江水</text>`;
   let edges = "";
   const drawn = new Set();
   for (const c of active) for (const adj of c.adjacent) {
@@ -254,9 +301,9 @@ function renderMap(s) {
     armies += `<g><rect x="${x - 15}" y="${y - 10}" width="30" height="20" rx="4" fill="#0c1210" stroke="${color}" stroke-width="1.5"/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="10" fill="${color}">${a.kind === "attack" ? "⚔" : "➤"}${Math.round(a.troops / 1000)}k</text></g>`;
   }
   const legend = Object.keys(byState).map((k) => `<span class="legend-chip" data-legend="${k}" style="color:${stateColor(k)};border-color:${stateColor(k)}66">${stateName(k)}</span>`).join("");
-  return `<svg viewBox="0 0 920 700" preserveAspectRatio="xMidYMid meet">
-    <rect x="0" y="0" width="920" height="700" fill="transparent"/>
-    ${territories}${rivers}${edges}${nodes}${armies}
+  return `<svg viewBox="110 30 800 520" preserveAspectRatio="xMidYMid meet">
+    <rect x="110" y="30" width="800" height="520" fill="transparent"/>
+    ${renderBaseMap()}${territories}${edges}${nodes}${armies}
   </svg><div class="map-legend">${legend}</div>`;
 }
 
@@ -767,7 +814,7 @@ function openHelp() {
       ・<b>史實</b>：據《左傳》《史記》《戰國策》及楊寬《戰國史》、童書業《春秋史》框架。<br>
       ・<b>演義</b>：取材《東周列國志》（馮夢龍／蔡元放）——小說演義，非史實，已標記。<br>
       ・<b>待考</b>：Historical verification required——不確定之年代／歸屬／名諱，標記而非虛構。<br>
-      武將能力值為<b>遊戲設計估值</b>，非歷史數據。地圖為<b>示意戰略圖</b>，非精確歷史疆界。生年不詳者年齡為估算。<br><br>
+      武將能力值為<b>遊戲設計估值</b>，非歷史數據。地圖為<b>原創古風地理底圖</b>：海岸、渤海／黃海／東海、河水／江水／淮水／濟水／渭水／汾水／漢水、雲夢澤／洞庭／彭蠡澤／具區、太行／秦嶺／泰山／華山／巫山／燕山；城市坐標對照真實地理位置（經緯投影）， state 疆界為近似。生年不詳者年齡為估算。<br><br>
       <b style="color:var(--bronze2)">劇本</b>：前506柏舉之戰（春秋）、前350商鞅變法、前318合縱連橫、前260長平之戰、前238秦王親政。涵蓋孫臏、龐涓、商鞅、蘇秦、張儀、樂毅、白起、廉頗、李牧、王翦、秦始皇等。
     </div>`;
   openModal("說明 Help", body, `<button class="btn btn-primary" id="modal-cancel">明白</button>`, true);

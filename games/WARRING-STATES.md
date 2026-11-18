@@ -30,7 +30,7 @@ Game State is the single source of truth; the UI only renders it and calls engin
 
 | Module | Role |
 |---|---|
-| `ws-data.mjs` | States, 40 cities (schematic map + adjacency), ~150 officers, traits, personalities, **troop types**, terrain effects |
+| `ws-data.mjs` | States, 40 cities on approximate real geography (lon/lat projected) + adjacency, ~150 officers, traits, personalities, **troop types**, terrain effects |
 | `ws-scenarios.mjs` | 5 scenarios (ownership/placements/relations), scripted + random **event library** (provenance-tagged) |
 | `ws-util.mjs` | Seeded RNG (mulberry32), clamp/round/jitter, calendar helpers |
 | `ws-engine.mjs` | State creation, turn flow, economy, domestic, personnel, armies/logistics, intelligence, troop composition, victory |
@@ -39,7 +39,7 @@ Game State is the single source of truth; the UI only renders it and calls engin
 | `ws-diplomacy.mjs` | gift/alliance/nap/trade/threaten/persuade/coalition/break/aid/surrender |
 | `ws-events.mjs` | Scripted historical chains + random events; effect interpreter |
 | `ws-save.mjs` | Full-state serialize/validate/deserialize; 3 slots + autosave; export/import JSON |
-| `ws-ui.mjs` + `warring-states.html` | SVG strategic map, panels, dialogs, battle screen, save/load, help |
+| `ws-ui.mjs` + `warring-states.html` | SVG strategic map over an **original antique geographic base map** (coast/Bohai/Yellow/East seas; 河水/江水/淮水/濟水/渭水/汾水/漢水; 雲夢澤/洞庭/彭蠡澤/具區; 太行/秦嶺/泰山/華山/巫山/燕山), panels, dialogs, battle screen, save/load, help |
 
 ## Core rules
 
@@ -60,7 +60,7 @@ Every event and uncertain datum is tagged:
 
 Scenarios: 前506 柏舉之戰 (春秋, 《左傳》), 前350 商鞅變法, 前318 合縱連橫 (蘇秦/張儀), 前260 長平之戰, 前238 秦王親政 (秦始皇/王翦/李牧). Covers 孫臏、龐涓、商鞅、蘇秦、張儀、樂毅、白起、廉頗、李牧、王翦、秦始皇 etc.
 
-**Disclaimers:** officer ability scores are *game-design estimates*, not historical data; the map is a *schematic strategic map*, not precise historical borders; officers with unknown birth years use estimated ages (flagged 待考); minor-state rosters are sparse where records are sparse.
+**Disclaimers:** officer ability scores are *game-design estimates*, not historical data; the map is an *original antique-style base map on approximate real geography* (city coordinates projected from lon/lat; coast, rivers, lakes and ranges hand-authored, no copyrighted map assets) and state borders are approximate; officers with unknown birth years use estimated ages (flagged 待考); minor-state rosters are sparse where records are sparse.
 
 ## Testing
 
