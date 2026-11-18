@@ -132,7 +132,8 @@ const aiGroup = {
   message: "",
   selected: { grok: true, qwen: true, deepseek: true, nvidia: true },
   models: Object.fromEntries(AI_GROUP.map((provider) => [provider.id, provider.models[0]])),
-  results: {},
+  thread: [],
+  turn: 0,
   asking: false,
 };
 
@@ -1055,37 +1056,50 @@ function renderStudy() {
     </section>`;
 }
 
+function aiGroupClock(date = new Date()) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Hong_Kong",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
 function renderAiGroup() {
-  const panes = AI_GROUP.map((provider) => {
-    const result = aiGroup.results[provider.id];
-    const body = aiGroup.asking && aiGroup.selected[provider.id]
-      ? "Asking…"
-      : result?.ok
-        ? result.text
-        : result?.error || "Waiting for a question.";
-    return `
-    <section class="ai-pane" data-provider="${provider.id}">
-      <header>
-        <label><input type="checkbox" data-ai-toggle="${provider.id}" ${aiGroup.selected[provider.id] ? "checked" : ""} ${aiGroup.asking ? "disabled" : ""}> ${escapeHtml(provider.name)}</label>
-        <select data-ai-model="${provider.id}" aria-label="${escapeHtml(provider.name)} model" ${aiGroup.asking ? "disabled" : ""}>
-          ${provider.models.map((model) => `<option value="${escapeHtml(model)}" ${aiGroup.models[provider.id] === model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
-        </select>
-      </header>
-      <p class="ai-answer">${escapeHtml(body)}</p>
-    </section>`;
-  }).join("");
+  const members = AI_GROUP.map((provider) => `
+    <label class="ai-member">
+      <input type="checkbox" data-ai-toggle="${provider.id}" ${aiGroup.selected[provider.id] ? "checked" : ""} ${aiGroup.asking ? "disabled" : ""}>
+      <span>${escapeHtml(provider.name)}</span>
+      <select data-ai-model="${provider.id}" aria-label="${escapeHtml(provider.name)} model" ${aiGroup.asking ? "disabled" : ""}>
+        ${provider.models.map((model) => `<option value="${escapeHtml(model)}" ${aiGroup.models[provider.id] === model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
+      </select>
+    </label>`).join("");
+  const messages = aiGroup.thread.length
+    ? aiGroup.thread.map((message) => {
+      const mine = message.role === "user";
+      const failed = message.role === "member" && message.ok === false;
+      return `
+      <article class="ai-msg ${mine ? "ai-msg-user" : "ai-msg-member"} ${failed ? "ai-msg-fail" : ""}" data-provider="${escapeHtml(message.provider || "you")}">
+        <p class="ai-msg-name">${escapeHtml(mine ? "You" : message.name)}</p>
+        <p class="ai-bubble">${escapeHtml(message.text)}</p>
+        <p class="ai-msg-time">${escapeHtml(message.at || "")}${message.model ? ` · ${escapeHtml(message.model)}` : ""}</p>
+      </article>`;
+    }).join("")
+    : `<p class="ai-group-empty">The group is quiet. Send a message and the selected members reply in this thread. <span lang="zh-Hant">群組還是空的。送出訊息後，已選成員會在這裡回覆。</span></p>`;
   viewContainer.innerHTML = `
-    ${pageHeading("AI Group", "One question, four models. Answers stay on this page. API keys stay on the Worker. 一個問題，四個模型。回答只留在這一頁。API key 留在 Worker。")}
+    ${pageHeading("AI Group", "One group thread. The members you tick reply here. API keys stay on the Worker. 一個群組對話。你勾選的成員在這裡回覆。API key 留在 Worker。")}
     <form class="ai-group" id="ai-group-form">
-      <label class="field" for="ai-group-question">Question 問題
-        <textarea id="ai-group-question" maxlength="4000" ${aiGroup.asking ? "disabled" : ""}>${escapeHtml(aiGroup.message)}</textarea>
-      </label>
-      <div class="ai-group-actions">
-        <button class="button button-primary" id="ai-group-ask" type="submit" ${aiGroup.asking ? "disabled" : ""}>Ask selected 詢問已選模型</button>
+      <div class="ai-members" aria-label="Group members">${members}</div>
+      <div class="ai-group-thread" id="ai-group-thread" aria-live="polite">${messages}</div>
+      <div class="ai-composer">
+        <label class="visually-hidden" for="ai-group-question">Message 訊息</label>
+        <textarea id="ai-group-question" maxlength="4000" placeholder="Message the group 傳訊息到群組" ${aiGroup.asking ? "disabled" : ""}>${escapeHtml(aiGroup.message)}</textarea>
+        <button class="button button-primary" id="ai-group-ask" type="submit" ${aiGroup.asking ? "disabled" : ""}>Send 送出</button>
       </div>
-      <div class="ai-group-board" aria-live="polite">${panes}</div>
     </form>`;
   if (typeof viewContainer.querySelector !== "function") return;
+  const thread = viewContainer.querySelector("#ai-group-thread");
+  if (thread) thread.scrollTop = thread.scrollHeight;
   viewContainer.querySelector("#ai-group-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     askAiGroup();
@@ -1120,8 +1134,33 @@ async function askAiGroup() {
     setStatus("Type a question and choose at least one model. 請輸入問題，並至少選一個模型。", "error");
     return;
   }
+  const turn = ++aiGroup.turn;
+  const at = aiGroupClock();
+  aiGroup.thread.push({ role: "user", turn, text: message, at });
+  for (const target of targets) {
+    const provider = AI_GROUP.find((item) => item.id === target.provider);
+    aiGroup.thread.push({
+      role: "member",
+      turn,
+      provider: target.provider,
+      name: provider.name,
+      model: target.model,
+      text: "…",
+      pending: true,
+      ok: true,
+      at,
+    });
+  }
+  aiGroup.message = "";
   aiGroup.asking = true;
   renderAiGroup();
+  const fill = (providerId, text, ok) => {
+    const item = aiGroup.thread.find((entry) => entry.turn === turn && entry.provider === providerId && entry.pending);
+    if (!item) return;
+    item.pending = false;
+    item.ok = ok;
+    item.text = text;
+  };
   try {
     const response = await fetch(API, {
       method: "POST",
@@ -1130,10 +1169,12 @@ async function askAiGroup() {
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || "AI Group is unavailable.");
-    aiGroup.results = Object.fromEntries((body.results || []).map((row) => [row.provider, row]));
-    setStatus("Answers are on this page only. Nothing was saved to the vault. 回答只在這一頁，沒有寫入 vault。", "success");
+    for (const row of body.results || []) fill(row.provider, row.ok ? row.text : row.error, Boolean(row.ok));
+    setStatus("The thread stays on this page. Nothing was saved to the vault. 對話只在這一頁，沒有寫入 vault。", "success");
   } catch (error) {
-    setStatus(error.message || "AI Group is unavailable.", "error");
+    const note = error.message || "AI Group is unavailable.";
+    for (const target of targets) fill(target.provider, note, false);
+    setStatus(note, "error");
   } finally {
     aiGroup.asking = false;
     if (state.view === "ai-group") renderAiGroup();

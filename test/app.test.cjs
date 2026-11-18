@@ -364,7 +364,9 @@ test("AI Group view lists four providers and does not collect API keys", () => {
   const w = workspace();
   assert.equal(w.run('VIEWS["ai-group"].title'), "AI Group");
   w.run("renderAiGroup()");
-  const html = w.elements.get("#view").innerHTML;
+  let html = w.elements.get("#view").innerHTML;
+  assert.match(html, /ai-group-thread/);
+  assert.doesNotMatch(html, /ai-group-board/);
   assert.match(html, /Grok/);
   assert.match(html, /Qwen/);
   assert.match(html, /DeepSeek/);
@@ -374,6 +376,12 @@ test("AI Group view lists four providers and does not collect API keys", () => {
   assert.match(html, /deepseek-v4-pro/);
   assert.match(html, /nemotron-3-ultra/);
   assert.match(html, /API keys stay on the Worker/);
+  w.run('aiGroup.thread = [{role:"user", text:"All is working now", at:"16:41"}, {role:"member", provider:"qwen", name:"Qwen", model:"qwen3.8-flash", text:"Great", ok:true, at:"16:41"}]; renderAiGroup()');
+  html = w.elements.get("#view").innerHTML;
+  assert.match(html, /All is working now/);
+  assert.match(html, /Great/);
+  assert.match(html, /ai-msg-user/);
+  assert.match(html, /ai-msg-member/);
   assert.doesNotMatch(html, /type="password"/);
   assert.doesNotMatch(html, /sk-/);
   const index = fs.readFileSync(

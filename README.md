@@ -224,7 +224,7 @@ The Grok bot form asks for OAuth. Use client ID `momo-grok-bot`, leave the clien
 
 ## AI Group
 
-Open **AI Group** in the sidebar. Type one question, tick the models you want, and press **Ask selected**. Grok, Qwen, DeepSeek, and NVIDIA answer in the same box. A provider that is not configured, or that fails, leaves the other answers in place. Nothing is written to the vault.
+Open **AI Group** in the sidebar. It is one group thread. Tick the members you want, type in the box at the bottom, and press **Send**. Your message sits on the right. Grok, Qwen, DeepSeek, and NVIDIA reply underneath it in the same thread. A member that fails leaves a note in the thread and the others still reply. Nothing is written to the vault.
 
 The page does not accept or store API keys. Set them on the Worker, from `worker/`, without pasting them into chat:
 
