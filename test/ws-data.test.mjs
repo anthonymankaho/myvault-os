@@ -85,6 +85,19 @@ test("placed officers are born and not historically dead at scenario year", () =
   assert.deepEqual(problems, [], problems.join("\n"));
 });
 
+test("every scenario state owns a city and each ruler sits in his own state", () => {
+  const problems = [];
+  for (const sc of SCENARIOS) {
+    for (const key of sc.states) {
+      const owned = Object.values(sc.ownership).filter((o) => o === key).length;
+      if (owned === 0) problems.push(`${sc.id}: ${key} owns no city`);
+      const placed = sc.placements.find((p) => p[0] === sc.rulers[key]);
+      if (placed && sc.ownership[placed[1]] !== key) problems.push(`${sc.id}: ruler ${sc.rulers[key]} in ${sc.ownership[placed[1]]}, not ${key}`);
+    }
+  }
+  assert.deepEqual(problems, [], problems.join("\n"));
+});
+
 test("events have valid provenance and effect vocabulary", () => {
   const validProv = ["史實", "演義", "待考"];
   const validEffects = ["msg", "city", "allCities", "troops", "loyalty", "death", "move", "join", "relation", "alliance", "war", "gold", "food", "ruler", "spawnFree", "spawnWanderer", "randomOfficerLoyalty", "randomOldDeath"];
