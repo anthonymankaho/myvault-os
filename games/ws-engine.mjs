@@ -623,6 +623,20 @@ function disbandArmy(state, army) {
   }
 }
 
+export function applyTribute(state) {
+  for (const st of Object.values(state.states)) {
+    if (!st.alive || !st.vassalOf) continue;
+    const overlord = state.states[st.vassalOf];
+    if (!overlord?.alive) continue;
+    const vCap = citiesOf(state, st.key)[0];
+    const oCap = citiesOf(state, st.vassalOf).find((c) => c.tier === "capital") ?? citiesOf(state, st.vassalOf)[0];
+    if (vCap && oCap) {
+      const tribute = Math.min(200, vCap.gold);
+      vCap.gold -= tribute; oCap.gold += tribute;
+    }
+  }
+}
+
 function upkeep(state) {
   const season = SEASON_OF_MONTH[state.month - 1];
   for (const city of Object.values(state.cities)) {
@@ -653,6 +667,9 @@ function upkeep(state) {
     city.morale = clamp(city.morale + (city.order > 60 ? 1 : -1), 0, 100);
     city.gold = round(city.gold); city.food = round(city.food); city.troops = round(city.troops);
   }
+
+  // vassal tribute: a surrendered state pays its overlord each turn
+  applyTribute(state);
 
   // officer loyalty drift, aging, wounds
   for (const officer of Object.values(state.officers)) {

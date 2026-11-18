@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createGame, develop, search, recruitOfficer, reward, transferOfficer, appointGovernor, moveArmy, transport, attack, stratagem, diplomacy, endTurn, startPlayerPhase, citiesOf, officersOf, stateTotals, DOMESTIC, troopCap } from "../games/ws-engine.mjs";
+import { createGame, develop, search, recruitOfficer, reward, transferOfficer, appointGovernor, moveArmy, transport, attack, stratagem, diplomacy, endTurn, startPlayerPhase, citiesOf, officersOf, stateTotals, DOMESTIC, troopCap, applyTribute, applyEventEffects } from "../games/ws-engine.mjs";
 import { battleRound, autoTactic, finalizeBattle } from "../games/ws-battle.mjs";
 import { checkBattleEvents } from "../games/ws-events.mjs";
-import { SCENARIOS } from "../games/ws-scenarios.mjs";
+import { SCENARIOS, EVENT_BY_ID } from "../games/ws-scenarios.mjs";
 import { serialize, deserialize, validate } from "../games/ws-save.mjs";
 
 function autoResolvePending(state) {
@@ -167,4 +167,36 @@ test("transport moves resources between adjacent own cities", () => {
   const res = transport(state, "xianyang", "yueyang", 500, 1000);
   assert.ok(res.ok, res.reason);
   assert.equal(to.gold, beforeToGold + 500);
+});
+
+test("vassal pays tribute to its overlord each upkeep", () => {
+  const state = createGame("changping", "qin", "normal", 31);
+  state.states.zhao.vassalOf = "qin";
+  const vCap = citiesOf(state, "zhao")[0];
+  const oCap = citiesOf(state, "qin").find((c) => c.tier === "capital");
+  vCap.gold = 1000; oCap.gold = 1000;
+  applyTribute(state);
+  assert.equal(vCap.gold, 800);
+  assert.equal(oCap.gold, 1200);
+});
+
+test("284 scenario: Yue Yi breaks Qi then Tian Dan restores it (city transfers)", () => {
+  const state = createGame("poqi", "yan", "normal", 5);
+  assert.equal(state.cities.linzi.state, "qi");
+  applyEventEffects(state, EVENT_BY_ID.poqi.effects, {});
+  assert.equal(state.cities.linzi.state, "yan");
+  assert.equal(state.cities.pinglu.state, "yan");
+  assert.equal(state.officers.king_min_qi.status, "dead");
+  assert.equal(state.states.qi.ruler, "king_xiang_qi");
+  assert.equal(state.cities.jimo.state, "qi", "Jimo holds out");
+  applyEventEffects(state, EVENT_BY_ID.fuqi.effects, {});
+  assert.equal(state.cities.linzi.state, "qi");
+  assert.equal(state.cities.pinglu.state, "qi");
+});
+
+test("poqi scenario is valid and playable for a few turns", () => {
+  const state = createGame("poqi", "qi", "normal", 9);
+  assert.ok(citiesOf(state, "qi").length >= 2);
+  for (let i = 0; i < 6; i++) { endTurn(state); state.pendingBattles = []; for (const o of Object.values(state.officers)) o.acted = false; }
+  assert.ok(state.turn > 1);
 });

@@ -51,6 +51,21 @@ function postFullscreen(active) {
   try { window.parent.postMessage({ type: "myvault-warring-states", action: "fullscreen", active }, window.location.origin); } catch {}
 }
 
+// ---- Sound hooks (procedural WebAudio, no external assets) ----
+let audioCtx = null, soundOn = true;
+function beep(freq = 440, dur = 0.09, type = "sine", gain = 0.04) {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = gain;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.stop(audioCtx.currentTime + dur);
+  } catch { /* audio unavailable */ }
+}
+
 // ---------------------------------------------------------------------------
 // Rendering root
 // ---------------------------------------------------------------------------
@@ -154,6 +169,7 @@ function renderGame() {
         <div class="actions">
           <button class="btn btn-sm" id="tb-save">保存</button>
           <button class="btn btn-sm" id="tb-load">讀取</button>
+          <button class="btn btn-sm" id="tb-sound" title="音效開關">${soundOn ? "🔊" : "🔇"}</button>
           <button class="btn btn-sm" id="tb-help">說明</button>
           <button class="btn btn-sm" id="tb-fullscreen">${ui.fullscreen ? "離開全螢幕" : "全螢幕"}</button>
           <button class="btn btn-sm btn-ghost" id="tb-title">主選單</button>
@@ -181,6 +197,7 @@ function renderGame() {
 function wireTopbar() {
   app.querySelector("#tb-save").addEventListener("click", () => openSaveLoad("save"));
   app.querySelector("#tb-load").addEventListener("click", () => openSaveLoad("load"));
+  app.querySelector("#tb-sound").addEventListener("click", (e) => { soundOn = !soundOn; e.currentTarget.textContent = soundOn ? "🔊" : "🔇"; if (soundOn) beep(660); });
   app.querySelector("#tb-help").addEventListener("click", () => openHelp());
   app.querySelector("#tb-fullscreen").addEventListener("click", () => postFullscreen(!ui.fullscreen));
   app.querySelector("#tb-title").addEventListener("click", () => { saves.autosave(ui.state); ui.screen = "title"; render(); });
@@ -334,7 +351,7 @@ function renderPanel(s) {
 
 function statBar(label, value, max, color) {
   const pct = clamp(value / max * 100, 0, 100);
-  return `<div class="stat"><small>${label}</small><b>${fmt(value)}</b><div class="bar"><i style="width:${pct}%;background:${color}"></i></div></div>`;
+  return `<div class="stat" title="${label}：${fmt(value)} / ${fmt(max)}"><small>${label}</small><b>${fmt(value)}</b><div class="bar"><i style="width:${pct}%;background:${color}"></i></div></div>`;
 }
 
 function renderCityPanel(s) {
@@ -510,7 +527,7 @@ function openDomestic(cityId, preset) {
     el.querySelector("#dom-officer").addEventListener("change", (e) => { officerId = e.target.value; });
     el.querySelector("#dom-go").addEventListener("click", () => {
       const res = develop(ui.state, cityId, action, officerId, troopType);
-      if (res.ok) { lastResult = `<div class="result-msg ok">${esc(res.label ?? "成功")}。</div>`; saves.autosave(ui.state); renderGame(); refresh(); }
+      if (res.ok) { lastResult = `<div class="result-msg ok">${esc(res.label ?? "成功")}。</div>`; beep(520); saves.autosave(ui.state); renderGame(); refresh(); }
       else { lastResult = `<div class="result-msg no">${esc(res.reason)}</div>`; refresh(); }
     });
   };
@@ -554,7 +571,7 @@ function openMilitary(cityId, mode = "attack") {
       if (!target) { el.querySelector("#mil-result").innerHTML = `<div class="result-msg no">請選目標。</div>`; return; }
       const fn = kind === "attack" ? attack : moveArmy;
       const res = fn(ui.state, cityId, target, troops, commander, [], food);
-      if (res.ok) { closeModal(); saves.autosave(ui.state); render(); toast(kind === "attack" ? "出陣！" : "移駐！"); }
+      if (res.ok) { closeModal(); beep(300, 0.12, "square"); saves.autosave(ui.state); render(); toast(kind === "attack" ? "出陣！" : "移駐！"); }
       else el.querySelector("#mil-result").innerHTML = `<div class="result-msg no">${esc(res.reason)}</div>`;
     });
   };
@@ -816,7 +833,7 @@ function openHelp() {
       ・<b>演義</b>：取材《東周列國志》（馮夢龍／蔡元放）——小說演義，非史實，已標記。<br>
       ・<b>待考</b>：Historical verification required——不確定之年代／歸屬／名諱，標記而非虛構。<br>
       武將能力值為<b>遊戲設計估值</b>，非歷史數據。地圖為<b>原創古風地理底圖</b>：海岸、渤海／黃海／東海、河水／江水／淮水／濟水／渭水／汾水／漢水、雲夢澤／洞庭／彭蠡澤／具區、太行／秦嶺／泰山／華山／巫山／燕山；城市坐標對照真實地理位置（經緯投影）， state 疆界為近似。生年不詳者年齡為估算。<br><br>
-      <b style="color:var(--bronze2)">劇本</b>：前506柏舉之戰（春秋）、前350商鞅變法、前318合縱連橫、前260長平之戰、前238秦王親政。涵蓋孫臏、龐涓、商鞅、蘇秦、張儀、樂毅、白起、廉頗、李牧、王翦、秦始皇等。
+      <b style="color:var(--bronze2)">劇本</b>：前506柏舉之戰（春秋）、前350商鞅變法、前318合縱連橫、前284樂毅破齊／田單復齊、前260長平之戰、前238秦王親政。涵蓋孫臏、龐涓、商鞅、蘇秦、張儀、樂毅、田單、白起、廉頗、李牧、王翦、秦始皇等。
     </div>`;
   openModal("說明 Help", body, `<button class="btn btn-primary" id="modal-cancel">明白</button>`, true);
   ui.modal.wire = (el) => el.querySelector("#modal-cancel").addEventListener("click", closeModal);
@@ -894,7 +911,7 @@ function renderHexModal() {
   document.body.appendChild(el);
   const logEl = el.querySelector("#hex-log"); logEl.scrollTop = logEl.scrollHeight;
   const after = () => {
-    if (hb.concluded && !b.finalized) { finalizeBattle(s, b); checkBattleEvents(s, b); }
+    if (hb.concluded && !b.finalized) { finalizeBattle(s, b); checkBattleEvents(s, b); beep(180, 0.25, "triangle"); }
     renderHexModal();
   };
   el.querySelectorAll(".hex-unit").forEach((g) => g.addEventListener("click", () => {
@@ -904,12 +921,12 @@ function renderHexModal() {
       hb.selected = u; hb.reachable = hexReachable(s, hb, u); hb.targets = hexAttackTargets(s, hb, u);
       renderHexModal(); return;
     }
-    if (hb.selected && hb.targets.some((t) => !t.fort && t.id === u.id)) { hexAttack(s, hb, hb.selected, u); hb.selected = null; hb.reachable = []; hb.targets = []; after(); }
+    if (hb.selected && hb.targets.some((t) => !t.fort && t.id === u.id)) { hexAttack(s, hb, hb.selected, u); beep(200, 0.1, "sawtooth"); hb.selected = null; hb.reachable = []; hb.targets = []; after(); }
   }));
   el.querySelectorAll(".hex-cell").forEach((p) => p.addEventListener("click", () => {
     if (hb.concluded || !hb.selected) return;
     const [c, r] = p.dataset.hex.split(",").map(Number);
-    if (hb.targets.some((t) => t.fort && t.c === c && t.r === r)) { hexAttack(s, hb, hb.selected, { fort: true, c, r }); hb.selected = null; hb.reachable = []; hb.targets = []; after(); return; }
+    if (hb.targets.some((t) => t.fort && t.c === c && t.r === r)) { hexAttack(s, hb, hb.selected, { fort: true, c, r }); beep(160, 0.12, "sawtooth"); hb.selected = null; hb.reachable = []; hb.targets = []; after(); return; }
     if (hb.reachable.some(([rc, rr]) => rc === c && rr === r)) { hexMove(s, hb, hb.selected, c, r); hb.selected = null; hb.reachable = []; hb.targets = []; after(); }
   }));
   el.querySelector("#hex-end")?.addEventListener("click", () => { hexEndPlayerPhase(s, hb); after(); });
@@ -997,6 +1014,7 @@ function advancePendingBattles() {
 
 function doEndTurn() {
   const s = ui.state;
+  beep(440, 0.1);
   const before = { gold: stateTotals(s, s.playerState).gold, food: stateTotals(s, s.playerState).food };
   const report = endTurn(s);
   ui.lastReport = { ...report, before };

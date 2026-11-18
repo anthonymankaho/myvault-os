@@ -129,6 +129,21 @@ export function applyEventEffects(state, effects, ctx = {}) {
         if (rb) rb.war = ef.on;
         break;
       }
+      case "cityOwner": {
+        const city = state.cities[ef.city];
+        if (city && city.active && state.states[ef.state]?.alive) {
+          const old = city.state;
+          city.state = ef.state;
+          city.governor = null;
+          for (const id of [...city.officers]) {
+            const o = state.officers[id];
+            if (o && o.state === old) { o.status = "captured"; o.capturedBy = ef.state; }
+          }
+          city.officers = city.officers.filter((id) => state.officers[id]?.status === "active" && state.officers[id]?.state === ef.state);
+          log(state, `${city.name}歸${state.states[ef.state].name}。`, "capture");
+        }
+        break;
+      }
       case "gold": {
         const key = ef.state === "@" ? ctx.state : ef.state;
         const cap = citiesOf(state, key).find((c) => c.tier === "capital") ?? citiesOf(state, key)[0];

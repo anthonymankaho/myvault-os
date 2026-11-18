@@ -100,7 +100,7 @@ test("every scenario state owns a city and each ruler sits in his own state", ()
 
 test("events have valid provenance and effect vocabulary", () => {
   const validProv = ["史實", "演義", "待考"];
-  const validEffects = ["msg", "city", "allCities", "troops", "loyalty", "death", "move", "join", "relation", "alliance", "war", "gold", "food", "ruler", "spawnFree", "spawnWanderer", "randomOfficerLoyalty", "randomOldDeath"];
+  const validEffects = ["msg", "city", "allCities", "troops", "loyalty", "death", "move", "join", "relation", "alliance", "war", "cityOwner", "gold", "food", "ruler", "spawnFree", "spawnWanderer", "randomOfficerLoyalty", "randomOldDeath"];
   for (const ev of [...EVENTS, ...RANDOM_EVENTS]) {
     assert.ok(validProv.includes(ev.provenance), `${ev.id} provenance ${ev.provenance}`);
     for (const ef of ev.effects ?? []) assert.ok(validEffects.includes(ef.t), `${ev.id} effect ${ef.t}`);

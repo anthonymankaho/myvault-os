@@ -25,8 +25,8 @@ export const EVENTS = [
   { id: "marquis_cheng_death", provenance: "史實", title: "趙成侯卒", text: "成侯卒，子肅侯立。", trigger: { year: -350 }, effects: [{ t: "death", officer: "marquis_cheng" }, { t: "ruler", state: "zhao", officer: "marquis_su_zhao" }] },
   { id: "shenbuhai_han", provenance: "史實", title: "申不害相韓", text: "申不害相韓昭侯，內修政教，外應諸侯，終申子之身，國治兵強，無侵韓者。", trigger: { year: -351, condition: { t: "inState", officer: "shenbuhai", state: "han" } }, effects: [{ t: "allCities", state: "han", stat: "order", d: 8 }, { t: "allCities", state: "han", stat: "defense", d: 6 }] },
   { id: "zouji_qi", provenance: "史實", title: "鄒忌諷齊王納諫", text: "鄒忌以鼓琴見威王，諷齊王納諫。門庭若市，齊國大治。", trigger: { year: -349, condition: { t: "inState", officer: "zouji", state: "qi" } }, effects: [{ t: "allCities", state: "qi", stat: "order", d: 6 }] },
-  { id: "yue_destroyed", provenance: "待考", title: "楚滅越", text: "越王無彊伐楚，楚大敗之，殺無彊，盡取故吳地至浙江。越以此散（確年待考，此處繫於前334）。", trigger: { year: -334, condition: { t: "stateAlive", state: "yue" } }, effects: [{ t: "death", officer: "king_wuqiang" }, { t: "move", officer: "king_wuqiang", city: "kuaiji" }, { t: "msg" }] },
-  { id: "zhongshan_destroyed", provenance: "史實", title: "趙滅中山", text: "趙武靈王胡服騎射，北破林胡、樓煩，滅中山。", trigger: { year: -296, condition: { t: "stateAlive", state: "zhongshan" } }, effects: [{ t: "msg" }] },
+  { id: "yue_destroyed", provenance: "待考", title: "楚滅越", text: "越王無彊伐楚，楚大敗之，殺無彊，盡取故吳地至浙江。越以此散（確年待考，此處繫於前334）。", trigger: { year: -334, condition: { t: "stateAlive", state: "yue" } }, effects: [{ t: "death", officer: "king_wuqiang" }, { t: "cityOwner", city: "kuaiji", state: "chu" }, { t: "cityOwner", city: "gusu", state: "chu" }, { t: "msg" }] },
+  { id: "zhongshan_destroyed", provenance: "史實", title: "趙滅中山", text: "趙武靈王胡服騎射，北破林胡、樓煩，滅中山。", trigger: { year: -296, condition: { t: "stateAlive", state: "zhongshan" } }, effects: [{ t: "cityOwner", city: "lingshou", state: "zhao" }, { t: "msg" }] },
 
   // ===== 318 BC 合縱連橫 =====
   { id: "wuguo_faqin", provenance: "史實", title: "五國伐秦", text: "公孫衍（犀首）發起魏、趙、韓、燕、中山五國伐秦，至函谷關而還。", trigger: { year: -318, condition: { t: "alive", officer: "gongsunyan" } }, effects: [{ t: "relation", a: "qin", b: "wei", d: -35 }, { t: "relation", a: "qin", b: "zhao", d: -30 }, { t: "relation", a: "qin", b: "han", d: -30 }, { t: "relation", a: "qin", b: "yan", d: -25 }, { t: "relation", a: "wei", b: "zhao", d: 20 }, { t: "relation", a: "wei", b: "han", d: 20 }] },
@@ -38,7 +38,7 @@ export const EVENTS = [
   { id: "mengke_liang", provenance: "史實", title: "孟子見梁惠王", text: "孟子見梁惠王。王曰：「叟，不遠千里而來，亦將有以利吾國乎？」孟子對曰：「王何必曰利，亦有仁義而已矣。」", trigger: { year: -318, condition: { t: "alive", officer: "mengke" } }, effects: [{ t: "msg" }] },
   { id: "zhuangzi_dream", provenance: "演義", title: "莊周夢蝶", text: "莊周夢為蝴蝶，栩栩然蝴蝶也。不知周之夢為蝴蝶與，蝴蝶之夢為周與？（《莊子·齊物論》，哲理寓言）", trigger: { year: -317, condition: { t: "alive", officer: "zhuangzi" } }, effects: [{ t: "city", city: "suiyang", stat: "order", d: 4 }] },
   { id: "song_kang_bao", provenance: "史實", title: "宋王偃暴政", text: "宋王偃行王政，滅滕、伐薛，東敗齊、南敗楚、西敗魏。然射天笞地，諸侯皆曰「桀宋」。", trigger: { year: -315, condition: { t: "inState", officer: "king_yan_song", state: "song" } }, effects: [{ t: "allCities", state: "song", stat: "order", d: -10 }, { t: "relation", a: "song", b: "qi", d: -25 }, { t: "relation", a: "song", b: "chu", d: -25 }, { t: "relation", a: "song", b: "wei", d: -25 }] },
-  { id: "qi_song", provenance: "史實", title: "齊滅宋", text: "齊湣王伐宋，宋王偃死於魏。齊南割楚之淮北，西侵三晉，諸侯恐懼。", trigger: { year: -286, condition: { t: "stateAlive", state: "song" } }, effects: [{ t: "death", officer: "king_yan_song" }, { t: "msg" }] },
+  { id: "qi_song", provenance: "史實", title: "齊滅宋", text: "齊湣王伐宋，宋王偃死於魏。齊南割楚之淮北，西侵三晉，諸侯恐懼。", trigger: { year: -286, condition: { t: "stateAlive", state: "song" } }, effects: [{ t: "death", officer: "king_yan_song" }, { t: "cityOwner", city: "suiyang", state: "qi" }, { t: "msg" }] },
 
   // ===== 260 BC 長平之戰 =====
   { id: "shangdang_zhao", provenance: "史實", title: "上黨歸趙", text: "韓上黨守馮亭不降秦，以上黨十七城降趙。趙孝成王受之，平陽君趙豹諫：「聖人甚禍無故之利。」秦遂攻上黨。", trigger: { year: -260, month: 1 }, effects: [{ t: "relation", a: "qin", b: "zhao", d: -30 }, { t: "msg" }] },
@@ -87,6 +87,11 @@ export const EVENTS = [
   { id: "woxin", provenance: "史實", title: "臥薪嘗膽", text: "越子句踐反國，乃苦身焦思，置膽於坐，坐臥即仰膽，飲食亦嘗膽也。曰：「女忘會稽之恥邪？」身自耕作，夫人自織，食不加肉，衣不重采。", trigger: { year: -492, condition: { t: "inState", officer: "goujian", state: "yue" } }, effects: [{ t: "allCities", state: "yue", stat: "training", d: 12 }, { t: "allCities", state: "yue", stat: "agriculture", d: 10 }, { t: "allCities", state: "yue", stat: "morale", d: 12 }] },
   { id: "yue_wu", provenance: "史實", title: "越滅吳", text: "越伐吳，吳師敗。越圍吳，吳王夫差自殺。越滅吳。句踐已平吳，乃以兵北渡淮，與齊晉諸侯會於徐州，致貢於周。周元王使人賜句踐胙，命為伯。", trigger: { year: -473, condition: { t: "owner", city: "gusu", state: "yue" } }, effects: [{ t: "msg" }] },
   { id: "wuzixu_death", provenance: "史實", title: "伍子胥之死", text: "吳王夫差賜伍子胥屬鏤之劍。子胥曰：「抉吾眼縣吳東門之上，以觀越寇之入滅吳也。」乃自剄。吳王聞之大怒，取子胥屍盛以鴟夷革，浮之江中。", trigger: { year: -484, condition: { t: "and", c: [{ t: "alive", officer: "wuzixu" }, { t: "alive", officer: "boqi" }] } }, effects: [{ t: "death", officer: "wuzixu" }, { t: "allCities", state: "wu", stat: "morale", d: -12 }] },
+  // ===== 284 BC 樂毅破齊 / 田單復齊 =====
+  { id: "poqi", provenance: "史實", title: "樂毅破齊", text: "樂毅將燕、秦、趙、韓、魏五國兵伐齊，破之濟西。諸侯兵罷歸，樂毅獨追入臨淄。齊湣王奔莒，為淖齒所殺。齊七十餘城皆入燕，唯莒、即墨不下。", trigger: { year: -284, month: 6, condition: { t: "inState", officer: "yueyi", state: "yan" } }, effects: [{ t: "cityOwner", city: "linzi", state: "yan" }, { t: "cityOwner", city: "pinglu", state: "yan" }, { t: "death", officer: "king_min_qi" }, { t: "ruler", state: "qi", officer: "king_xiang_qi" }, { t: "allCities", state: "qi", stat: "morale", d: -20 }, { t: "relation", a: "yan", b: "qi", d: -40 }] },
+  { id: "fuqi", provenance: "史實", title: "田單復齊", text: "田單守即墨，以火牛陣夜破燕軍，殺騎劫。齊七十餘城皆復為齊。迎襄王於莒，入臨淄聽政。", trigger: { year: -279, condition: { t: "and", c: [{ t: "alive", officer: "tiandan" }, { t: "owner", city: "jimo", state: "qi" }] } }, effects: [{ t: "cityOwner", city: "linzi", state: "qi" }, { t: "cityOwner", city: "pinglu", state: "qi" }, { t: "allCities", state: "yan", stat: "morale", d: -15 }, { t: "relation", a: "qi", b: "yan", d: -40 }] },
+  { id: "king_zhao_yan_death", provenance: "史實", title: "燕昭王卒", text: "燕昭王卒，子惠王立。惠王為太子時與樂毅有隙，即位後疑毅。", trigger: { year: -279 }, effects: [{ t: "death", officer: "king_zhao_yan" }, { t: "ruler", state: "yan", officer: "king_hui_yan" }] },
+  { id: "yueyi_benzhao", provenance: "史實", title: "樂毅奔趙", text: "燕惠王使騎劫代樂毅。樂毅恐誅，奔趙。趙封之於觀津，號望諸君。", trigger: { year: -279, condition: { t: "and", c: [{ t: "alive", officer: "yueyi" }, { t: "inState", officer: "yueyi", state: "yan" }] } }, effects: [{ t: "move", officer: "yueyi", city: "handan", state: "zhao" }] },
 ];
 
 // Random event pool. scope: city / state. weight relative; condition optional.
@@ -317,6 +322,32 @@ export const SCENARIOS = [
     relations: { "qin:zhao": -70, "qin:han": -60, "qin:wei": -50, "qin:chu": -40, "qin:yan": -30, "qin:qi": 20, "qin:wey": 10, "zhao:yan": -30, "zhao:wei": 10, "zhao:chu": 10, "chu:wei": 10, "chu:qi": 20, "wei:qi": 10, "han:wei": 10, "yan:zhao": -30 },
     events: ["laoai_luan", "yingzheng_qinzheng", "hanfei_ruqin", "guokai_limu", "qin_han", "jingke_ci", "qin_zhao", "qin_chu", "qin_qi", "zhengguo_qu"],
     notes: ["王翦、李信、王賁生年不詳，年齡估算（待考）。", "李牧前238年約六十餘（生年不詳，待考）。", "嫪毐之亂（前238）、李園殺春申君（前238，春申君已於260劇本死亡事件）、郭開讒李牧（前229）、荊軻刺秦（前227）為史實事件鏈。", "衛僅存濮陽，為秦附庸。周、魯已亡（前256/前249/前256）。", "秦滅六國順序：韓前230、趙前228、魏前225、楚前223、燕前222、齊前221。"],
+  },
+  {
+    id: "poqi", name: "樂毅破齊", en: "Yue Yi Breaks Qi", year: -284, month: 1, scale: 0.95, troopEra: "early",
+    intro: "燕昭王黃金臺下士，用樂毅。齊湣王滅宋而驕，諸侯懼之。樂毅將燕、秦、趙、韓、魏五國兵伐齊，破之濟西，入臨淄；齊唯莒、即墨不下。田單守即墨。楚頃襄王、趙惠文王（廉頗、藺相如、趙奢）、秦昭襄王（魏冉、白起）、魏昭王（信陵君）、韓釐王、宋王偃並立。",
+    sources: ["《史記·樂毅列傳》《田單列傳》《燕召公世家》《田敬仲完世家》", "《戰國策·燕策》《齊策》", "楊寬《戰國史》"],
+    states: ["qin", "zhao", "qi", "yan", "chu", "wei", "han", "zhou", "lu", "wey"],
+    rulers: { qin: "king_zhaoxiang", zhao: "king_huiwen_zhao", qi: "king_min_qi", yan: "king_zhao_yan", chu: "king_qingxiang_chu", wei: "king_zhao_wei", han: "king_li_han", zhou: "king_nan_zhou", lu: "duke_min_lu", wey: "lord_si_wey" },
+    ownership: { xianyang: "qin", yueyang: "qin", yong: "qin", shangjun: "qin", hanzhong: "qin", shangyu: "qin", chengdu: "qin", anyi: "qin", handan: "zhao", jinyang: "zhao", dai: "zhao", wuan: "zhao", changping: "zhao", pingyang: "zhao", ye: "zhao", lingshou: "zhao", linzi: "qi", jimo: "qi", ju: "qi", pinglu: "qi", suiyang: "qi", ji: "yan", wuyang: "yan", liaodong: "yan", ying: "chu", wan: "chu", ye2: "chu", chen: "chu", shangcai: "chu", changsha: "chu", gusu: "chu", kuaiji: "chu", daliang: "wei", zhaoge: "wei", xinzheng: "han", yiyang: "han", xingyang: "han", shangdang: "han", luoyang: "zhou", qufu: "lu", puyang: "wey" },
+    cityOverrides: { linzi: { population: 380000, commerce: 88, troops: 40000 }, jimo: { troops: 15000, defense: 70 }, ju: { troops: 12000 }, ji: { troops: 35000 }, handan: { troops: 40000 }, xianyang: { troops: 50000 } },
+    placements: [
+      ["king_zhaoxiang", "xianyang", "governor", null], ["weiran", "xianyang", "advisor", null], ["baiqi", "xianyang", "general", null], ["simacuo", "xianyang", "general", null], ["weizhang", "xianyang", "general", null],
+      ["king_huiwen_zhao", "handan", "governor", null], ["lianpo", "handan", "general", null], ["linxiangru", "handan", "advisor", null], ["pingyuanjun", "handan", "advisor", null], ["zhaoshe", "handan", "general", null], ["yuesheng", "handan", "general", null],
+      ["king_min_qi", "linzi", "governor", null], ["tiandan", "jimo", "general", null], ["king_xiang_qi", "ju", "general", null], ["yongmenzhou", "linzi", "advisor", null], ["diaobo", "linzi", "advisor", null],
+      ["king_zhao_yan", "ji", "governor", null], ["yueyi", "ji", "general", null], ["guowei", "ji", "advisor", null], ["yuejian", "ji", "general", null], ["juxin", "ji", "general", null], ["qinkai", "ji", "general", null], ["lifu", "ji", "advisor", null],
+      ["king_qingxiang_chu", "ying", "governor", null], ["chunshenjun", "ying", "advisor", null], ["zhuangxin", "ying", "advisor", null], ["zhaoju", "ying", "advisor", null], ["zhuangqiao", "wan", "general", null],
+      ["king_zhao_wei", "daliang", "governor", null], ["xinlingjun", "daliang", "general", null], ["mangmao", "daliang", "general", null], ["tangju", "daliang", "advisor", null],
+      ["king_li_han", "xinzheng", "governor", null], ["baoyuan", "xinzheng", "general", null], ["zhangqian", "xinzheng", "advisor", null], ["hanmin", "xinzheng", "advisor", null],
+      ["xuejuzhou", "suiyang", "advisor", null],
+      ["king_nan_zhou", "luoyang", "governor", null], ["xiyoujun", "luoyang", "advisor", null], ["dongyoujun", "luoyang", "advisor", null], ["yanlv", "luoyang", "advisor", null],
+      ["duke_min_lu", "qufu", "governor", null], ["lezhengzi", "qufu", "advisor", null],
+      ["lord_si_wey", "puyang", "governor", null],
+    ],
+    freeOfficers: [["ganmao", "linzi"], ["luzhonglian", "linzi"], ["zouyan", "linzi"], ["zhuangzi", "suiyang"]],
+    relations: { "yan:qi": -80, "qin:qi": -20, "qin:zhao": -30, "qin:wei": -30, "qin:han": -30, "qin:chu": -30, "zhao:qi": 20, "zhao:yan": 20, "wei:qi": 10, "chu:qi": 10, "han:qi": 10, "song:qi": -30, "song:chu": -25, "song:wei": -25 },
+    events: ["poqi", "fuqi", "king_zhao_yan_death", "yueyi_benzhao"],
+    notes: ["前284年樂毅破齊：臨淄、平陸入燕，齊唯莒、即墨；前279年田單火牛陣復齊。", "燕昭王前279年卒，惠王立，樂毅奔趙（望諸君）。", "中山已於前296年為趙所滅，靈壽屬趙；宋已於前286年為齊所滅，睢陽屬齊。", "衛嗣君、韓釐王、魯湣公名諱待考。", "齊湣王死於莒（淖齒），襄王立於莒。"],
   },
 ];
 
