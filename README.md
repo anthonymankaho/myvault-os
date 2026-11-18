@@ -224,7 +224,7 @@ The Grok bot form asks for OAuth. Use client ID `momo-grok-bot`, leave the clien
 
 ## AI Group
 
-Open **AI Group** in the sidebar. It is one group thread. Tick the members you want, type in the box at the bottom, and press **Send**. Your message sits on the right. Grok, Qwen, DeepSeek, and NVIDIA reply underneath it in the same thread. A member that fails leaves a note in the thread and the others still reply. Nothing is written to the vault.
+Open **AI Group** in the sidebar, then press **New tab**. The group chat opens on its own page, the same way an accounting system opens with **New tab**. Tick the members, type at the bottom, and press **Send**. Your message sits on the right. Grok, Qwen, DeepSeek, and NVIDIA reply in that same thread. A member that fails leaves a note there, and the others still reply. Nothing is written to the vault. Sign in on MyVault OS first. The new tab uses that same GitHub session.
 
 The page does not accept or store API keys. Set them on the Worker, from `worker/`, without pasting them into chat:
 

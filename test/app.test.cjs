@@ -360,30 +360,32 @@ test("study source view is wired and links to HK Tax StudyHub", () => {
   assert.match(index, /data-icon="study"/);
 });
 
-test("AI Group view lists four providers and does not collect API keys", () => {
+test("AI Group opens in a new tab and the chat page does not collect API keys", () => {
   const w = workspace();
   assert.equal(w.run('VIEWS["ai-group"].title'), "AI Group");
   w.run("renderAiGroup()");
-  let html = w.elements.get("#view").innerHTML;
-  assert.match(html, /ai-group-thread/);
-  assert.doesNotMatch(html, /ai-group-board/);
-  assert.match(html, /Grok/);
-  assert.match(html, /Qwen/);
-  assert.match(html, /DeepSeek/);
-  assert.match(html, /NVIDIA/);
-  assert.match(html, /grok-4\.7/);
-  assert.match(html, /qwen3\.8-max/);
-  assert.match(html, /deepseek-v4-pro/);
-  assert.match(html, /nemotron-3-ultra/);
-  assert.match(html, /API keys stay on the Worker/);
-  w.run('aiGroup.thread = [{role:"user", text:"All is working now", at:"16:41"}, {role:"member", provider:"qwen", name:"Qwen", model:"qwen3.8-flash", text:"Great", ok:true, at:"16:41"}]; renderAiGroup()');
-  html = w.elements.get("#view").innerHTML;
-  assert.match(html, /All is working now/);
-  assert.match(html, /Great/);
-  assert.match(html, /ai-msg-user/);
-  assert.match(html, /ai-msg-member/);
+  const html = w.elements.get("#view").innerHTML;
+  assert.match(html, /href="systems\/ai-group\.html"/);
+  assert.match(html, /target="_blank"/);
+  assert.match(html, /rel="noopener noreferrer"/);
+  assert.match(html, /New tab/);
   assert.doesNotMatch(html, /type="password"/);
-  assert.doesNotMatch(html, /sk-/);
+  const page = fs.readFileSync(
+    require("node:path").join(__dirname, "../systems/ai-group.html"),
+    "utf8",
+  );
+  assert.match(page, /id="thread"/);
+  assert.match(page, /Grok/);
+  assert.match(page, /Qwen/);
+  assert.match(page, /DeepSeek/);
+  assert.match(page, /NVIDIA/);
+  assert.match(page, /grok-4\.7/);
+  assert.match(page, /qwen3\.8-max/);
+  assert.match(page, /deepseek-v4-pro/);
+  assert.match(page, /nemotron-3-ultra/);
+  assert.match(page, /action: "ai-group"/);
+  assert.doesNotMatch(page, /type="password"/);
+  assert.doesNotMatch(page, /sk-/);
   const index = fs.readFileSync(
     require("node:path").join(__dirname, "../index.html"),
     "utf8",

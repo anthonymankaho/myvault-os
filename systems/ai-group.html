@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>AI Group · MyVault OS</title>
+  <style>
+    :root { color-scheme: dark; --bg: #111719; --surface: #171e20; --line: #2a3436; --muted: #94a3a5; --text: #e8efec; --accent: #b9e8d1; --accent-bg: #213b32; --danger: #ffb0aa; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { display: flex; flex-direction: column; min-height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    header a { color: var(--muted); text-decoration: none; }
+    header strong { font-size: 16px; font-weight: 600; }
+    main { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; flex: 1; min-height: 0; gap: 10px; padding: 12px; }
+    .members { display: flex; flex-wrap: wrap; gap: 8px; }
+    .member { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+    .member select { max-width: 168px; border: 0; background: transparent; color: var(--muted); font: 11px/1.3 ui-monospace, monospace; }
+    #thread { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; padding: 16px 12px; border: 1px solid var(--line); border-radius: 12px; background: #0d1416; }
+    .empty { margin: auto; max-width: 420px; color: var(--muted); text-align: center; }
+    .msg { display: flex; flex-direction: column; max-width: min(560px, 86%); }
+    .mine { align-self: flex-end; align-items: flex-end; }
+    .theirs { align-self: flex-start; }
+    .name { margin: 0 10px 2px; font-size: 12px; font-weight: 650; }
+    .mine .name { color: var(--muted); }
+    .msg[data-provider="grok"] .name { color: var(--accent); }
+    .msg[data-provider="qwen"] .name { color: #f2a47e; }
+    .msg[data-provider="deepseek"] .name { color: #9ec5ff; }
+    .msg[data-provider="nvidia"] .name { color: #d7c4f2; }
+    .bubble { margin: 0; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .theirs .bubble { border: 1px solid var(--line); border-top-left-radius: 4px; background: var(--surface); }
+    .mine .bubble { border-top-right-radius: 4px; background: var(--accent-bg); }
+    .fail .bubble { color: var(--danger); }
+    .time { margin: 2px 10px 0; color: var(--muted); font-size: 10px; }
+    form { display: flex; align-items: flex-end; gap: 8px; }
+    textarea { flex: 1; min-height: 46px; max-height: 140px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; resize: vertical; }
+    button { min-height: 46px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent-bg); color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+    button:disabled, textarea:disabled { opacity: .6; cursor: default; }
+    #status { min-height: 1.2em; margin: 0 16px 10px; color: var(--muted); font-size: 12px; }
+    #status[data-kind="error"] { color: var(--danger); }
+    #status[data-kind="success"] { color: #a5cbb5; }
+    @media (max-width: 700px) { .member select { max-width: 120px; } header, main { padding-left: 10px; padding-right: 10px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="../index.html#ai-group">← MyVault OS</a>
+    <strong>AI Group</strong>
+  </header>
+  <main>
+    <div class="members" id="members" aria-label="Group members"></div>
+    <div id="thread" aria-live="polite"></div>
+    <form id="composer">
+      <label class="visually-hidden" for="message" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Message 訊息</label>
+      <textarea id="message" maxlength="4000" placeholder="Message the group 傳訊息到群組"></textarea>
+      <button type="submit">Send 送出</button>
+    </form>
+  </main>
+  <p id="status" aria-live="polite"></p>
+  <script>
+    const API = "https://myvault-api.anthonym-354.workers.dev";
+    const TOKEN_KEY = "myvault_token";
+    const PROVIDERS = [
+      { id: "grok", name: "Grok", models: ["grok-4.7"] },
+      { id: "qwen", name: "Qwen", models: ["qwen3.8-flash", "qwen3.8-max"] },
+      { id: "deepseek", name: "DeepSeek", models: ["deepseek-flash", "deepseek-v4-pro"] },
+      { id: "nvidia", name: "NVIDIA", models: ["nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia/nemotron-3-ultra-550b-a55b"] },
+    ];
+    const state = {
+      message: "",
+      selected: { grok: true, qwen: true, deepseek: true, nvidia: true },
+      models: Object.fromEntries(PROVIDERS.map((provider) => [provider.id, provider.models[0]])),
+      thread: [],
+      turn: 0,
+      asking: false,
+    };
+    const members = document.querySelector("#members");
+    const thread = document.querySelector("#thread");
+    const box = document.querySelector("#message");
+    const status = document.querySelector("#status");
+
+    function escapeHtml(value) {
+      return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    }
+    function clock(date = new Date()) {
+      return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+    }
+    function setStatus(text, kind) {
+      status.textContent = text;
+      status.dataset.kind = kind || "";
+    }
+    function render() {
+      members.innerHTML = PROVIDERS.map((provider) => `
+        <label class="member">
+          <input type="checkbox" data-toggle="${provider.id}" ${state.selected[provider.id] ? "checked" : ""} ${state.asking ? "disabled" : ""}>
+          <span>${escapeHtml(provider.name)}</span>
+          <select data-model="${provider.id}" aria-label="${escapeHtml(provider.name)} model" ${state.asking ? "disabled" : ""}>
+            ${provider.models.map((model) => `<option value="${escapeHtml(model)}" ${state.models[provider.id] === model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
+          </select>
+        </label>`).join("");
+      thread.innerHTML = state.thread.length
+        ? state.thread.map((message) => {
+          const mine = message.role === "user";
+          const failed = message.role === "member" && message.ok === false;
+          return `<article class="msg ${mine ? "mine" : "theirs"} ${failed ? "fail" : ""}" data-provider="${escapeHtml(message.provider || "you")}">
+            <p class="name">${escapeHtml(mine ? "You" : message.name)}</p>
+            <p class="bubble">${escapeHtml(message.text)}</p>
+            <p class="time">${escapeHtml(message.at || "")}${message.model ? ` · ${escapeHtml(message.model)}` : ""}</p>
+          </article>`;
+        }).join("")
+        : `<p class="empty">The group is quiet. Send a message and the selected members reply in this thread. <span lang="zh-Hant">群組還是空的。送出訊息後，已選成員會在這裡回覆。</span></p>`;
+      thread.scrollTop = thread.scrollHeight;
+      box.disabled = state.asking;
+      document.querySelector("button[type=submit]").disabled = state.asking;
+      members.querySelectorAll("[data-toggle]").forEach((input) => {
+        input.addEventListener("change", () => { state.selected[input.dataset.toggle] = input.checked; });
+      });
+      members.querySelectorAll("[data-model]").forEach((select) => {
+        select.addEventListener("change", () => { state.models[select.dataset.model] = select.value; });
+      });
+    }
+
+    async function send(event) {
+      event.preventDefault();
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        setStatus("Sign in with GitHub in MyVault OS, then return to this tab. 請先在 MyVault OS 用 GitHub 登入，再回到這個分頁。", "error");
+        return;
+      }
+      const message = state.message.trim();
+      const targets = PROVIDERS.filter((provider) => state.selected[provider.id]).map((provider) => ({ provider: provider.id, model: state.models[provider.id] }));
+      if (!message || !targets.length) {
+        setStatus("Type a message and choose at least one member. 請輸入訊息，並至少選一個成員。", "error");
+        return;
+      }
+      const turn = ++state.turn;
+      const at = clock();
+      state.thread.push({ role: "user", turn, text: message, at });
+      for (const target of targets) {
+        const provider = PROVIDERS.find((item) => item.id === target.provider);
+        state.thread.push({ role: "member", turn, provider: target.provider, name: provider.name, model: target.model, text: "…", pending: true, ok: true, at });
+      }
+      state.message = "";
+      box.value = "";
+      state.asking = true;
+      render();
+      const fill = (providerId, text, ok) => {
+        const item = state.thread.find((entry) => entry.turn === turn && entry.provider === providerId && entry.pending);
+        if (!item) return;
+        item.pending = false;
+        item.ok = ok;
+        item.text = text;
+      };
+      try {
+        const response = await fetch(API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: "ai-group", payload: { message, targets } }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "AI Group is unavailable.");
+        for (const row of body.results || []) fill(row.provider, row.ok ? row.text : row.error, Boolean(row.ok));
+        setStatus("This thread stays in this tab. Nothing was saved to the vault. 對話只在這個分頁，沒有寫入 vault。", "success");
+      } catch (error) {
+        const note = error.message || "AI Group is unavailable.";
+        for (const target of targets) fill(target.provider, note, false);
+        setStatus(note, "error");
+      } finally {
+        state.asking = false;
+        render();
+      }
+    }
+
+    box.addEventListener("input", () => { state.message = box.value; });
+    document.querySelector("#composer").addEventListener("submit", send);
+    render();
+  </script>
+</body>
+</html>
