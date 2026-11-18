@@ -1,5 +1,6 @@
 import { handleQwen, AIError, readBoundedJSON } from "./qwen.js";
 import { handleMomo } from "./momo.js";
+import { handleMcp } from "./mcp.js";
 
 const GITHUB_CONTENTS_URL =
   "https://api.github.com/repos/anthonymankaho/myvault-data/contents/vault.json";
@@ -434,6 +435,8 @@ async function handleAccountingSystem(authorization, env, origin, systemKey, pay
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === "/mcp" || url.pathname === "/mcp/") return handleMcp(request, env);
     const origin = request.headers.get("Origin");
 
     if (request.method === "OPTIONS") {

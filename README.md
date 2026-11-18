@@ -205,6 +205,16 @@ npx wrangler deploy
 
 The monthly cap is **1,000,000 tokens** (`XAI_MONTHLY_TOKEN_QUOTA`), stored in the existing `QWEN_USAGE` KV under `momo-usage:{login}:{YYYY-MM}`, separate from the Qwen counter.
 
+## Grok bot MCP
+
+The phone and iPad Grok bot reaches MyVault through a separate MCP endpoint:
+
+`https://myvault-api.anthonym-354.workers.dev/mcp`
+
+The connector uses a bearer token stored as the Worker secret `MYVAULT_MCP_TOKEN`. The token is not in this repository. Tools are `list_monthly_tasks`, `complete_monthly_task`, and `reopen_monthly_task`. A completion requires `completed_at` at the Hong Kong time you stated. The Worker writes `vault.json` with `MYVAULT_DATA_TOKEN` and does not return chat notes.
+
+In the Grok account that owns MOMO, open [grok.com/connectors](https://grok.com/connectors), choose **New Connector**, then **Custom**, and enter that URL. Put the bearer token in the connector authentication field.
+
 ### Processing status · 處理狀態 (2026-11-18)
 
 - Local only. The live GitHub Pages site and the Worker do not have MOMO until `XAI_API_KEY` is set and both the Worker and this frontend are deployed.
