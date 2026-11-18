@@ -45,6 +45,11 @@ body {
 .game-cover { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr); min-height: 360px; overflow: hidden; border: 1px solid #273c42; border-radius: 18px; background: linear-gradient(130deg, #132126, #17201f 62%, #1e2922); box-shadow: 0 24px 70px #05090a55; }
 .game-cover-art { position: relative; min-height: 360px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #f4a56c 0, #d66c56 14%, #4c3652 39%, #1a2635 67%, #10181e 100%); }
 .game-cover-art::before { position: absolute; inset: 0; content: ""; background: linear-gradient(180deg, transparent 45%, #111719 100%); }
+.game-cover-art.ws-art { background: radial-gradient(ellipse at 42% 30%, #3a3418 0, #232a1c 34%, #16201b 62%, #0e1412 100%); }
+.game-cover-art.ws-art .ws-seal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -54%); font-family: "Noto Serif TC", "PMingLiU", Georgia, serif; font-size: clamp(64px, 9vw, 120px); font-weight: 700; letter-spacing: .1em; color: #e6c65a; text-shadow: 0 6px 40px #c9a22755; writing-mode: vertical-rl; }
+.game-cover-art.ws-art .ws-rivers { position: absolute; inset: 0; background:
+  linear-gradient(100deg, transparent 46%, #3a6a8a33 47%, #3a6a8a33 49%, transparent 50%),
+  linear-gradient(80deg, transparent 62%, #3a6a8a2b 63%, #3a6a8a2b 66%, transparent 67%); }
 .game-sun { position: absolute; top: 16%; left: 50%; width: 112px; aspect-ratio: 1; border-radius: 50%; transform: translateX(-50%); background: linear-gradient(#ffd0a0, #f29173); box-shadow: 0 0 75px #f38c6880; }
 .game-horizon { position: absolute; right: -20%; bottom: 22%; left: -20%; height: 38%; border-radius: 50% 50% 0 0; background: linear-gradient(180deg, #243b46, #111719); }
 .game-track { position: absolute; bottom: -42%; left: 50%; width: 92%; height: 85%; border: 38px solid #252b32; border-radius: 50%; transform: translateX(-50%) perspective(150px) rotateX(55deg); box-shadow: 0 0 0 3px #df806e, 0 0 40px #f2876a45; }

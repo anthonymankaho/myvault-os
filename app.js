@@ -514,6 +514,14 @@ function setNeonApexFullscreen(active) {
   document.body.classList.toggle("game-viewport-lock", active);
 }
 
+let warringStatesFrame = null;
+let warringStatesArea = null;
+
+function setWarringStatesFullscreen(active) {
+  warringStatesArea?.classList.toggle("game-play-fill", active);
+  document.body.classList.toggle("game-viewport-lock", active);
+}
+
 let accountingArea = null;
 
 function setAccountingFullscreen(active) {
@@ -523,6 +531,7 @@ function setAccountingFullscreen(active) {
 
 function render() {
   if (state.view !== "games") setNeonApexFullscreen(false);
+  if (state.view !== "games") setWarringStatesFullscreen(false);
   if (state.view !== "accounting") setAccountingFullscreen(false);
   document.body.classList.toggle("constellation-home", state.view === "home");
   document.querySelector(".skip-link")?.setAttribute("href", state.view === "home" ? "#orbit-main" : "#main");
@@ -776,7 +785,25 @@ function renderGames() {
         <div class="game-play-heading"><div><p class="eyebrow">NOW PLAYING</p><h2>Neon Apex</h2></div><button class="button button-quiet" id="close-neon-apex" type="button">Back to Games</button></div>
         <iframe class="game-frame" id="neon-apex-frame" title="Neon Apex 3D racing game" loading="lazy" allow="fullscreen; autoplay" allowfullscreen referrerpolicy="no-referrer"></iframe>
       </div>
-      <p class="game-library-note">Games are separate from your synced vault records. Your best lap is saved only in this browser.</p>
+      <div class="game-cover">
+        <div class="game-cover-art ws-art" aria-hidden="true">
+          <div class="ws-seal">戰國</div>
+          <div class="ws-rivers"></div>
+          <div class="game-cover-tag">MYVAULT STRATEGY <b>02</b></div>
+        </div>
+        <div class="game-cover-copy">
+          <p class="eyebrow">GRAND STRATEGY / 春秋戰國</p>
+          <h2>春秋戰國 Warring States</h2>
+          <p>Turn-based grand strategy across five historical scenarios (506–238 BC). Govern cities, command officers and six troop types, weave diplomacy and fight calculated battles — then unify the realm. An original engine inspired by the strategy philosophy of classic historical simulators; no copyrighted assets.</p>
+          <div class="game-facts"><span>5 scenarios</span><span>40 cities</span><span>6 troop types</span><span>Save slots</span></div>
+          <div class="game-actions"><button class="button button-primary" id="launch-warring-states" type="button">Start a campaign <span aria-hidden="true">↗</span></button><a class="button button-quiet" href="games/warring-states.html" target="_blank" rel="noopener">Open standalone ↗</a></div>
+        </div>
+      </div>
+      <div class="game-play-area" id="ws-play-area" hidden>
+        <div class="game-play-heading"><div><p class="eyebrow">NOW PLAYING</p><h2>春秋戰國 Warring States</h2></div><button class="button button-quiet" id="close-warring-states" type="button">Back to Games</button></div>
+        <iframe class="game-frame" id="warring-states-frame" title="春秋戰國 Warring States strategy game" loading="lazy" allow="fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>
+      </div>
+      <p class="game-library-note">Games are separate from your synced vault records. Game progress is saved only in this browser.</p>
     </section>`;
   const area = viewContainer.querySelector("#game-play-area");
   const frame = viewContainer.querySelector("#neon-apex-frame");
@@ -791,6 +818,20 @@ function renderGames() {
     setNeonApexFullscreen(false);
     frame.src = "about:blank";
     area.hidden = true;
+  });
+  const wsArea = viewContainer.querySelector("#ws-play-area");
+  const wsFrame = viewContainer.querySelector("#warring-states-frame");
+  warringStatesArea = wsArea;
+  warringStatesFrame = wsFrame;
+  viewContainer.querySelector("#launch-warring-states").addEventListener("click", () => {
+    wsFrame.src = "games/warring-states.html?v=ws-1";
+    wsArea.hidden = false;
+    wsArea.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  viewContainer.querySelector("#close-warring-states").addEventListener("click", () => {
+    setWarringStatesFullscreen(false);
+    wsFrame.src = "about:blank";
+    wsArea.hidden = true;
   });
 }
 
@@ -2342,6 +2383,18 @@ function buildConstellationModel() {
     safeMeta: "Arcade racer",
     safeDescription: "The built-in arcade racer — three maps, a fair grid, draft, drift, boost and local best laps.",
   });
+  nodes.push({
+    key: "games:warring-states",
+    id: "warring-states",
+    kind: "games",
+    name: "春秋戰國 Warring States",
+    meta: "Grand strategy",
+    description: "Turn-based grand strategy across five historical scenarios (506–238 BC) — cities, officers, six troop types, diplomacy, calculated battles and unification.",
+    links: [],
+    safeName: "春秋戰國 Warring States",
+    safeMeta: "Grand strategy",
+    safeDescription: "Turn-based grand strategy across five historical scenarios (506–238 BC) — cities, officers, six troop types, diplomacy, calculated battles and unification.",
+  });
   const aliases = new Map();
   nodes.forEach((node, index) => {
     const values = [node.name, constellationAlias(node.name)];
@@ -2868,6 +2921,16 @@ window.addEventListener("message", (event) => {
       event.data.action === "fullscreen"
     ) {
       setNeonApexFullscreen(Boolean(event.data.active));
+    }
+    return;
+  }
+  if (event.data?.type === "myvault-warring-states") {
+    if (
+      warringStatesFrame &&
+      event.source === warringStatesFrame.contentWindow &&
+      event.data.action === "fullscreen"
+    ) {
+      setWarringStatesFullscreen(Boolean(event.data.active));
     }
     return;
   }
