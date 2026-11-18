@@ -215,12 +215,27 @@ The phone and iPad Grok bot reaches MyVault through a separate MCP endpoint:
 
 The connector uses a bearer token stored as the Worker secret `MYVAULT_MCP_TOKEN`. The token is not in this repository. Tools are `list_monthly_tasks`, `complete_monthly_task`, and `reopen_monthly_task`. A completion requires `completed_at` at the Hong Kong time you stated. The Worker writes `vault.json` with `MYVAULT_DATA_TOKEN` and does not return chat notes.
 
-In the Grok account that owns MOMO, open [grok.com/connectors](https://grok.com/connectors), choose **New Connector**, then **Custom**, and enter that URL. Put the bearer token in the connector authentication field.
+The Grok bot form asks for OAuth. Use client ID `momo-grok-bot`, leave the client secret empty, and keep token authentication on **none (PKCE)**. Authorization endpoint: `https://myvault-api.anthonym-354.workers.dev/oauth/authorize`. Token endpoint: `https://myvault-api.anthonym-354.workers.dev/oauth/token`. Scope: `tasks`. The browser page then asks for the connector password in `worker/.mcp-connector.txt`. Do not paste that password into the token endpoint.
 
 ### Processing status · 處理狀態 (2026-11-18)
 
-- Local only. The live GitHub Pages site and the Worker do not have MOMO until `XAI_API_KEY` is set and both the Worker and this frontend are deployed.
-- Verified: `node --test test/app.test.cjs test/qwen.test.mjs test/momo.test.mjs` (55 passed) and `npx vitest run test/momo.spec.js test/qwen.spec.js` (37 passed). A local browser check opened Ask MOMO, saved Weekly Exchange Report with completion time 16 Nov 09:16 HKT, reopened the edit dialog with that time intact, and checked the panel at 390px width. No page errors. The live Grok call was not run.
+- Ask MOMO on the website is deployed. It still needs the Worker secret `XAI_API_KEY` before it can call Grok. The phone connector does not use that key.
+- The phone connector uses OAuth on the Worker. The connector password stays in `worker/.mcp-connector.txt` and is not committed.
+
+## AI Group
+
+Open **AI Group** in the sidebar. Type one question, tick the models you want, and press **Ask selected**. Grok, Qwen, DeepSeek, and NVIDIA answer in the same box. A provider that is not configured, or that fails, leaves the other answers in place. Nothing is written to the vault.
+
+The page does not accept or store API keys. Set them on the Worker, from `worker/`, without pasting them into chat:
+
+```
+npx wrangler secret put XAI_API_KEY
+npx wrangler secret put DASHSCOPE_API_KEY
+npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put NVIDIA_API_KEY
+```
+
+Model menus are fixed: `grok-4.7`, `qwen3.8-flash`, `qwen3.8-max`, `deepseek-flash`, `deepseek-v4-pro`, `nvidia/nemotron-3.5-lightning-30b-a3b`, and `nvidia/nemotron-3-ultra-550b-a55b`. The monthly cap is 1,000,000 tokens in `QWEN_USAGE` under `ai-group-usage:{login}:{YYYY-MM}`, separate from Ask Qwen and Ask MOMO.
 
 ## Monthly Task
 

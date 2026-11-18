@@ -329,7 +329,7 @@ export async function handleMcp(request, env) {
 			status: 401,
 			headers: {
 				"Content-Type": "application/json; charset=utf-8",
-				"WWW-Authenticate": 'Bearer realm="myvault"',
+				"WWW-Authenticate": `Bearer realm="myvault", resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource"`,
 				"Cache-Control": "no-store",
 			},
 		});

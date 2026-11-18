@@ -1,6 +1,8 @@
 import { handleQwen, AIError, readBoundedJSON } from "./qwen.js";
 import { handleMomo } from "./momo.js";
 import { handleMcp } from "./mcp.js";
+import { handleOAuth } from "./oauth.js";
+import { handleAiGroup } from "./ai-group.js";
 
 const GITHUB_CONTENTS_URL =
   "https://api.github.com/repos/anthonymankaho/myvault-data/contents/vault.json";
@@ -436,7 +438,15 @@ async function handleAccountingSystem(authorization, env, origin, systemKey, pay
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/mcp" || url.pathname === "/mcp/") return handleMcp(request, env);
+    if (
+      url.pathname === "/mcp" ||
+      url.pathname === "/mcp/" ||
+      url.pathname.startsWith("/oauth/") ||
+      url.pathname.startsWith("/.well-known/oauth-")
+    ) {
+      if (url.pathname === "/mcp" || url.pathname === "/mcp/") return handleMcp(request, env);
+      return handleOAuth(request, env);
+    }
     const origin = request.headers.get("Origin");
 
     if (request.method === "OPTIONS") {
@@ -465,10 +475,11 @@ export default {
 
     switch (body.action) {
       case 'momo':
-      case 'qwen': {
+      case 'qwen':
+      case 'ai-group': {
         if (origin && !ALLOWED_ORIGINS.has(origin)) return errorResponse('Origin is not allowed.', 403, origin);
         try {
-          const reply = await (body.action === 'momo' ? handleMomo : handleQwen)(payload, request.headers.get('Authorization'), env);
+          const reply = await (body.action === 'momo' ? handleMomo : body.action === 'ai-group' ? handleAiGroup : handleQwen)(payload, request.headers.get('Authorization'), env);
           return new Response(JSON.stringify(reply), {
             headers: { ...corsHeaders(origin), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
           });
@@ -476,7 +487,7 @@ export default {
           const known = error instanceof AIError;
           return new Response(
             JSON.stringify({
-              error: known ? error.message : body.action === 'momo' ? 'MOMO is temporarily unavailable.' : 'Qwen is temporarily unavailable.',
+              error: known ? error.message : body.action === 'momo' ? 'MOMO is temporarily unavailable.' : body.action === 'ai-group' ? 'AI Group is temporarily unavailable.' : 'Qwen is temporarily unavailable.',
               code: known ? error.code : 'AI_UNAVAILABLE',
             }),
             {

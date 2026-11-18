@@ -16,6 +16,8 @@
     "XAI_MODEL": "grok-4.7",
     "XAI_MONTHLY_TOKEN_QUOTA": "1000000"
   },
+  // Secrets, never put in this file: XAI_API_KEY, DASHSCOPE_API_KEY,
+  // DEEPSEEK_API_KEY, NVIDIA_API_KEY. Set each with npx wrangler secret put.
   // XAI_API_KEY is a Worker secret (npx wrangler secret put XAI_API_KEY).
   // Never put it in this file. MOMO token counts use the QWEN_USAGE KV
   // under the key prefix momo-usage:, separate from the Qwen counter.
