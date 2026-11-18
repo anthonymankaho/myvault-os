@@ -384,6 +384,10 @@ test("AI Group opens in a new tab and the chat page does not collect API keys", 
   assert.match(page, /deepseek-v4-pro/);
   assert.match(page, /nemotron-3-ultra/);
   assert.match(page, /action: "ai-group"/);
+  assert.match(page, /id="file"/);
+  assert.match(page, /type="file"/);
+  assert.match(page, /multiple/);
+  assert.match(page, /attachments/);
   assert.doesNotMatch(page, /type="password"/);
   assert.doesNotMatch(page, /sk-/);
   const index = fs.readFileSync(

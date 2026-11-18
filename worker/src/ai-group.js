@@ -30,6 +30,11 @@ export const AI_GROUP_PROVIDERS = {
 };
 
 const MAX_MESSAGE = 4000;
+const MAX_FILES = 8;
+const MAX_FILE_TEXT = 20000;
+const MAX_FILE_BUDGET = 80000;
+const MAX_IMAGES = 4;
+const MAX_IMAGE = 1_600_000;
 const MAX_REPLY = 12000;
 const MAX_TOKENS = 1024;
 const CALL_MS = 22000;
@@ -76,10 +81,55 @@ function endpoint(provider, env) {
 	return parsed.href;
 }
 
+function cleanName(name) {
+	const cleaned = String(name || "file").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 180);
+	return cleaned || "file";
+}
+
+function validateAttachments(raw) {
+	if (raw == null) return [];
+	if (!Array.isArray(raw) || raw.length > MAX_FILES) throw new AIError("Attach at most 8 files.", 400, "AI_INVALID_REQUEST");
+	let budget = 0;
+	let images = 0;
+	return raw.map((file) => {
+		const name = cleanName(file?.name);
+		if (file?.kind === "text" || file?.kind === "note") {
+			const text = typeof file.text === "string" ? file.text : "";
+			if (text.length > MAX_FILE_TEXT) throw new AIError("One file is too long. Keep each text file under 20,000 characters.", 400, "AI_INVALID_REQUEST");
+			budget += text.length;
+			if (budget > MAX_FILE_BUDGET) throw new AIError("The attached files are too large together.", 400, "AI_INVALID_REQUEST");
+			return { name, kind: file.kind, text };
+		}
+		if (file?.kind === "image") {
+			images += 1;
+			const image = typeof file.image === "string" ? file.image : "";
+			if (images > MAX_IMAGES || image.length > MAX_IMAGE || !/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/.test(image))
+				throw new AIError("An image could not be attached. Use PNG, JPEG, GIF, or WebP under 1.5 MB.", 400, "AI_INVALID_REQUEST");
+			return { name, kind: "image", image };
+		}
+		throw new AIError("A file could not be read.", 400, "AI_INVALID_REQUEST");
+	});
+}
+
+function composeMessage(message, files) {
+	const blocks = [];
+	if (message) blocks.push(message);
+	for (const file of files) {
+		if (file.kind === "image") blocks.push(`[Image: ${file.name}]`);
+		else if (file.kind === "note") blocks.push(`[File: ${file.name}] ${file.text}`);
+		else blocks.push(`[File: ${file.name}]\n${file.text}`);
+	}
+	const text = blocks.join("\n\n");
+	const images = files.filter((file) => file.kind === "image");
+	if (!images.length) return text;
+	return [{ type: "text", text }, ...images.map((file) => ({ type: "image_url", image_url: { url: file.image } }))];
+}
+
 function validatePayload(payload) {
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new AIError("The question could not be read.", 400, "AI_INVALID_REQUEST");
 	const message = typeof payload.message === "string" ? payload.message.trim() : "";
-	if (!message || message.length > MAX_MESSAGE) throw new AIError("Type a question of at most 4,000 characters.", 400, "AI_INVALID_REQUEST");
+	const attachments = validateAttachments(payload.attachments);
+	if ((!message && !attachments.length) || message.length > MAX_MESSAGE) throw new AIError("Type a message of at most 4,000 characters, or attach a file.", 400, "AI_INVALID_REQUEST");
 	if (!Array.isArray(payload.targets) || payload.targets.length < 1 || payload.targets.length > 4)
 		throw new AIError("Choose one to four models.", 400, "AI_INVALID_REQUEST");
 	const seen = new Set();
@@ -91,7 +141,7 @@ function validatePayload(payload) {
 		seen.add(id);
 		return { provider: id, model: target.model };
 	});
-	return { message, targets };
+	return { message, attachments, targets };
 }
 
 async function githubLogin(authorization) {
@@ -134,7 +184,7 @@ function answerText(data) {
 	return text.trim().slice(0, MAX_REPLY);
 }
 
-async function callProvider(target, message, env) {
+async function callProvider(target, content, env) {
 	const spec = AI_GROUP_PROVIDERS[target.provider];
 	const key = env[spec.secret];
 	const url = endpoint(target.provider, env);
@@ -152,7 +202,7 @@ async function callProvider(target, message, env) {
 				model: target.model,
 				messages: [
 					{ role: "system", content: SYSTEM },
-					{ role: "user", content: message },
+					{ role: "user", content },
 				],
 				max_tokens: MAX_TOKENS,
 				temperature: 0.3,
@@ -190,7 +240,8 @@ export async function handleAiGroup(payload, authorization, env) {
 		if (used >= limit) throw new AIError("The monthly AI Group token quota is spent. It resets on the first day of next month.", 429, "AI_QUOTA", 3600);
 	}
 
-	const results = await Promise.all(input.targets.map((target) => callProvider(target, input.message, env)));
+	const content = composeMessage(input.message, input.attachments);
+	const results = await Promise.all(input.targets.map((target) => callProvider(target, content, env)));
 	const spent = results.reduce((sum, result) => sum + (result.tokens || 0), 0);
 	if (kv && spent > 0) await kv.put(key, String(used + spent));
 	return {

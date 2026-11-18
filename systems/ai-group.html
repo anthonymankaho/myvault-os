@@ -33,9 +33,18 @@
     .mine .bubble { border-top-right-radius: 4px; background: var(--accent-bg); }
     .fail .bubble { color: var(--danger); }
     .time { margin: 2px 10px 0; color: var(--muted); font-size: 10px; }
-    form { display: flex; align-items: flex-end; gap: 8px; }
+    form { display: flex; flex-direction: column; gap: 8px; }
+    .composer-row { display: flex; align-items: flex-end; gap: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips:empty { display: none; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 12px; }
+    .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .chip button { min-height: 28px; padding: 0 8px; background: transparent; color: var(--muted); }
+    .attach { position: relative; display: inline-flex; align-items: center; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font-weight: 650; cursor: pointer; }
+    .attach input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+    .attach:has(input:disabled) { opacity: .6; cursor: default; }
     textarea { flex: 1; min-height: 46px; max-height: 140px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; resize: vertical; }
-    button { min-height: 46px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent-bg); color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+    button[type="submit"] { min-height: 46px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent-bg); color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
     button:disabled, textarea:disabled { opacity: .6; cursor: default; }
     #status { min-height: 1.2em; margin: 0 16px 10px; color: var(--muted); font-size: 12px; }
     #status[data-kind="error"] { color: var(--danger); }
@@ -52,9 +61,16 @@
     <div class="members" id="members" aria-label="Group members"></div>
     <div id="thread" aria-live="polite"></div>
     <form id="composer">
-      <label class="visually-hidden" for="message" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Message 訊息</label>
-      <textarea id="message" maxlength="4000" placeholder="Message the group 傳訊息到群組"></textarea>
-      <button type="submit">Send 送出</button>
+      <div id="chips" class="chips" aria-label="Attached files 附件"></div>
+      <div class="composer-row">
+        <label class="attach">
+          Attach 附件
+          <input id="file" type="file" multiple aria-label="Attach files 附加檔案">
+        </label>
+        <label class="visually-hidden" for="message" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Message 訊息</label>
+        <textarea id="message" maxlength="4000" placeholder="Message the group 傳訊息到群組"></textarea>
+        <button type="submit">Send 送出</button>
+      </div>
     </form>
   </main>
   <p id="status" aria-live="polite"></p>
@@ -67,8 +83,15 @@
       { id: "deepseek", name: "DeepSeek", models: ["deepseek-flash", "deepseek-v4-pro"] },
       { id: "nvidia", name: "NVIDIA", models: ["nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia/nemotron-3-ultra-550b-a55b"] },
     ];
+    const MAX_FILES = 8;
+    const MAX_TEXT = 20000;
+    const MAX_TEXT_BUDGET = 80000;
+    const MAX_IMAGES = 4;
+    const MAX_IMAGE_CHARS = 1400000;
     const state = {
       message: "",
+      files: [],
+      fileSeq: 0,
       selected: { grok: true, qwen: true, deepseek: true, nvidia: true },
       models: Object.fromEntries(PROVIDERS.map((provider) => [provider.id, provider.models[0]])),
       thread: [],
@@ -77,6 +100,8 @@
     };
     const members = document.querySelector("#members");
     const thread = document.querySelector("#thread");
+    const chips = document.querySelector("#chips");
+    const fileInput = document.querySelector("#file");
     const box = document.querySelector("#message");
     const status = document.querySelector("#status");
 
@@ -109,9 +134,21 @@
             <p class="time">${escapeHtml(message.at || "")}${message.model ? ` · ${escapeHtml(message.model)}` : ""}</p>
           </article>`;
         }).join("")
-        : `<p class="empty">The group is quiet. Send a message and the selected members reply in this thread. <span lang="zh-Hant">群組還是空的。送出訊息後，已選成員會在這裡回覆。</span></p>`;
+        : `<p class="empty">The group is quiet. Send a message or attach a file. Selected members reply in this thread. <span lang="zh-Hant">群組還是空的。送出訊息或附加檔案後，已選成員會在這裡回覆。</span></p>`;
       thread.scrollTop = thread.scrollHeight;
+      chips.innerHTML = state.files.map((file) => `
+        <span class="chip">
+          <span>${escapeHtml(file.name)}</span>
+          <button type="button" data-remove="${file.id}" aria-label="Remove ${escapeHtml(file.name)} 移除" ${state.asking ? "disabled" : ""}>×</button>
+        </span>`).join("");
+      chips.querySelectorAll("[data-remove]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.files = state.files.filter((file) => String(file.id) !== button.dataset.remove);
+          render();
+        });
+      });
       box.disabled = state.asking;
+      fileInput.disabled = state.asking;
       document.querySelector("button[type=submit]").disabled = state.asking;
       members.querySelectorAll("[data-toggle]").forEach((input) => {
         input.addEventListener("change", () => { state.selected[input.dataset.toggle] = input.checked; });
@@ -129,19 +166,24 @@
         return;
       }
       const message = state.message.trim();
+      const attachments = state.files.map((file) => (
+        file.kind === "image" ? { name: file.name, kind: "image", image: file.image } : { name: file.name, kind: file.kind, text: file.text }
+      ));
       const targets = PROVIDERS.filter((provider) => state.selected[provider.id]).map((provider) => ({ provider: provider.id, model: state.models[provider.id] }));
-      if (!message || !targets.length) {
-        setStatus("Type a message and choose at least one member. 請輸入訊息，並至少選一個成員。", "error");
+      if ((!message && !attachments.length) || !targets.length) {
+        setStatus("Type a message or attach a file, and choose at least one member. 請輸入訊息或附加檔案，並至少選一個成員。", "error");
         return;
       }
       const turn = ++state.turn;
       const at = clock();
-      state.thread.push({ role: "user", turn, text: message, at });
+      const names = state.files.map((file) => (file.kind === "image" ? `[Image: ${file.name}]` : `[File: ${file.name}]`)).join("\n");
+      state.thread.push({ role: "user", turn, text: [message, names].filter(Boolean).join("\n\n"), at });
       for (const target of targets) {
         const provider = PROVIDERS.find((item) => item.id === target.provider);
         state.thread.push({ role: "member", turn, provider: target.provider, name: provider.name, model: target.model, text: "…", pending: true, ok: true, at });
       }
       state.message = "";
+      state.files = [];
       box.value = "";
       state.asking = true;
       render();
@@ -156,7 +198,7 @@
         const response = await fetch(API, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ action: "ai-group", payload: { message, targets } }),
+          body: JSON.stringify({ action: "ai-group", payload: { message, targets, attachments } }),
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "AI Group is unavailable.");
@@ -172,6 +214,69 @@
       }
     }
 
+    function readDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("A file could not be read. 有一個檔案讀不到。"));
+        reader.readAsDataURL(file);
+      });
+    }
+    function looksBinary(text) {
+      if (text.includes("\u0000")) return true;
+      let bad = 0;
+      for (const char of text.slice(0, 4000)) if (char === "\uFFFD") bad += 1;
+      return bad > 8;
+    }
+    async function readAttachment(file) {
+      const name = file.name || "file";
+      const imageType = file.type === "image/jpg" ? "image/jpeg" : file.type;
+      if (["image/png", "image/jpeg", "image/gif", "image/webp"].includes(imageType)) {
+        const images = state.files.filter((item) => item.kind === "image");
+        if (images.length >= MAX_IMAGES) throw new Error("Attach at most 4 images. 最多 4 張圖片。");
+        if (file.size > 1000000) throw new Error("Keep each image under 1 MB. 每張圖片請小於 1 MB。");
+        let image = await readDataUrl(file);
+        image = image.replace(/^data:image\/jpg;/i, "data:image/jpeg;");
+        const used = images.reduce((sum, item) => sum + item.image.length, 0);
+        if (!image.startsWith(`data:${imageType};base64,`) || image.length > 1600000 || used + image.length > MAX_IMAGE_CHARS)
+          throw new Error("Keep images as PNG, JPEG, GIF, or WebP, together under about 1 MB. 圖片請用 PNG、JPEG、GIF 或 WebP，合計約 1 MB 以內。");
+        return { name, kind: "image", image };
+      }
+      if (file.size > 1500000) return { name, kind: "note", text: `${file.type || "file"}, ${file.size} bytes` };
+      const raw = await file.text();
+      if (looksBinary(raw)) return { name, kind: "note", text: `${file.type || "file"}, ${file.size} bytes` };
+      const budget = state.files.reduce((sum, item) => sum + (item.text ? item.text.length : 0), 0);
+      if (budget >= MAX_TEXT_BUDGET) throw new Error("The attached text is too large together. 附加文字合計太大。");
+      const text = raw.slice(0, Math.min(MAX_TEXT, MAX_TEXT_BUDGET - budget));
+      return { name, kind: "text", text, shortened: text.length < raw.length };
+    }
+    fileInput.addEventListener("change", async () => {
+      const picked = [...fileInput.files];
+      fileInput.value = "";
+      if (!picked.length || state.asking) return;
+      const problems = [];
+      let shortened = false;
+      let namedOnly = false;
+      for (const file of picked) {
+        if (state.files.length >= MAX_FILES) {
+          problems.push("Attach at most 8 files. 最多 8 個檔案。");
+          break;
+        }
+        try {
+          const item = await readAttachment(file);
+          shortened = shortened || item.shortened;
+          namedOnly = namedOnly || item.kind === "note";
+          state.files.push({ id: ++state.fileSeq, name: item.name, kind: item.kind, text: item.text, image: item.image });
+        } catch (error) {
+          problems.push(error.message || "A file could not be read. 有一個檔案讀不到。");
+        }
+      }
+      render();
+      if (problems.length) setStatus(problems[0], "error");
+      else if (namedOnly) setStatus("Text and PNG, JPEG, GIF, and WebP are sent to the models. Other files are sent by name and size only. Nothing is saved to the vault. 文字和 PNG、JPEG、GIF、WebP 會送給模型。其他檔案只送名稱和大小。沒有寫入 vault。", "");
+      else if (shortened) setStatus("Long text was shortened to 20,000 characters. 過長文字已截到 20,000 字。", "");
+      else setStatus("Files stay in this tab until you send them. 檔案只留在這個分頁，送出前不會寫入 vault。", "success");
+    });
     box.addEventListener("input", () => { state.message = box.value; });
     document.querySelector("#composer").addEventListener("submit", send);
     render();

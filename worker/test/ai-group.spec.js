@@ -100,6 +100,52 @@ describe('AI Group', () => {
 		expect(body.results[1]).toMatchObject({ ok: true, text: 'qwen ok' });
 	});
 
+	it('sends a text file with the question', async () => {
+		const mock = vi.fn(async (url) => (String(url).includes('github.com') ? Response.json({ login: 'anthonymankaho' }) : completion('saw the file')));
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({
+			message: '',
+			attachments: [{ name: 'notes.txt', kind: 'text', text: 'invoice 42' }],
+			targets: targets.slice(0, 1),
+		}), ENV);
+		expect(response.status).toBe(200);
+		const grok = mock.mock.calls.find((call) => String(call[0]).includes('x.ai'));
+		const content = JSON.parse(grok[1].body).messages[1].content;
+		expect(content).toContain('[File: notes.txt]');
+		expect(content).toContain('invoice 42');
+	});
+
+	it('sends an image as a picture part', async () => {
+		const mock = vi.fn(async (url) => (String(url).includes('github.com') ? Response.json({ login: 'anthonymankaho' }) : completion('saw the picture')));
+		vi.stubGlobal('fetch', mock);
+		const image = 'data:image/png;base64,iVBORw0KGgo=';
+		const response = await worker.fetch(request({
+			message: 'What is this?',
+			attachments: [{ name: 'shot.png', kind: 'image', image }],
+			targets: targets.slice(0, 1),
+		}), ENV);
+		expect(response.status).toBe(200);
+		const grok = mock.mock.calls.find((call) => String(call[0]).includes('x.ai'));
+		const content = JSON.parse(grok[1].body).messages[1].content;
+		expect(content[0].text).toContain('[Image: shot.png]');
+		expect(content[1]).toEqual({ type: 'image_url', image_url: { url: image } });
+	});
+
+	it('rejects more than 8 files and a bad image', async () => {
+		const mock = vi.fn();
+		vi.stubGlobal('fetch', mock);
+		const many = Array.from({ length: 9 }, (_, index) => ({ name: `f${index}.txt`, kind: 'text', text: 'a' }));
+		const tooMany = await worker.fetch(request({ message: 'Hello', attachments: many, targets: targets.slice(0, 1) }), ENV);
+		expect(tooMany.status).toBe(400);
+		const badImage = await worker.fetch(request({
+			message: 'Hello',
+			attachments: [{ name: 'x.bin', kind: 'image', image: 'data:image/svg+xml;base64,AAAA' }],
+			targets: targets.slice(0, 1),
+		}), ENV);
+		expect(badImage.status).toBe(400);
+		expect(mock).not.toHaveBeenCalled();
+	});
+
 	it('stops when the monthly quota is spent', async () => {
 		const mock = vi.fn(async () => Response.json({ login: 'anthonymankaho' }));
 		vi.stubGlobal('fetch', mock);
