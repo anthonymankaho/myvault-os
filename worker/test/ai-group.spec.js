@@ -175,6 +175,33 @@ describe('AI Group', () => {
 		expect(nvidia).not.toContain('nvidia-said-this');
 	});
 
+	it('speaks one by one and passes each reply to the next member', async () => {
+		const mock = vi.fn(async (url, init) => {
+			if (String(url).includes('github.com')) return Response.json({ login: 'anthonymankaho' });
+			const model = JSON.parse(init.body).model;
+			const text = model.includes('deepseek') ? 'deepseek-turn' : model.includes('qwen') ? 'qwen-turn' : 'nvidia-turn';
+			return completion(text);
+		});
+		vi.stubGlobal('fetch', mock);
+		const response = await worker.fetch(request({
+			message: 'Go',
+			targets: [
+				{ provider: 'deepseek', model: 'deepseek-flash' },
+				{ provider: 'qwen', model: 'qwen3.8-max' },
+				{ provider: 'nvidia', model: 'nvidia/nemotron-3.5-lightning-30b-a3b' },
+			],
+		}), ENV);
+		expect(response.status).toBe(200);
+		const providers = mock.mock.calls.map((call) => String(call[0])).filter((url) => !url.includes('github.com'));
+		expect(providers.map((url) => (url.includes('deepseek') ? 'deepseek' : url.includes('qwen') ? 'qwen' : 'nvidia'))).toEqual(['deepseek', 'qwen', 'nvidia']);
+		const bodyOf = (host) => JSON.parse(mock.mock.calls.find((call) => String(call[0]).includes(host))[1].body).messages[1].content;
+		expect(bodyOf('deepseek')).not.toContain('qwen-turn');
+		expect(bodyOf('qwen')).toContain('DeepSeek: deepseek-turn');
+		expect(bodyOf('qwen')).not.toContain('qwen-turn');
+		expect(bodyOf('nvidia')).toContain('Qwen: qwen-turn');
+		expect(bodyOf('nvidia')).toContain('DeepSeek: deepseek-turn');
+	});
+
 	it('rejects a group thread that is too long', async () => {
 		const mock = vi.fn();
 		vi.stubGlobal('fetch', mock);

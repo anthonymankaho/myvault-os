@@ -14,8 +14,11 @@
     header a { color: var(--muted); text-decoration: none; }
     header strong { font-size: 16px; font-weight: 600; }
     main { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; flex: 1; min-height: 0; gap: 10px; padding: 12px; }
+    .roster { display: flex; flex-direction: column; gap: 8px; }
     .members { display: flex; flex-wrap: wrap; gap: 8px; }
     .member { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+    .order { min-width: 1.1em; color: var(--accent); font-size: 12px; font-weight: 700; }
+    .policy { margin: 0; color: var(--muted); font-size: 12px; }
     .member select { max-width: 168px; border: 0; background: transparent; color: var(--muted); font: 11px/1.3 ui-monospace, monospace; }
     #thread { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; padding: 16px 12px; border: 1px solid var(--line); border-radius: 12px; background: #0d1416; }
     .empty { margin: auto; max-width: 420px; color: var(--muted); text-align: center; }
@@ -58,7 +61,10 @@
     <strong>AI Group</strong>
   </header>
   <main>
-    <div class="members" id="members" aria-label="Group members"></div>
+    <div class="roster">
+      <div class="members" id="members" aria-label="Group members"></div>
+      <p id="policy" class="policy">One by one. Ticked members speak from left to right. Each member reads the thread and the replies already spoken, then speaks. A member who cannot answer is skipped. <span lang="zh-Hant">逐個發言。已勾選的成員由左至右發言。每位成員先讀對話和已說出的回覆，再發言。答不到的成員會跳過。</span></p>
+    </div>
     <div id="thread" aria-live="polite"></div>
     <form id="composer">
       <div id="chips" class="chips" aria-label="Attached files 附件"></div>
@@ -116,14 +122,19 @@
       status.dataset.kind = kind || "";
     }
     function render() {
-      members.innerHTML = PROVIDERS.map((provider) => `
+      let place = 0;
+      members.innerHTML = PROVIDERS.map((provider) => {
+        const order = state.selected[provider.id] ? ++place : 0;
+        return `
         <label class="member">
           <input type="checkbox" data-toggle="${provider.id}" ${state.selected[provider.id] ? "checked" : ""} ${state.asking ? "disabled" : ""}>
+          ${order ? `<span class="order">${order}</span>` : ""}
           <span>${escapeHtml(provider.name)}</span>
           <select data-model="${provider.id}" aria-label="${escapeHtml(provider.name)} model" ${state.asking ? "disabled" : ""}>
             ${provider.models.map((model) => `<option value="${escapeHtml(model)}" ${state.models[provider.id] === model ? "selected" : ""}>${escapeHtml(model)}</option>`).join("")}
           </select>
-        </label>`).join("");
+        </label>`;
+      }).join("");
       thread.innerHTML = state.thread.length
         ? state.thread.map((message) => {
           const mine = message.role === "user";
@@ -134,7 +145,7 @@
             <p class="time">${escapeHtml(message.at || "")}${message.model ? ` · ${escapeHtml(message.model)}` : ""}</p>
           </article>`;
         }).join("")
-        : `<p class="empty">The group is quiet. Send a message or attach a file. Selected members reply in this thread. <span lang="zh-Hant">群組還是空的。送出訊息或附加檔案後，已選成員會在這裡回覆。</span></p>`;
+        : `<p class="empty">The group is quiet. Send a message or attach a file. Ticked members speak one by one. <span lang="zh-Hant">群組還是空的。送出訊息或附加檔案後，已勾選的成員會逐個發言。</span></p>`;
       thread.scrollTop = thread.scrollHeight;
       chips.innerHTML = state.files.map((file) => `
         <span class="chip">
@@ -151,7 +162,10 @@
       fileInput.disabled = state.asking;
       document.querySelector("button[type=submit]").disabled = state.asking;
       members.querySelectorAll("[data-toggle]").forEach((input) => {
-        input.addEventListener("change", () => { state.selected[input.dataset.toggle] = input.checked; });
+        input.addEventListener("change", () => {
+          state.selected[input.dataset.toggle] = input.checked;
+          render();
+        });
       });
       members.querySelectorAll("[data-model]").forEach((select) => {
         select.addEventListener("change", () => { state.models[select.dataset.model] = select.value; });
@@ -196,34 +210,30 @@
         item.text = text;
       };
       try {
-        const first = await askGroup(token, message, targets, attachments, history);
-        let results = first.results || [];
-        let shared = true;
-        const peers = results
-          .filter((row) => row.ok && row.text)
-          .map((row) => ({ name: PROVIDERS.find((provider) => provider.id === row.provider)?.name, text: clipText(row.text), fresh: true }))
-          .filter((row) => row.name && row.text);
-        if (peers.length >= 2) {
-          const peerTargets = targets.filter((target) => peers.some((peer) => peer.name === PROVIDERS.find((provider) => provider.id === target.provider)?.name));
-          try {
-            const second = await askGroup(token, message, peerTargets, attachments, packHistory(history, peers));
-            const revised = new Map((second.results || []).map((row) => [row.provider, row]));
-            results = results.map((row) => revised.get(row.provider) || row);
-          } catch {
-            shared = false;
+      const spoken = [];
+      let stopped = "";
+      for (let index = 0; index < targets.length; index += 1) {
+        const target = targets[index];
+        const provider = PROVIDERS.find((item) => item.id === target.provider);
+        setStatus(`${provider.name} is speaking (${index + 1}/${targets.length}). ${provider.name} 正在發言。`);
+        try {
+          const body = await askGroup(token, message, [target], attachments, packHistory(history, spoken));
+          const row = (body.results || [])[0];
+          if (!row) throw new Error("AI Group is unavailable.");
+          fill(target.provider, row.ok ? row.text : row.error, Boolean(row.ok));
+          if (row.ok && row.text) spoken.push({ name: provider.name, text: clipText(row.text), fresh: true });
+        } catch (error) {
+          const note = error.message || "AI Group is unavailable.";
+          fill(target.provider, note, false);
+          if (/Sign in|cannot use AI Group|quota/i.test(note)) {
+            stopped = note;
+            for (const later of targets.slice(index + 1)) fill(later.provider, note, false);
+            break;
           }
         }
-        for (const row of results) fill(row.provider, row.ok ? row.text : row.error, Boolean(row.ok));
-        setStatus(
-          shared
-            ? "Members can read the other replies in this thread. Nothing was saved to the vault. 成員可以讀到這個對話裡其他人的回覆。沒有寫入 vault。"
-            : "The first replies are shown. A member could not read the others this time. 已顯示第一次回覆。有成員這次讀不到其他人的回覆。",
-          shared ? "success" : "error",
-        );
-      } catch (error) {
-        const note = error.message || "AI Group is unavailable.";
-        for (const target of targets) fill(target.provider, note, false);
-        setStatus(note, "error");
+        render();
+      }
+      setStatus(stopped || "They spoke one by one. Nothing was saved to the vault. 已逐個發言。沒有寫入 vault。", stopped ? "error" : "success");
       } finally {
         state.asking = false;
         render();
