@@ -185,7 +185,10 @@
       const attachments = state.files.map((file) => (
         file.kind === "image" ? { name: file.name, kind: "image", image: file.image } : { name: file.name, kind: file.kind, text: file.text }
       ));
-      const targets = PROVIDERS.filter((provider) => state.selected[provider.id]).map((provider) => ({ provider: provider.id, model: state.models[provider.id] }));
+      const mentioned = mentionedProviders(message);
+      const targets = PROVIDERS
+        .filter((provider) => mentioned.length ? mentioned.includes(provider.id) : state.selected[provider.id])
+        .map((provider) => ({ provider: provider.id, model: state.models[provider.id] }));
       if ((!message && !attachments.length) || !targets.length) {
         setStatus("Type a message or attach a file, and choose at least one member. 請輸入訊息或附加檔案，並至少選一個成員。", "error");
         return;
@@ -240,6 +243,16 @@
         state.asking = false;
         render();
       }
+    }
+
+    function mentionedProviders(message) {
+      const aliases = new Map(PROVIDERS.map((provider) => [provider.name.toLowerCase(), provider.id]));
+      const found = new Set();
+      for (const match of message.matchAll(/(?:^|\s)@([\w-]+)/g)) {
+        const providerId = aliases.get(match[1].toLowerCase());
+        if (providerId) found.add(providerId);
+      }
+      return [...found];
     }
 
     function clipText(text) {
