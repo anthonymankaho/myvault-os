@@ -44,18 +44,22 @@ function groupBySection(nodes) {
   })).filter((group) => group.members.length > 0);
 }
 
-// World-space position of one orbiting star. Tilt rotates the orbital plane
-// gently around X so each system reads as its own tilted disc.
+// World-space position of one orbiting star. Each system has its own orbital
+// inclination and ascending node so the galaxy reads in three dimensions.
 export function starOrbitPosition(system, star, angle, out, offset) {
-  const x = Math.cos(angle) * star.orbitRadius;
+  const flatX = Math.cos(angle) * star.orbitRadius;
   const flatZ = Math.sin(angle) * star.orbitRadius;
-  const sinT = Math.sin(system.tilt);
-  const cosT = Math.cos(system.tilt);
-  out[offset] = system.center.x + x;
-  out[offset + 1] =
-    system.center.y - flatZ * sinT + star.yOffset * cosT;
-  out[offset + 2] =
-    system.center.z + flatZ * cosT + star.yOffset * sinT;
+  const inclination = star.inclination ?? system.tilt;
+  const sinT = Math.sin(inclination);
+  const cosT = Math.cos(inclination);
+  const y = -flatZ * sinT + star.yOffset * cosT;
+  const z = flatZ * cosT + star.yOffset * sinT;
+  const node = star.node ?? system.node ?? 0;
+  const sinN = Math.sin(node);
+  const cosN = Math.cos(node);
+  out[offset] = system.center.x + flatX * cosN + z * sinN;
+  out[offset + 1] = system.center.y + y;
+  out[offset + 2] = system.center.z - flatX * sinN + z * cosN;
   return out;
 }
 
@@ -64,22 +68,31 @@ export function layoutSolarSystems(nodes) {
   const golden = 2.399111111149431;
   const systems = groups.map((group, slot) => {
     const angle = slot * golden + 0.55;
-    const spread = 30 + slot * 15.5;
+    // Fibonacci-sphere placement distributes systems in depth as well as
+    // across the screen, avoiding a flat and crowded belt in the default view.
+    const vertical = 1 - (2 * (slot + 0.5)) / groups.length;
+    const horizontal = Math.sqrt(Math.max(0, 1 - vertical * vertical));
+    const spread = groups.length > 1 ? 112 : 0;
     const center = {
-      x: Math.cos(angle) * spread,
-      y: (hash01(group.kind, 7) - 0.5) * 13,
-      z: Math.sin(angle) * spread,
+      x: Math.cos(angle) * horizontal * spread,
+      y: vertical * spread * 0.72 + (hash01(group.kind, 7) - 0.5) * 8,
+      z: Math.sin(angle) * horizontal * spread,
     };
     const count = group.members.length;
     const shells = count <= 6 ? 1 : count <= 18 ? 2 : 3;
     const baseRadius = 8.5 + Math.sqrt(count) * 2.0;
-    const tilt = (hash01(group.kind, 8) - 0.5) * 0.55;
+    // Broader inclinations keep the system discs from reading as one flat plane.
+    const tilt = (hash01(group.kind, 8) - 0.5) * 1.25;
+    const node = hash01(group.kind, 15) * Math.PI * 2;
     const stars = group.members.map(({ node, index }, slot2) => {
       const shell = slot2 % shells;
       const seed = node.key ?? `${group.kind}:${index}`;
       return {
         index,
         shell,
+        inclination:
+          tilt + (shell - (shells - 1) / 2) * 0.24 + (hash01(seed, 16) - 0.5) * 0.26,
+        node: node + shell * 0.34 + (hash01(seed, 17) - 0.5) * 0.9,
         orbitRadius:
           baseRadius * (0.6 + shell * 0.4) + (hash01(seed, 9) - 0.5) * 1.7,
         angle: 0,
@@ -106,7 +119,7 @@ export function layoutSolarSystems(nodes) {
       });
     }
     const radius = baseRadius * (0.6 + (shells - 1) * 0.4) + 3.4;
-    return { kind: group.kind, center, radius, tilt, shells, baseRadius, stars, count };
+    return { kind: group.kind, center, radius, tilt, node, shells, baseRadius, stars, count };
   });
 
   const positions = new Float32Array(nodes.length * 3);

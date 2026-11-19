@@ -5,7 +5,7 @@ import {
   hash01,
   layoutSolarSystems,
   starOrbitPosition,
-} from "./constellation-systems.mjs?v=6";
+} from "./constellation-systems.mjs?v=9";
 
 const FOV = 46;
 const DEG = Math.PI / 180;
@@ -225,14 +225,14 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     disposables.push(geometry, material);
     return material;
   }
-  const skyFar = backgroundLayer(900, 380, 900, 1.5, 0x93a7c9, 0.5);
-  const skyNear = backgroundLayer(420, 200, 380, 2.1, 0xc9d8ee, 0.42);
+  const skyFar = backgroundLayer(1100, 380, 900, 1.25, 0xa9bed7, 0.34);
+  const skyNear = backgroundLayer(520, 200, 380, 1.7, 0xd7e6f3, 0.28);
 
   const nebulae = nebulaTextures.map((texture, index) => {
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      opacity: 0.13,
+      opacity: 0.09,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -250,12 +250,12 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
   const sunGeometry = new THREE.SphereGeometry(2.7, 48, 48);
   disposables.push(sunGeometry);
   const sunUniforms = [];
+  const orbitTracks = new Map();
   const systemObjects = systems.map((system) => {
     const meta = SECTION_META[system.kind];
     const color = new THREE.Color(meta.sun);
     const group = new THREE.Group();
     group.position.set(system.center.x, system.center.y, system.center.z);
-    group.rotation.x = system.tilt;
 
     const uniforms = { uTime: { value: 0 }, uColor: { value: color } };
     sunUniforms.push(uniforms);
@@ -293,34 +293,36 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
       map: coronaTexture,
       color,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.44,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
     const corona = new THREE.Sprite(coronaMaterial);
-    corona.scale.set(24, 24, 1);
+    corona.scale.set(14, 14, 1);
     group.add(corona);
     disposables.push(coronaMaterial);
 
-    const light = new THREE.PointLight(color, 260, system.radius * 6, 2);
+    const light = new THREE.PointLight(color, 105, system.radius * 6, 2);
     group.add(light);
 
-    const ringMaterial = new THREE.LineBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.16,
-      blending: THREE.AdditiveBlending,
+    system.stars.forEach((star) => {
+      const geometry = makeOrbitGeometry(star.orbitRadius, 96);
+      const trackMaterial = new THREE.LineBasicMaterial({
+        color: SECTION_META[system.kind].star,
+        transparent: true,
+        opacity: 0.075,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const orbit = new THREE.LineLoop(geometry, trackMaterial);
+      orbit.rotation.x = star.inclination;
+      orbit.rotation.y = star.node;
+      group.add(orbit);
+      orbitTracks.set(star.index, orbit);
+      disposables.push(geometry, trackMaterial);
     });
-    disposables.push(ringMaterial);
-    const ringGeometries = [];
-    for (let shell = 0; shell < system.shells; shell += 1) {
-      const geometry = makeOrbitGeometry(system.baseRadius * (0.6 + shell * 0.4));
-      ringGeometries.push(geometry);
-      disposables.push(geometry);
-      group.add(new THREE.LineLoop(geometry, ringMaterial));
-    }
     graph.add(group);
-    return { system, group, corona, coronaMaterial, ringGeometries };
+    return { system, group, corona, coronaMaterial };
   });
 
   // ---- item stars (one Points cloud, positions animated per frame) ----
@@ -347,7 +349,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
   const nodeMaterial = new THREE.ShaderMaterial({
     uniforms: {
       uPixels: { value: 400 },
-      uScale: { value: 7.6 },
+      uScale: { value: 2.7 },
       uTime: { value: 0 },
       uGlow: { value: 1 },
     },
@@ -374,10 +376,10 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
         float d = length(gl_PointCoord - 0.5) * 2.0;
         if (d > 1.0) discard;
         float twinkle = 0.88 + 0.12 * sin(uTime * 1.6 + vPhase * 6.2831);
-        float core = smoothstep(0.62, 0.0, d);
-        float halo = pow(1.0 - d, 2.6);
-        vec3 col = vColor * (0.5 + core * 1.3) * uGlow * twinkle + vec3(core * 0.5);
-        float alpha = min(1.0, (core * 0.98 + halo * 0.5) * uGlow);
+        float core = 1.0 - smoothstep(0.02, 0.24, d);
+        float halo = exp(-d * 7.0);
+        vec3 col = vColor * (0.28 + core * 0.82) * uGlow * twinkle + vec3(core * 0.28);
+        float alpha = min(0.96, (core * 0.88 + halo * 0.16) * uGlow);
         gl_FragColor = vec4(col, alpha);
       }`,
     vertexColors: true,
@@ -479,6 +481,12 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     .sort((a, b) => b.score - a.score)
     .slice(0, 20);
 
+  function highlightOrbit(index = selectedIndex) {
+    orbitTracks.forEach((orbit, starIndex) => {
+      orbit.material.opacity = starIndex === index ? 0.48 : 0.075;
+    });
+  }
+
   function syncButtons() {
     const stateByAction = { labels: showLabels, signals, motion, rotate: spin };
     Object.entries(stateByAction).forEach(([action, active]) => {
@@ -533,6 +541,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     cameraState.targetGoal.set(0, 0, 0);
     cameraState.targetDistance = baseDistance;
     selectedIndex = -1;
+    highlightOrbit(-1);
     selectionRing.visible = false;
     selectionText.textContent = "No selection";
     detail.hidden = true;
@@ -556,6 +565,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     const node = nodes[index];
     if (!node) return;
     selectedIndex = index;
+    highlightOrbit(index);
     spin = false;
     syncButtons();
     selectionText.textContent = node.name;
@@ -571,6 +581,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
       <button type="button" class="constellation-open-record">${virtual ? `Open ${meta.label} ↗` : "Open in MyVault"}</button>`;
     detail.querySelector(".constellation-detail-close").addEventListener("click", () => {
       selectedIndex = -1;
+      highlightOrbit(-1);
       selectionRing.visible = false;
       selectionText.textContent = "No selection";
       detail.hidden = true;
@@ -718,7 +729,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
     });
     if (edges.length) linePositionAttribute.needsUpdate = true;
     lines.visible = signals;
-    lineMaterial.opacity = signals && !reducedMotion ? 0.26 + Math.sin(time * 1.8) * 0.09 : 0.24;
+    lineMaterial.opacity = signals && !reducedMotion ? 0.15 + Math.sin(time * 1.8) * 0.035 : 0.14;
 
     if (selectedIndex >= 0) {
       selectionRing.visible = true;
@@ -737,7 +748,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
         sprite.material.rotation = time * 0.008 * (index % 2 ? 1 : -1);
       });
       systemObjects.forEach(({ corona }, index) => {
-        const pulse = 24 + Math.sin(time * 1.3 + index * 1.7) * 1.6;
+        const pulse = 14 + Math.sin(time * 1.3 + index * 1.7) * 0.7;
         corona.scale.set(pulse, pulse, 1);
       });
     }
@@ -886,6 +897,7 @@ export function createMyVaultConstellation({ container, nodes, edges, onOpen }) 
       resultsHost.hidden = true;
       detail.hidden = true;
       selectedIndex = -1;
+      highlightOrbit(-1);
       selectionRing.visible = false;
       selectionText.textContent = "No selection";
     }

@@ -2509,7 +2509,7 @@ async function updateConstellationBackground() {
   const request = ++constellationRequest;
   const model = buildConstellationModel();
   try {
-    const { createMyVaultConstellation } = await import("./constellation.mjs?v=6");
+    const { createMyVaultConstellation } = await import("./constellation.mjs?v=9");
     if (request !== constellationRequest) return;
     const constellation = createMyVaultConstellation({
       container,
