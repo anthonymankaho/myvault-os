@@ -83,7 +83,7 @@ export function layoutSolarSystems(nodes) {
     const baseRadius = 8.5 + Math.sqrt(count) * 2.0;
     // Broader inclinations keep the system discs from reading as one flat plane.
     const tilt = (hash01(group.kind, 8) - 0.5) * 1.25;
-    const node = hash01(group.kind, 15) * Math.PI * 2;
+    const ascendingNode = hash01(group.kind, 15) * Math.PI * 2;
     const stars = group.members.map(({ node, index }, slot2) => {
       const shell = slot2 % shells;
       const seed = node.key ?? `${group.kind}:${index}`;
@@ -92,7 +92,7 @@ export function layoutSolarSystems(nodes) {
         shell,
         inclination:
           tilt + (shell - (shells - 1) / 2) * 0.24 + (hash01(seed, 16) - 0.5) * 0.26,
-        node: node + shell * 0.34 + (hash01(seed, 17) - 0.5) * 0.9,
+        node: ascendingNode + shell * 0.34 + (hash01(seed, 17) - 0.5) * 0.9,
         orbitRadius:
           baseRadius * (0.6 + shell * 0.4) + (hash01(seed, 9) - 0.5) * 1.7,
         angle: 0,
@@ -119,7 +119,7 @@ export function layoutSolarSystems(nodes) {
       });
     }
     const radius = baseRadius * (0.6 + (shells - 1) * 0.4) + 3.4;
-    return { kind: group.kind, center, radius, tilt, node, shells, baseRadius, stars, count };
+    return { kind: group.kind, center, radius, tilt, node: ascendingNode, shells, baseRadius, stars, count };
   });
 
   const positions = new Float32Array(nodes.length * 3);

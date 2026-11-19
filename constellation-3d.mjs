@@ -5,7 +5,7 @@ import {
   hash01,
   layoutSolarSystems,
   starOrbitPosition,
-} from "./constellation-systems.mjs?v=9";
+} from "./constellation-systems.mjs?v=10";
 
 const FOV = 46;
 const DEG = Math.PI / 180;
