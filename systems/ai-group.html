@@ -92,6 +92,8 @@
     const MAX_FILES = 8;
     const MAX_TEXT = 20000;
     const MAX_TEXT_BUDGET = 80000;
+    const MAX_PDF_BYTES = 15000000;
+    const MAX_PDF_PAGES = 200;
     const MAX_IMAGES = 4;
     const MAX_IMAGE_CHARS = 1400000;
     const state = {
@@ -293,6 +295,16 @@
           throw new Error("Keep images as PNG, JPEG, GIF, or WebP, together under about 1 MB. 圖片請用 PNG、JPEG、GIF 或 WebP，合計約 1 MB 以內。");
         return { name, kind: "image", image };
       }
+      if (imageType === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
+        if (file.size > MAX_PDF_BYTES) throw new Error("Keep each PDF under 15 MB. 每份 PDF 請小於 15 MB。");
+        const { extractPdfText } = await import("./ai-group-pdf.mjs?v=1");
+        const extracted = await extractPdfText(file, { maxChars: MAX_TEXT, maxPages: MAX_PDF_PAGES });
+        if (!extracted.text.trim()) throw new Error("No selectable text was found in this PDF. Scanned/image-only PDFs need OCR. 這份 PDF 沒有可擷取的文字；掃描圖片版 PDF 需要 OCR。");
+        const budget = state.files.reduce((sum, item) => sum + (item.text ? item.text.length : 0), 0);
+        if (budget >= MAX_TEXT_BUDGET) throw new Error("The attached text is too large together. 附件文字合計超過上限。");
+        const text = extracted.text.slice(0, Math.min(MAX_TEXT, MAX_TEXT_BUDGET - budget));
+        return { name, kind: "text", text, shortened: extracted.truncated || text.length < extracted.text.length, pdfPages: extracted.pages };
+      }
       if (file.size > 1500000) return { name, kind: "note", text: `${file.type || "file"}, ${file.size} bytes` };
       const raw = await file.text();
       if (looksBinary(raw)) return { name, kind: "note", text: `${file.type || "file"}, ${file.size} bytes` };
@@ -306,6 +318,7 @@
       fileInput.value = "";
       if (!picked.length || state.asking) return;
       const problems = [];
+      const pdfSummaries = [];
       let shortened = false;
       let namedOnly = false;
       for (const file of picked) {
@@ -316,6 +329,7 @@
         try {
           const item = await readAttachment(file);
           shortened = shortened || item.shortened;
+          if (item.pdfPages) pdfSummaries.push(`${item.name}: ${item.pdfPages} pages, ${item.text.length.toLocaleString()} characters extracted`);
           namedOnly = namedOnly || item.kind === "note";
           state.files.push({ id: ++state.fileSeq, name: item.name, kind: item.kind, text: item.text, image: item.image });
         } catch (error) {
@@ -324,6 +338,7 @@
       }
       render();
       if (problems.length) setStatus(problems[0], "error");
+      else if (pdfSummaries.length) setStatus(`${pdfSummaries.join("; ")}. PDF text extracted and ready to send. Scanned/image-only PDFs need OCR.`, "success");
       else if (namedOnly) setStatus("Text and PNG, JPEG, GIF, and WebP are sent to the models. Other files are sent by name and size only. Nothing is saved to the vault. 文字和 PNG、JPEG、GIF、WebP 會送給模型。其他檔案只送名稱和大小。沒有寫入 vault。", "");
       else if (shortened) setStatus("Long text was shortened to 20,000 characters. 過長文字已截到 20,000 字。", "");
       else setStatus("Files stay in this tab until you send them. 檔案只留在這個分頁，送出前不會寫入 vault。", "success");
