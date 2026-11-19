@@ -63,7 +63,7 @@
   <main>
     <div class="roster">
       <div class="members" id="members" aria-label="Group members"></div>
-      <p id="policy" class="policy">One by one. Ticked members speak from left to right. Each member reads the thread and the replies already spoken, then speaks. A member who cannot answer is skipped. <span lang="zh-Hant">逐個發言。已勾選的成員由左至右發言。每位成員先讀對話和已說出的回覆，再發言。答不到的成員會跳過。</span></p>
+      <p id="policy" class="policy">Members take turns in a rotating order. Keep each reply under 100 words and use: Agree/disagree (reason), Suggestion, Open question (or None). Disagree with a specific point and offer an alternative. Roles rotate: proposer, challenger, completeness checker, summarizer. Every third round, the facilitator records the shared view, unresolved points, decision log, and one testable next action. <span lang="zh-Hant">成員輪流發言，每輪輪換順序。每次回覆不超過 100 字，並使用：同意／不同意（原因）、建議、待釐清問題（或「無」）。不同意時請指出具體觀點並提出替代方案。角色輪換：提議者、質疑者、完整性檢查者、摘要者。每三輪由主持人記錄共識、未解決事項、決定紀錄及一項可驗證的下一步。</span></p>
     </div>
     <div id="thread" aria-live="polite"></div>
     <form id="composer">
@@ -186,13 +186,27 @@
         file.kind === "image" ? { name: file.name, kind: "image", image: file.image } : { name: file.name, kind: file.kind, text: file.text }
       ));
       const mentioned = mentionedProviders(message);
-      const targets = PROVIDERS
+      const selectedTargets = PROVIDERS
         .filter((provider) => mentioned.length ? mentioned.includes(provider.id) : state.selected[provider.id])
         .map((provider) => ({ provider: provider.id, model: state.models[provider.id] }));
-      if ((!message && !attachments.length) || !targets.length) {
+      if ((!message && !attachments.length) || !selectedTargets.length) {
         setStatus("Type a message or attach a file, and choose at least one member. 請輸入訊息或附加檔案，並至少選一個成員。", "error");
         return;
       }
+      const round = state.turn + 1;
+      const roles = ["proposer", "challenger", "completeness checker", "summarizer"];
+      const facilitatorIndex = (round - 1) % selectedTargets.length;
+      const facilitator = selectedTargets[facilitatorIndex];
+      const speakingOrder = [...selectedTargets.slice(facilitatorIndex + 1), ...selectedTargets.slice(0, facilitatorIndex + 1)];
+      const targets = speakingOrder.map((target) => ({
+        ...target,
+        discussion: {
+          round,
+          role: roles[(round - 1 + PROVIDERS.findIndex((provider) => provider.id === target.provider)) % roles.length],
+          facilitator: target.provider === facilitator.provider,
+          summaryDue: round % 3 === 0,
+        },
+      }));
       const history = priorHistory();
       const turn = ++state.turn;
       const at = clock();
@@ -274,7 +288,7 @@
       const response = await fetch(API, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: "ai-group", payload: { message, targets, attachments, history } }),
+        body: JSON.stringify({ action: "ai-group", payload: { message, targets: targets.map(({ provider, model }) => ({ provider, model })), discussion: targets[0].discussion || null, attachments, history } }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "AI Group is unavailable.");
