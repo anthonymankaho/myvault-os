@@ -1,10 +1,11 @@
-const CACHE_NAME = "neon-apex-offline-v2";
+const CACHE_NAME = "neon-apex-offline-v3";
 const GAME_URL = new URL("./neon-apex.html", self.registration.scope).href;
 const APP_FILES = [
   "./neon-apex.html",
   "./neon-apex-input.mjs",
   "./neon-apex-tracks.mjs",
   "./neon-apex-race.mjs",
+  "./neon-apex-drive.mjs",
   "./vendor/three.module.js",
   "./manifest.webmanifest",
   "./icons/neon-apex-180.png",
